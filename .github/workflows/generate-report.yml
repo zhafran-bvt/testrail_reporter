@@ -19,6 +19,13 @@ on:
 jobs:
   report:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,10 +63,20 @@ jobs:
         run: |
           python testrail_daily_report.py ${{ steps.build_args.outputs.args }}
 
-      - name: Upload report artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: testrail-report
-          path: out/*.html
-          if-no-files-found: error
+      - name: Select latest HTML and set as index
+        id: pick
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=$(ls -1t out/*.html | head -n 1)
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          cp "$FILE" out/index.html
 
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
