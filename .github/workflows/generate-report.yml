@@ -3,10 +3,6 @@ name: Generate Report
 on:
   workflow_dispatch:
     inputs:
-      project:
-        description: 'TestRail Project ID'
-        required: true
-        type: number
       plan:
         description: 'TestRail Plan ID (optional if using run)'
         required: false
@@ -46,7 +42,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ARGS=("--project" "${{ github.event.inputs.project }}")
+          # Project is fixed to 1
+          ARGS=("--project" "1")
           if [ -n "${{ github.event.inputs.plan }}" ]; then
             ARGS+=("--plan" "${{ github.event.inputs.plan }}")
           fi
