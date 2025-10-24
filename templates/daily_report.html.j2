@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ report_title }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
+    h1 { margin-bottom: 8px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #ddd; padding: 6px; font-size: 13px; vertical-align: top; word-break: break-word; }
+    th { background: #f4f4f4; }
+    .pill { padding: 2px 6px; border-radius: 10px; font-size: 12px; }
+    .ok { background: #d1fae5; }
+    .fail { background: #fee2e2; }
+    .donut { width: 160px; height: 160px; border-radius: 50%; position: relative; }
+    .donut::after { content: ""; position: absolute; inset: 32px; background: #fff; border-radius: 50%; }
+    .pagination { display:flex; align-items:center; gap:8px; margin:8px 0; flex-wrap:wrap; }
+    .pagination button { padding: 4px 8px; border: 1px solid #ccc; background:#fff; cursor:pointer; border-radius:4px; }
+    .pagination button[disabled] { opacity: 0.5; cursor: not-allowed; }
+    .muted { color:#666; font-size:12px; }
+  </style>
+</head>
+<body>
+  <h1>{{ report_title }}</h1>
+  <p><b>Generated:</b> {{ generated_at }}</p>
+  <p>
+    <b>Project:</b>
+    {% if base_url and project_id %}
+      <a href="{{ base_url }}/index.php?/projects/overview/{{ project_id }}" target="_blank" rel="noopener">{{ project_name }}</a>
+    {% else %}
+      {{ project_name }}
+    {% endif %}
+    {% if plan_name and plan_id %}
+      | <b>Plan:</b> <a href="{{ base_url }}/index.php?/plans/view/{{ plan_id }}" target="_blank" rel="noopener">{{ plan_name }}</a>
+    {% endif %}
+  </p>
+
+  <div class="card">
+    <h3>Project Status</h3>
+    <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+      <div class="donut" style="background: {{ donut_style }}"></div>
+      <div>
+        {% if donut_legend and donut_legend|length > 0 %}
+          {% for seg in donut_legend %}
+            <div style="display:flex; align-items:center; gap:8px; margin:4px 0;">
+              <span style="display:inline-block; width:12px; height:12px; background: {{ seg.color }}; border-radius:2px;"></span>
+              <span>{{ seg.label }}: {{ seg.count }} ({{ seg.percent }}%)</span>
+            </div>
+          {% endfor %}
+        {% else %}
+          <span>No data</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Summary</h3>
+    <p>Total: {{ summary.total }} | Passed: {{ summary.Passed }} | Failed: {{ summary.Failed }} | Pass Rate: {{ summary.pass_rate }}%</p>
+  </div>
+
+  {% for t in tables %}
+  <div class="card run-card" id="run-{{ t.run_id }}" data-run-id="{{ t.run_id }}">
+    <h3>Run #{{ t.run_id }}{% if t.run_name %} - {{ t.run_name }}{% endif %}</h3>
+    <p>
+      Pass Rate: {{ t.pass_rate }}% |
+      Passed: {{ t.counts['Passed'] | default(0) }} |
+      Untested: {{ t.counts['Untested'] | default(0) }} |
+      Failed: {{ t.counts['Failed'] | default(0) }} |
+      Blocked: {{ t.counts['Blocked'] | default(0) }} |
+      Obsolete: {{ t.counts['Obsolete'] | default(0) }} |
+      Retest: {{ t.counts['Retest'] | default(0) }}
+    </p>
+    <div class="pagination" data-run-id="{{ t.run_id }}" style="display:none;">
+      <button class="prev" data-run-id="{{ t.run_id }}">Prev</button>
+      <span class="page-info" data-run-id="{{ t.run_id }}"></span>
+      <button class="next" data-run-id="{{ t.run_id }}">Next</button>
+      <span class="muted">(showing 25 per page)</span>
+    </div>
+    <table>
+      <colgroup>
+        <col style="width:7%" />
+        <col style="width:45%" />
+        <col style="width:8%" />
+        <col style="width:25%" />
+        <col style="width:7%" />
+        <col style="width:8%" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>ID</th><th>Title</th><th>Status</th><th>Assignee</th><th>Refs</th><th>Priority</th>
+        </tr>
+      </thead>
+      <tbody id="rows-{{ t.run_id }}">
+        {% for r in t.rows %}
+        <tr>
+          <td>{{ r.test_id }}</td>
+          <td>{{ r.title }}</td>
+          <td>
+            {% if r.status_name == 'Passed' %}
+              <span class="pill ok">Passed</span>
+            {% elif r.status_name == 'Failed' %}
+              <span class="pill fail">Failed</span>
+            {% else %}
+              {{ r.status_name }}
+            {% endif %}
+          </td>
+          <td>{{ r.assignee or '' }}</td>
+          <td>
+            {% if r.refs %}
+              {% set refs = (r.refs|string).split(',') %}
+              {% for ref in refs %}
+                {% set ref_trim = ref.strip() %}
+                {% if ref_trim %}
+                  <a href="{{ jira_base }}{{ ref_trim }}" target="_blank" rel="noopener">{{ ref_trim }}</a>{% if not loop.last %}, {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          </td>
+          <td>{{ r.priority or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+  <script>
+    (function(){
+      const PAGE_SIZE = 25;
+      function setupRun(runId){
+        const tbody = document.getElementById('rows-' + runId);
+        if(!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const total = rows.length;
+        if(total <= PAGE_SIZE) return; // no pagination needed
+        let page = 1;
+        const totalPages = Math.ceil(total / PAGE_SIZE);
+        const card = document.getElementById('run-' + runId);
+        const pager = card.querySelector('.pagination');
+        const prevBtn = pager.querySelector('.prev');
+        const nextBtn = pager.querySelector('.next');
+        const info = pager.querySelector('.page-info');
+        pager.style.display = 'flex';
+
+        function render(){
+          const start = (page - 1) * PAGE_SIZE;
+          const end = start + PAGE_SIZE;
+          rows.forEach((tr, idx) => {
+            tr.style.display = (idx >= start && idx < end) ? '' : 'none';
+          });
+          info.textContent = `Page ${page} of ${totalPages}`;
+          prevBtn.disabled = (page === 1);
+          nextBtn.disabled = (page === totalPages);
+        }
+        prevBtn.addEventListener('click', () => { if(page>1){ page--; render(); } });
+        nextBtn.addEventListener('click', () => { if(page<totalPages){ page++; render(); } });
+        render();
+      }
+
+      document.addEventListener('DOMContentLoaded', function(){
+        document.querySelectorAll('.run-card').forEach(card => {
+          setupRun(card.getAttribute('data-run-id'));
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
