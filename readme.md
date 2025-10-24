@@ -93,8 +93,9 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 ## CI/CD and Automation
 - GitHub Actions
   - CI: `.github/workflows/ci.yml` — installs deps, compiles, and checks CLI help.
-  - Generate Report: `.github/workflows/generate-report.yml` — manual trigger with Plan or Run; fixed `--project 1`.
-  - Netlify deploy: Requires secrets `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` to publish `out/` (latest report is copied to `out/index.html`). Also uploads the HTML as an artifact and posts the Netlify URLs in the job summary.
+  - Deploy: `.github/workflows/deploy.yml` — manual trigger that deploys backend first, then frontend:
+    - Backend (Render): triggers a deploy via Render API and waits for it to be live. Requires repo secrets `RENDER_API_KEY` and `RENDER_SERVICE_ID`.
+    - Frontend (Netlify): generates the report (Plan or Run; `--project 1`), copies the latest file to `out/index.html`, and deploys `out/` to Netlify. Requires `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` secrets, plus TestRail secrets (`TESTRAIL_BASE_URL`, `TESTRAIL_USER`, `TESTRAIL_API_KEY`). Posts Netlify URLs in the job summary.
 
 ## Troubleshooting
 - Empty report: ensure API credentials and base URL are correct, and the plan/run IDs exist for the given project.
