@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>TestRail Reporter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
+    h1 { margin-bottom: 8px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-bottom: 16px; max-width: 640px; }
+    label { display:block; margin: 8px 0 4px; }
+    input { padding: 6px 8px; font-size: 14px; width: 100%; box-sizing: border-box; }
+    .row { display:flex; gap:12px; }
+    .col { flex:1; }
+    .note { color: #555; font-size: 13px; }
+    button { margin-top: 12px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
+  </style>
+  <script>
+    function toggleFields(){
+      const plan = document.getElementById('plan');
+      const run = document.getElementById('run');
+      if (plan.value) { run.disabled = true; } else { run.disabled = false; }
+      if (run.value) { plan.disabled = true; } else { plan.disabled = false; }
+    }
+  </script>
+  </head>
+<body>
+  <h1>TestRail Reporter</h1>
+  <p class="note">Generate and view an HTML report for a TestRail plan or run.</p>
+  <div class="card">
+    <form method="post" action="/generate">
+      <label>Project ID</label>
+      <input type="number" name="project" value="{{ default_project }}" />
+      <div class="row">
+        <div class="col">
+          <label>Plan ID (optional)</label>
+          <input type="number" id="plan" name="plan" oninput="toggleFields()" />
+        </div>
+        <div class="col">
+          <label>Run ID (optional)</label>
+          <input type="number" id="run" name="run" oninput="toggleFields()" />
+        </div>
+      </div>
+      <p class="note">Provide exactly one of Plan ID or Run ID.</p>
+      <button type="submit">Generate Report</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>API</h3>
+    <pre>GET /api/report?project=1&plan=241</pre>
+  </div>
+</body>
+</html>
+

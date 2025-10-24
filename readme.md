@@ -1,6 +1,6 @@
-# TestRail Daily HTML Report
+# TestRail Reporter (HTML + API)
 
-Generate a clean HTML summary for a TestRail project’s plan or run. The report includes per-run breakdowns (Passed/Untested/Failed/Blocked/Obsolete/Retest), fixed-width tables with Title and Assignee emphasized, assignee and priority names, and a project-level donut chart. Project and plan names link back to TestRail.
+Generate and serve clean HTML summaries for TestRail plans or runs. The report includes per‑run breakdowns (Passed/Untested/Failed/Blocked/Obsolete/Retest), fixed‑width tables with Title and Assignee emphasized, assignee and priority names, and a project‑level donut chart. Project and plan names link back to TestRail (and Refs link to JIRA).
 
 ## Features
 - Project + Plan context with links to TestRail
@@ -32,21 +32,41 @@ Set the following environment variables (e.g., in `.env`):
 
 Load from `.env` is handled automatically via `python-dotenv`.
 
-## Usage
+## CLI Usage
 
-Run against a plan (aggregates all runs inside the plan):
+Run against a plan (aggregates all runs in the plan):
 
 ```bash
 python3 testrail_daily_report.py --project 1 --plan 241
 ```
 
-Or run against a single run:
+Or a single run:
 
 ```bash
 python3 testrail_daily_report.py --project 1 --run 1234
 ```
 
-Output is saved to `out/report_YYYY-MM-DD.html` and can be opened in a browser.
+Output is saved to `out/Testing_Progress_Report_{plan_or_project}_ddmmyy.html` and can be opened in a browser.
+
+## Web App Usage (API + UI)
+
+Run a local server (serves UI + generated files):
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Open UI: `http://127.0.0.1:8000/` (alias: `/ui`)
+
+API endpoints:
+- `GET /api/report?project=1&plan=241` → generates and returns `{ path, url }`
+- `GET /api/report?project=1&run=1234` → generates and returns `{ path, url }`
+- `GET /reports/<file.html>` → serves previously generated HTML
+- `GET /healthz` → health check
+
+Notes:
+- Provide exactly one of `plan` or `run`.
+- Project defaults to `1` in most flows, but can be passed explicitly.
 
 ## How it works (data sources)
 - Runs in a plan are enumerated via `get_plan/<plan_id>`.
@@ -54,12 +74,15 @@ Output is saved to `out/report_YYYY-MM-DD.html` and can be opened in a browser.
 - Latest results per test are fetched via `get_results_for_run/<run_id>` only for enrichment (e.g., comments/attachments if needed), but do not affect the status shown.
 - Assignee names come from `get_users` (with `get_user/<id>` fallback).
 - Priority names come from `get_priorities`.
+- Refs link to JIRA with base `https://bvarta-project.atlassian.net/browse/{REF}`.
 
 ## Columns and layout
 - Columns: `ID | Title | Status | Assignee | Refs | Priority`
 - Fixed widths for consistent readability:
   - Title is the widest; Assignee is second widest.
   - Table uses `table-layout: fixed` and wraps long text.
+- Sorting: non‑Passed appear first (Failed → Blocked → Retest → Untested → Passed).
+- Pagination: 25 rows per page, with Prev/Next controls per run.
 
 ## Template customization
 The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can:
@@ -67,10 +90,17 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 - Add or remove fields shown per test
 - Adjust colors for the donut chart or status pills
 
+## CI/CD and Automation
+- GitHub Actions
+  - CI: `.github/workflows/ci.yml` — installs deps, compiles, and checks CLI help.
+  - Generate Report: `.github/workflows/generate-report.yml` — manual trigger with Plan or Run; fixed `--project 1`.
+  - Netlify deploy: Requires secrets `NETLIFY_AUTH_TOKEN` and `NETLIFY_SITE_ID` to publish `out/` (latest report is copied to `out/index.html`). Also uploads the HTML as an artifact and posts the Netlify URLs in the job summary.
+
 ## Troubleshooting
 - Empty report: ensure API credentials and base URL are correct, and the plan/run IDs exist for the given project.
 - Count mismatches: this script uses `get_tests` for status to match TestRail’s own counts. If you customize it to use results, deduplicate to the latest per `test_id`.
 - Missing names: if a user or priority is missing, the script falls back to the raw ID.
+- 404 on UI: confirm you started the server in the repo root with `uvicorn app.main:app --reload`, then open `http://127.0.0.1:8000/`.
 
 ## Roadmap ideas
 - Optional per-run donut charts

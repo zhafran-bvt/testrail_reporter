@@ -6,6 +6,9 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
     h1 { margin-bottom: 8px; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom: 12px; }
+    .btn { padding: 6px 10px; border: 1px solid #ccc; background:#fff; cursor:pointer; border-radius:6px; font-size: 13px; }
+    .btn:hover { background:#f8f8f8; }
     .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td { border: 1px solid #ddd; padding: 6px; font-size: 13px; vertical-align: top; word-break: break-word; }
@@ -23,6 +26,9 @@
 </head>
 <body>
   <h1>{{ report_title }}</h1>
+  <div class="toolbar">
+    <button class="btn" onclick="downloadHTML()">Download HTML</button>
+  </div>
   <p><b>Generated:</b> {{ generated_at }}</p>
   <p>
     <b>Project:</b>
@@ -164,6 +170,24 @@
         });
       });
     })();
+  </script>
+  <script>
+    function downloadHTML(){
+      try {
+        const html = document.documentElement.outerHTML;
+        const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = {{ (output_filename or 'report.html')|tojson }};
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        a.remove();
+      } catch (e) {
+        alert('Failed to download HTML: ' + e);
+      }
+    }
   </script>
 </body>
 </html>

@@ -307,6 +307,143 @@ def render_html(context: dict, out_path: Path):
     return str(out_path)
 
 
+def generate_report(project: int, plan: int | None = None, run: int | None = None) -> str:
+    """Generate a report for a plan or run and return the output HTML path."""
+    if (plan is None and run is None) or (plan is not None and run is not None):
+        raise ValueError("Provide exactly one of plan or run")
+
+    base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
+    user = env_or_die("TESTRAIL_USER")
+    api_key = env_or_die("TESTRAIL_API_KEY")
+
+    session = requests.Session()
+    session.auth = (user, api_key)
+
+    # Enrichment data
+    project_obj = get_project(session, base_url, project)
+    project_name = project_obj.get("name") or f"Project {project}"
+    plan_name = None
+    run_names: dict[int, str] = {}
+    if plan is not None:
+        plan_obj = get_plan(session, base_url, plan)
+        plan_name = plan_obj.get("name") or f"Plan {plan}"
+        for entry in plan_obj.get("entries", []):
+            for r in entry.get("runs", []):
+                rid = r.get("id")
+                if rid is not None:
+                    run_names[int(rid)] = r.get("name") or str(rid)
+
+    users_map = get_users_map(session, base_url)
+    priorities_map = get_priorities_map(session, base_url)
+    statuses_map = get_statuses_map(session, base_url)
+
+    run_ids = [run] if run is not None else get_plan_runs(session, base_url, plan)  # type: ignore[arg-type]
+    summary = {"total": 0, "Passed": 0, "Failed": 0}
+    tables = []
+
+    for rid in run_ids:
+        results = get_results_for_run(session, base_url, rid)
+        tests = get_tests_for_run(session, base_url, rid)
+        # Ensure assignee IDs are resolvable to names
+        try:
+            test_ids = {int(x) for x in pd.Series(tests).apply(lambda r: r.get("assignedto_id") if isinstance(r, dict) else None).dropna().tolist()}
+        except Exception:
+            test_ids = set()
+        try:
+            result_ids = {int(x) for x in pd.DataFrame(results).get("assignedto_id", pd.Series([], dtype="float")).dropna().astype(int).tolist()}
+        except Exception:
+            result_ids = set()
+        for uid in (test_ids | result_ids):
+            if uid not in users_map:
+                u = get_user(session, base_url, uid)
+                if isinstance(u, dict) and u.get("id") is not None:
+                    users_map[int(u["id"])] = u.get("name") or u.get("email") or str(u["id"])
+
+        res_summary = summarize_results(results)
+        table_df = build_test_table(pd.DataFrame(tests), res_summary["df"], users_map=users_map, priorities_map=priorities_map, status_map=statuses_map)
+        # Compute counts from the merged table (one row per test)
+        counts = table_df["status_name"].value_counts().to_dict()
+        normalized_counts: dict[str, int] = {}
+        for k, v in counts.items():
+            key = str(k)
+            normalized_counts[key] = normalized_counts.get(key, 0) + int(v)
+        counts = normalized_counts
+        run_total = len(table_df)
+        run_passed = counts.get("Passed", 0)
+        run_failed = counts.get("Failed", 0)
+        run_pass_rate = round((run_passed / run_total) * 100, 2) if run_total else 0.0
+        tables.append({
+            "run_id": rid,
+            "run_name": run_names.get(int(rid)) if run_names else None,
+            "rows": table_df.to_dict(orient="records"),
+            "counts": counts,
+            "total": run_total,
+            "pass_rate": run_pass_rate,
+        })
+        summary["total"] += run_total
+        summary["Passed"] += run_passed
+        summary["Failed"] += run_failed
+        for k, v in counts.items():
+            summary.setdefault("by_status", {})
+            summary["by_status"][k] = summary["by_status"].get(k, 0) + v
+
+    pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
+    # Donut segments
+    status_colors = {
+        "Passed": "#16a34a",
+        "Failed": "#ef4444",
+        "Blocked": "#f59e0b",
+        "Retest": "#3b82f6",
+        "Untested": "#9ca3af",
+    }
+    status_counts = summary.get("by_status", {})
+    total_for_chart = sum(status_counts.values())
+    segments = []
+    if total_for_chart > 0:
+        cumulative = 0.0
+        colors_lc = {k.lower(): v for k, v in status_colors.items()}
+        for label, count in sorted(status_counts.items(), key=lambda kv: (-kv[1], kv[0])):
+            pct = (count / total_for_chart) * 100.0
+            start = cumulative
+            end = cumulative + pct
+            color = colors_lc.get(str(label).lower(), "#6b7280")
+            segments.append({"label": label, "count": count, "percent": round(pct, 2), "start": start, "end": end, "color": color})
+            cumulative = end
+        donut_style = ", ".join([f"{s['color']} {s['start']}% {s['end']}%" for s in segments])
+        donut_style = f"conic-gradient({donut_style})"
+    else:
+        donut_style = "conic-gradient(#e5e7eb 0 100%)"
+
+    report_title = f"Testing Progress Report — {plan_name}" if plan_name else "Testing Progress Report"
+    context = {
+        "report_title": report_title,
+        "generated_at": datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M"),
+        "summary": {**summary, "pass_rate": pass_rate},
+        "tables": tables,
+        "notes": ["Generated automatically from TestRail API"],
+        "project_name": project_name,
+        "plan_name": plan_name,
+        "project_id": project,
+        "plan_id": plan,
+        "base_url": base_url,
+        "donut_style": donut_style,
+        "donut_legend": segments,
+        "jira_base": "https://bvarta-project.atlassian.net/browse/",
+    }
+
+    def _safe_filename(name: str) -> str:
+        cleaned = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in name)
+        return cleaned.strip("_") or "Project"
+
+    date_str = datetime.now().strftime('%d%m%y')
+    base_name = plan_name if plan_name else project_name
+    name_slug = _safe_filename(base_name)
+    filename = f"Testing_Progress_Report_{name_slug}_{date_str}.html"
+    out_file = Path("out") / filename
+    context["output_filename"] = filename
+    return render_html(context, out_file)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--project", type=int, required=True)
@@ -451,6 +588,7 @@ def main():
     name_slug = _safe_filename(base_name)
     filename = f"Testing_Progress_Report_{name_slug}_{date_str}.html"
     out_file = Path("out") / filename
+    context["output_filename"] = filename
     path = render_html(context, out_file)
     print(f"✅ Report saved to: {path}")
 
