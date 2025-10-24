@@ -30,3 +30,17 @@ jobs:
         run: |
           python testrail_daily_report.py --help
 
+      - name: Frontend URL (Render)
+        env:
+          FRONTEND_URL: ${{ secrets.BACKEND_BASE_URL }}
+        run: |
+          if [ -n "$FRONTEND_URL" ]; then
+            echo "Frontend URL: $FRONTEND_URL"
+            {
+              echo "### Frontend"
+              echo
+              echo "- URL: $FRONTEND_URL"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "BACKEND_BASE_URL secret not set; skipping frontend URL output."
+          fi

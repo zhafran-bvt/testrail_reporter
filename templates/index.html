@@ -5,50 +5,145 @@
   <title>TestRail Reporter</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
-    h1 { margin-bottom: 8px; }
-    .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-bottom: 16px; max-width: 640px; }
-    label { display:block; margin: 8px 0 4px; }
-    input { padding: 6px 8px; font-size: 14px; width: 100%; box-sizing: border-box; }
-    .row { display:flex; gap:12px; }
-    .col { flex:1; }
-    .note { color: #555; font-size: 13px; }
-    button { margin-top: 12px; padding: 8px 12px; font-size: 14px; cursor: pointer; }
+    :root{
+      /* Brandable tokens (defaults use your suggested palette) */
+      --primary: {{ brand.primary or '#1A8A85' }};      /* Primary Teal */
+      --primary-600: {{ brand.primary_600 or '#15736E' }}; /* Hover/Active */
+      --accent: {{ brand.accent or '#2C9FD3' }};       /* Secondary Blue */
+
+      --bg: {{ brand.bg or '#F8F9FA' }};               /* Background (Light) */
+      --bg2: {{ brand.bg2 or 'rgba(26,138,133,0.06)' }}; /* soft overlay */
+      --card-bg: #FFFFFF;
+      --text: #222222;                                  /* Text Primary */
+      --muted: #666666;                                 /* Text Secondary */
+      --border: #EAEAEA;                                /* Borders */
+
+      --ring: rgba(26, 138, 133, 0.35);                 /* Focus ring from primary */
+      --shadow: 0 10px 25px rgba(0,0,0,.08);
+      --radius: 12px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --card-bg: #1C1C1C;  /* Dark Background */
+        --text: #EAEAEA;
+        --muted: #B3B3B3;
+        --border: #333333;
+        --bg: #1C1C1C;
+        --bg2: rgba(44,159,211,0.06);
+        --shadow: 0 10px 25px rgba(0,0,0,.4);
+      }
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 8vh 16px 24px;
+      background: linear-gradient(180deg, var(--bg2), transparent 35%), var(--bg);
+    }
+    .wrap { width: 100%; max-width: 760px; }
+    .logo-wrap { position: relative; display:flex; justify-content:center; align-items:center; margin-bottom: 12px; }
+    .logo { display:block; max-height: 56px; position: relative; z-index: 1; }
+    h1 { margin: 0 0 6px; text-align: center; font-weight: 700; letter-spacing: .2px; }
+    .subtitle { color: var(--muted); text-align: center; margin: 0 0 18px; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+      backdrop-filter: saturate(120%) blur(4px);
+    }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px){ .grid { grid-template-columns: 1fr; } }
+    label { display:block; margin: 8px 0 6px; font-size: 13px; color: var(--muted); }
+    input, select { padding: 10px 12px; font-size: 14px; width: 100%; box-sizing: border-box; border:1px solid var(--border); border-radius: 10px; background: transparent; color: inherit; }
+    input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--ring); }
+    .note { color: var(--muted); font-size: 13px; text-align: center; margin: 6px 0 0; }
+    .actions { display:flex; justify-content: center; margin-top: 16px; }
+    button {
+      padding: 10px 16px; font-size: 14px; cursor: pointer; border-radius: 10px;
+      border: 1px solid var(--primary); background: var(--primary); color: #fff;
+      transition: background .15s ease, transform .05s ease;
+    }
+    button:hover { background: var(--primary-600); }
+    button:active { transform: translateY(1px); }
   </style>
   <script>
-    function toggleFields(){
-      const plan = document.getElementById('plan');
-      const run = document.getElementById('run');
-      if (plan.value) { run.disabled = true; } else { run.disabled = false; }
-      if (run.value) { plan.disabled = true; } else { plan.disabled = false; }
+    async function loadPlans(){
+      const project = document.getElementById('project').value || '1';
+      const planSel = document.getElementById('plan');
+      const note = document.getElementById('plan-note');
+      planSel.innerHTML = '<option value="" disabled selected>Loading plans…</option>';
+      planSel.disabled = true;
+      try {
+        const resp = await fetch(`/api/plans?project=${encodeURIComponent(project)}&is_completed=0`);
+        if(!resp.ok) throw new Error('Failed to fetch plans');
+        const data = await resp.json();
+        const plans = Array.isArray(data.plans) ? data.plans : [];
+        plans.sort((a,b)=> (b.created_on||0) - (a.created_on||0) || String(a.name||'').localeCompare(String(b.name||'')));
+        if(plans.length === 0){
+          planSel.innerHTML = '<option value="" disabled selected>No open plans found</option>';
+          note.textContent = 'No open plans. Try a different project.';
+        } else {
+          planSel.innerHTML = plans.map(p=> `<option value="${p.id}">${escapeHtml(p.name||('Plan '+p.id))} (ID ${p.id})</option>`).join('');
+          planSel.selectedIndex = 0;
+          note.textContent = `Loaded ${plans.length} plan(s).`;
+        }
+      } catch(e){
+        planSel.innerHTML = '<option value="" disabled selected>Error loading plans</option>';
+        note.textContent = 'Error loading plans. Check server logs or credentials.';
+      } finally {
+        planSel.disabled = false;
+      }
     }
+
+    function ensurePlanSelected(){
+      const planSel = document.getElementById('plan');
+      if(!planSel.value){
+        alert('Please select a Test Plan');
+        return false;
+      }
+      return true;
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+    }
+
+    document.addEventListener('DOMContentLoaded', loadPlans);
   </script>
   </head>
 <body>
-  <h1>TestRail Reporter</h1>
-  <p class="note">Generate and view an HTML report for a TestRail plan or run.</p>
-  <div class="card">
-    <form method="post" action="/generate">
-      <label>Project ID</label>
-      <input type="number" name="project" value="{{ default_project }}" />
-      <div class="row">
-        <div class="col">
-          <label>Plan ID (optional)</label>
-          <input type="number" id="plan" name="plan" oninput="toggleFields()" />
+  <div class="wrap">
+    <div class="logo-wrap">
+      <img class="logo" src="{{ logo_url }}" alt="Bhumi Varta Logo" />
+    </div>
+    <h1>TestRail Reporter</h1>
+    <p class="subtitle">Generate and view an HTML report for a TestRail plan.</p>
+    <div class="card">
+      <form method="post" action="/generate" onsubmit="return ensurePlanSelected()">
+        <div class="grid">
+          <div>
+            <label>Project ID</label>
+            <input type="number" id="project" name="project" value="{{ default_project }}" oninput="loadPlans()" />
+          </div>
+          <div>
+            <label>Test Plan</label>
+            <select id="plan" name="plan" required>
+              <option value="" disabled selected>Loading plans…</option>
+            </select>
+            <p class="note" id="plan-note">Showing open plans. Change project to refresh.</p>
+          </div>
         </div>
-        <div class="col">
-          <label>Run ID (optional)</label>
-          <input type="number" id="run" name="run" oninput="toggleFields()" />
+        <div class="actions">
+          <button type="submit">Generate Report</button>
         </div>
-      </div>
-      <p class="note">Provide exactly one of Plan ID or Run ID.</p>
-      <button type="submit">Generate Report</button>
-    </form>
-  </div>
-  <div class="card">
-    <h3>API</h3>
-    <pre>GET /api/report?project=1&plan=241</pre>
+      </form>
+    </div>
   </div>
 </body>
 </html>
-

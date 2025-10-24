@@ -4,32 +4,76 @@
   <meta charset="utf-8" />
   <title>{{ report_title }}</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
-    h1 { margin-bottom: 8px; }
-    .toolbar { display:flex; gap:8px; align-items:center; margin-bottom: 12px; }
-    .btn { padding: 6px 10px; border: 1px solid #ccc; background:#fff; cursor:pointer; border-radius:6px; font-size: 13px; }
-    .btn:hover { background:#f8f8f8; }
-    .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+    :root{
+      --primary: #1A8A85;
+      --primary-600: #15736E;
+      --ok: #16a34a;
+      --fail: #ef4444;
+      --blocked: #f59e0b;
+      --retest: #3b82f6;
+      --untested: #9ca3af;
+      --bg: #F8F9FA;
+      --card-bg: #ffffff;
+      --text: #222222;
+      --muted: #666666;
+      --border: #EAEAEA;
+      --shadow: 0 10px 25px rgba(0,0,0,.06);
+      --radius: 12px;
+    }
+    @media (prefers-color-scheme: dark){
+      :root{
+        --bg: #111315;
+        --card-bg: #15181c;
+        --text: #EAEAEA;
+        --muted: #B3B3B3;
+        --border: #22252a;
+        --shadow: 0 10px 25px rgba(0,0,0,.4);
+      }
+    }
+    *{ box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; color: var(--text); background: var(--bg); }
+    .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+    h1 { margin: 0 0 8px; font-weight: 700; letter-spacing: .2px; }
+    a { color: var(--primary-600); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .toolbar { display:flex; gap:8px; align-items:center; margin: 8px 0 14px; }
+    .btn { padding: 8px 12px; border: 1px solid var(--primary); background: var(--primary); color:#fff; cursor:pointer; border-radius:10px; font-size: 13px; }
+    .btn:hover { background: var(--primary-600); }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 14px 0; box-shadow: var(--shadow); }
+    .table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: auto; box-shadow: var(--shadow); position: relative; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border: 1px solid #ddd; padding: 6px; font-size: 13px; vertical-align: top; word-break: break-word; }
-    th { background: #f4f4f4; }
-    .pill { padding: 2px 6px; border-radius: 10px; font-size: 12px; }
-    .ok { background: #d1fae5; }
-    .fail { background: #fee2e2; }
-    .donut { width: 160px; height: 160px; border-radius: 50%; position: relative; }
-    .donut::after { content: ""; position: absolute; inset: 32px; background: #fff; border-radius: 50%; }
-    .pagination { display:flex; align-items:center; gap:8px; margin:8px 0; flex-wrap:wrap; }
-    .pagination button { padding: 4px 8px; border: 1px solid #ccc; background:#fff; cursor:pointer; border-radius:4px; }
-    .pagination button[disabled] { opacity: 0.5; cursor: not-allowed; }
-    .muted { color:#666; font-size:12px; }
+    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 13px; vertical-align: top; word-break: break-word; background: var(--card-bg); }
+    thead th {
+      background: var(--card-bg); /* solid background to prevent overlap */
+      text-align: left;
+      position: sticky;  /* keep header visible while body scrolls */
+      top: 0;
+      z-index: 5;
+      box-shadow: 0 1px 0 var(--border), 0 2px 6px rgba(0,0,0,0.04);
+    }
+    tbody tr:nth-child(odd){ background: rgba(0,0,0,0.02); }
+    tbody tr:hover { background: rgba(0,0,0,0.04); }
+    .pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; display:inline-block; font-weight: 600; }
+    .ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+    .fail { background: color-mix(in srgb, var(--fail) 18%, transparent); color: var(--fail); }
+    .blocked { background: color-mix(in srgb, var(--blocked) 18%, transparent); color: var(--blocked); }
+    .retest { background: color-mix(in srgb, var(--retest) 18%, transparent); color: var(--retest); }
+    .untested { background: color-mix(in srgb, var(--untested) 18%, transparent); color: var(--untested); }
+    .donut { width: 170px; height: 170px; border-radius: 50%; position: relative; box-shadow: var(--shadow); }
+    .donut::after { content: ""; position: absolute; inset: 34px; background: var(--card-bg); border-radius: 50%; }
+    .table-controls { display:flex; align-items:center; gap:12px; margin:8px 0; flex-wrap:wrap; justify-content:flex-end; }
+    .table-controls label { display:inline-flex; align-items:center; gap:6px; color: var(--muted); font-size: 12px; }
+    .table-controls select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); }
+    .muted { color:var(--muted); font-size:12px; }
   </style>
 </head>
 <body>
+  <div class="wrap">
   <h1>{{ report_title }}</h1>
   <div class="toolbar">
     <button class="btn" onclick="downloadHTML()">Download HTML</button>
   </div>
-  <p><b>Generated:</b> {{ generated_at }}</p>
+  <p class="muted"><b>Generated:</b> {{ generated_at }}</p>
   <p>
     <b>Project:</b>
     {% if base_url and project_id %}
@@ -78,13 +122,19 @@
       Obsolete: {{ t.counts['Obsolete'] | default(0) }} |
       Retest: {{ t.counts['Retest'] | default(0) }}
     </p>
-    <div class="pagination" data-run-id="{{ t.run_id }}" style="display:none;">
-      <button class="prev" data-run-id="{{ t.run_id }}">Prev</button>
-      <span class="page-info" data-run-id="{{ t.run_id }}"></span>
-      <button class="next" data-run-id="{{ t.run_id }}">Next</button>
-      <span class="muted">(showing 25 per page)</span>
+    <div class="table-controls" data-run-id="{{ t.run_id }}">
+      <label>Rows visible:
+        <select class="page-size" data-run-id="{{ t.run_id }}">
+          <option value="10" selected>10</option>
+          <option value="15">15</option>
+          <option value="20">20</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+      </label>
     </div>
-    <table>
+    <div class="table-wrap" id="wrap-{{ t.run_id }}">
+    <table id="table-{{ t.run_id }}">
       <colgroup>
         <col style="width:7%" />
         <col style="width:45%" />
@@ -129,39 +179,46 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
   </div>
   {% endfor %}
   <script>
     (function(){
-      const PAGE_SIZE = 25;
       function setupRun(runId){
         const tbody = document.getElementById('rows-' + runId);
-        if(!tbody) return;
+        const table = document.getElementById('table-' + runId);
+        const wrap = document.getElementById('wrap-' + runId);
+        if(!tbody || !table || !wrap) return;
         const rows = Array.from(tbody.querySelectorAll('tr'));
         const total = rows.length;
-        if(total <= PAGE_SIZE) return; // no pagination needed
-        let page = 1;
-        const totalPages = Math.ceil(total / PAGE_SIZE);
-        const card = document.getElementById('run-' + runId);
-        const pager = card.querySelector('.pagination');
-        const prevBtn = pager.querySelector('.prev');
-        const nextBtn = pager.querySelector('.next');
-        const info = pager.querySelector('.page-info');
-        pager.style.display = 'flex';
+        const ctrl = document.querySelector('.table-controls[data-run-id="' + runId + '"]');
+        const sizeSel = ctrl ? ctrl.querySelector('.page-size') : null;
+        const key = 'report_rows_visible';
+        let rowsVisible = parseInt(localStorage.getItem(key) || '10', 10);
+        if (isNaN(rowsVisible) || rowsVisible <= 0) rowsVisible = 10;
 
-        function render(){
-          const start = (page - 1) * PAGE_SIZE;
-          const end = start + PAGE_SIZE;
-          rows.forEach((tr, idx) => {
-            tr.style.display = (idx >= start && idx < end) ? '' : 'none';
-          });
-          info.textContent = `Page ${page} of ${totalPages}`;
-          prevBtn.disabled = (page === 1);
-          nextBtn.disabled = (page === totalPages);
+        function applyHeight(){
+          const headerH = table.tHead ? table.tHead.getBoundingClientRect().height : 36;
+          const firstRow = rows[0];
+          const rowH = firstRow ? firstRow.getBoundingClientRect().height : 36;
+          const desired = Math.round(headerH + rowH * rowsVisible + 2);
+          wrap.style.maxHeight = desired + 'px';
         }
-        prevBtn.addEventListener('click', () => { if(page>1){ page--; render(); } });
-        nextBtn.addEventListener('click', () => { if(page<totalPages){ page++; render(); } });
-        render();
+
+        if (sizeSel) {
+          sizeSel.value = String(rowsVisible);
+          sizeSel.addEventListener('change', () => {
+            const v = parseInt(sizeSel.value || '10', 10);
+            rowsVisible = isNaN(v) ? 10 : v;
+            localStorage.setItem(key, String(rowsVisible));
+            applyHeight();
+          });
+        }
+
+        // Initial height
+        applyHeight();
+        // Also adjust on window resize as row height may change
+        window.addEventListener('resize', applyHeight);
       }
 
       document.addEventListener('DOMContentLoaded', function(){
@@ -189,5 +246,6 @@
       }
     }
   </script>
+</div>
 </body>
 </html>

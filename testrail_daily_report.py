@@ -190,6 +190,42 @@ def get_tests_for_run(session, base_url, run_id: int):
     return tests
 
 
+def get_plans_for_project(session, base_url, project_id: int, *, is_completed: int | None = None,
+                          created_after: int | None = None, created_before: int | None = None) -> list:
+    """Return list of plans for a project.
+    Supports optional filters and handles both list and paginated dict shapes.
+    """
+    plans: list = []
+    offset, limit = 0, 250
+    while True:
+        qs = [f"limit={limit}", f"offset={offset}"]
+        if is_completed is not None:
+            qs.append(f"is_completed={is_completed}")
+        if created_after is not None:
+            qs.append(f"created_after={created_after}")
+        if created_before is not None:
+            qs.append(f"created_before={created_before}")
+        endpoint = f"get_plans/{project_id}&" + "&".join(qs)
+        try:
+            batch = api_get(session, base_url, endpoint)
+        except Exception:
+            break
+        if not batch:
+            break
+        if isinstance(batch, list):
+            items = batch
+        elif isinstance(batch, dict):
+            # Some instances may return a dict wrapper, try common keys
+            items = batch.get("plans") or batch.get("items") or []
+        else:
+            items = []
+        plans.extend(items)
+        if len(items) < limit:
+            break
+        offset += limit
+    return plans
+
+
 def summarize_results(results, status_map=DEFAULT_STATUS_MAP):
     df = pd.DataFrame(results)
     # If no results or unexpected payload (e.g., missing test_id), return empty frame with expected columns
