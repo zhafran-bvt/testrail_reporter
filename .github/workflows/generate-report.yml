@@ -50,7 +50,10 @@ jobs:
           if [ -n "${{ github.event.inputs.run }}" ]; then
             ARGS+=("--run" "${{ github.event.inputs.run }}")
           fi
-          printf 'args=%q ' "${ARGS[@]}" | sed 's/ $//' >> "$GITHUB_OUTPUT"
+          # Join args into a single space-delimited string output named 'args'
+          joined=$(printf '%s ' "${ARGS[@]}")
+          joined=${joined%% }  # trim trailing space
+          echo "args=$joined" >> "$GITHUB_OUTPUT"
 
       - name: Generate report
         env:
