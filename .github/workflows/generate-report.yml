@@ -73,4 +73,30 @@ jobs:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         run: |
-          npx netlify-cli deploy --dir out --prod --site "$NETLIFY_SITE_ID" --message "Automated TestRail report $GITHUB_SHA"
+          npx netlify-cli deploy --dir out --prod --site "$NETLIFY_SITE_ID" --message "Automated TestRail report $GITHUB_SHA" --json > deploy.json
+
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: testrail-report
+          path: out/*.html
+          if-no-files-found: error
+
+      - name: Post summary with links
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest=$(ls -1t out/*.html | head -n 1)
+          url=""; deploy_url=""
+          if [ -f deploy.json ]; then
+            url=$(node -e "console.log(JSON.parse(require('fs').readFileSync('deploy.json','utf8')).url || '')")
+            deploy_url=$(node -e "console.log(JSON.parse(require('fs').readFileSync('deploy.json','utf8')).deploy_url || '')")
+          fi
+          {
+            echo "### TestRail Report"
+            echo
+            echo "- Latest file: $latest"
+            if [ -n "$url" ]; then echo "- Netlify URL: $url"; fi
+            if [ -n "$deploy_url" ]; then echo "- Deploy URL: $deploy_url"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
