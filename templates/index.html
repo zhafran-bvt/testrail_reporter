@@ -63,7 +63,7 @@
     input, select { padding: 10px 12px; font-size: 14px; width: 100%; box-sizing: border-box; border:1px solid var(--border); border-radius: 10px; background: transparent; color: inherit; }
     input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--ring); }
     .note { color: var(--muted); font-size: 13px; text-align: center; margin: 6px 0 0; }
-    .actions { display:flex; justify-content: center; margin-top: 16px; }
+    .actions { display:flex; justify-content: center; margin-top: 16px; gap: 10px; }
     button {
       padding: 10px 16px; font-size: 14px; cursor: pointer; border-radius: 10px;
       border: 1px solid var(--primary); background: var(--primary); color: #fff;
@@ -71,31 +71,101 @@
     }
     button:hover { background: var(--primary-600); }
     button:active { transform: translateY(1px); }
+
+    /* Toast styles */
+    .toast { position: fixed; right: 16px; top: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+    .toast-item { min-width: 260px; max-width: 420px; padding: 12px 14px; border-radius: 10px; box-shadow: var(--shadow); color: #0f172a; border: 1px solid var(--border); background: #ecfeff; opacity: 0; transform: translateX(12px); animation: toast-in .18s ease-out forwards; }
+    .toast-item.success { background: #ecfdf5; color: #064e3b; border-color: #bbf7d0; }
+    .toast-item.error { background: #fef2f2; color: #7f1d1d; border-color: #fecaca; }
+    .toast-close { float: right; cursor: pointer; margin-left: 8px; opacity: .7; }
+    @keyframes toast-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toast-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(12px); } }
+    .toast-item.closing { animation: toast-out .2s ease-in forwards; }
   </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo-wrap">
+      <img class="logo" src="{{ logo_url }}" alt="Bhumi Varta Logo" />
+    </div>
+    <h1>TestRail Reporter</h1>
+    <p class="subtitle">Generate, preview, or email a TestRail plan report.</p>
+    <div class="card">
+      <form method="post" action="/send-report" id="reportForm">
+        <div class="grid">
+          <div>
+            <label>Project ID</label>
+            <input type="number" id="project" name="project" value="{{ default_project }}" oninput="loadPlans()" />
+          </div>
+          <div>
+            <label>Test Plan</label>
+            <select id="plan" name="plan" required>
+              <option value="" disabled selected>Loading plans…</option>
+            </select>
+            <p class="note" id="plan-note">Showing open plans. Change project to refresh.</p>
+          </div>
+        </div>
+        <div>
+          <label>Email to</label>
+          <input type="email" name="recipient" placeholder="Enter recipient's email" />
+        </div>
+        <div class="actions">
+          <button type="button" id="sendReportBtn">Send Report</button>
+          <button type="submit" id="previewReportBtn">Preview Report</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
   <script>
+    function escapeHtml(s){
+      return String(s).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+    }
+
     async function loadPlans(){
       const project = document.getElementById('project').value || '1';
       const planSel = document.getElementById('plan');
       const note = document.getElementById('plan-note');
       planSel.innerHTML = '<option value="" disabled selected>Loading plans…</option>';
       planSel.disabled = true;
-      try {
-        const resp = await fetch(`/api/plans?project=${encodeURIComponent(project)}&is_completed=0`);
-        if(!resp.ok) throw new Error('Failed to fetch plans');
+
+      async function fetchPlans(url){
+        const resp = await fetch(url);
+        if(!resp.ok) {
+          const text = await resp.text().catch(()=> '');
+          throw new Error(text || `Failed to fetch ${url}`);
+        }
         const data = await resp.json();
-        const plans = Array.isArray(data.plans) ? data.plans : [];
+        let plans = Array.isArray(data.plans) ? data.plans : [];
         plans.sort((a,b)=> (b.created_on||0) - (a.created_on||0) || String(a.name||'').localeCompare(String(b.name||'')));
+        return plans;
+      }
+
+      try {
+        // First try: open plans only
+        let plans = await fetchPlans(`/api/plans?project=${encodeURIComponent(project)}&is_completed=0`);
+        if (plans.length === 0) {
+          // Fallback: include completed (may be many; we just list most recent first)
+          plans = await fetchPlans(`/api/plans?project=${encodeURIComponent(project)}`);
+          if (plans.length > 0) {
+            note.textContent = `No open plans. Showing ${plans.length} total plan(s).`;
+          }
+        } else {
+          note.textContent = `Loaded ${plans.length} open plan(s).`;
+        }
+
         if(plans.length === 0){
-          planSel.innerHTML = '<option value="" disabled selected>No open plans found</option>';
-          note.textContent = 'No open plans. Try a different project.';
+          planSel.innerHTML = '<option value="" disabled selected>No plans found</option>';
         } else {
           planSel.innerHTML = plans.map(p=> `<option value="${p.id}">${escapeHtml(p.name||('Plan '+p.id))} (ID ${p.id})</option>`).join('');
           planSel.selectedIndex = 0;
-          note.textContent = `Loaded ${plans.length} plan(s).`;
         }
       } catch(e){
         planSel.innerHTML = '<option value="" disabled selected>Error loading plans</option>';
-        note.textContent = 'Error loading plans. Check server logs or credentials.';
+        note.textContent = 'Error loading plans. Check credentials or API access.';
+        showToast('Failed to load plans. Verify TestRail credentials and project ID.', 'error');
       } finally {
         planSel.disabled = false;
       }
@@ -110,40 +180,95 @@
       return true;
     }
 
-    function escapeHtml(s){
-      return String(s).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+    function validateRecipient(){
+      const recipientInput = document.querySelector('input[name="recipient"]');
+      if(!recipientInput.value.trim()){
+        alert('Please enter a recipient email address.');
+        return false;
+      }
+      return true;
     }
 
-    document.addEventListener('DOMContentLoaded', loadPlans);
+    function showToast(message, type){
+      const wrap = document.getElementById('toast');
+      const div = document.createElement('div');
+      div.className = 'toast-item ' + (type || 'info');
+      div.innerHTML = `<span class="toast-close" aria-label="Close">×</span>${message}`;
+      wrap.appendChild(div);
+      const closer = div.querySelector('.toast-close');
+      function removeToast(){
+        if (!div.classList.contains('closing')){
+          div.classList.add('closing');
+          setTimeout(()=> { if (div.parentNode === wrap) wrap.removeChild(div); }, 220);
+        }
+      }
+      closer.addEventListener('click', removeToast);
+      setTimeout(removeToast, 6000);
+    }
+
+    document.addEventListener('DOMContentLoaded', function(){
+      loadPlans();
+      const form = document.querySelector('.card form');
+      const sendReportBtn = document.getElementById('sendReportBtn');
+      const previewReportBtn = document.getElementById('previewReportBtn');
+
+      async function doSendReport(){
+        try {
+          const fd = new FormData(document.getElementById('reportForm'));
+          const resp = await fetch('/send-report', { method: 'POST', body: fd });
+          const ct = resp.headers.get('content-type') || '';
+          if (!resp.ok) {
+            let msg = 'Failed to send report';
+            if (ct.includes('application/json')) {
+              const data = await resp.json();
+              msg = data.detail || data.message || msg;
+            } else {
+              msg = await resp.text();
+            }
+            showToast(msg, 'error');
+          } else {
+            const data = ct.includes('application/json') ? await resp.json() : {};
+            const who = data.recipient ? ` to ${data.recipient}` : '';
+            showToast(`Report sent successfully${who}.`, 'success');
+          }
+        } catch (e) {
+          showToast('Network error while sending report.', 'error');
+        }
+      }
+
+      sendReportBtn.addEventListener('click', async function(event){
+        if(!ensurePlanSelected() || !validateRecipient()){
+          event.preventDefault();
+          return;
+        }
+        event.preventDefault();
+        await doSendReport();
+      });
+
+      // Handle Enter key submission: treat as send-report unless Preview button was used
+      const reportForm = document.getElementById('reportForm');
+      reportForm.addEventListener('submit', async function(e){
+        const submitter = e.submitter || document.activeElement;
+        const isPreview = submitter && submitter.id === 'previewReportBtn';
+        if (isPreview) {
+          // Let default proceed (opens preview in new tab)
+          if (!ensurePlanSelected()) { e.preventDefault(); }
+          return;
+        }
+        e.preventDefault();
+        if(!ensurePlanSelected() || !validateRecipient()) return;
+        await doSendReport();
+      });
+
+      previewReportBtn.addEventListener('click', function(event){
+        if(!ensurePlanSelected()){
+          event.preventDefault();
+          return;
+        }
+        form.action = '/generate';
+        form.setAttribute('target', '_blank');
+      });
+    });
   </script>
-  </head>
-<body>
-  <div class="wrap">
-    <div class="logo-wrap">
-      <img class="logo" src="{{ logo_url }}" alt="Bhumi Varta Logo" />
-    </div>
-    <h1>TestRail Reporter</h1>
-    <p class="subtitle">Generate and view an HTML report for a TestRail plan.</p>
-    <div class="card">
-      <form method="post" action="/generate" onsubmit="return ensurePlanSelected()">
-        <div class="grid">
-          <div>
-            <label>Project ID</label>
-            <input type="number" id="project" name="project" value="{{ default_project }}" oninput="loadPlans()" />
-          </div>
-          <div>
-            <label>Test Plan</label>
-            <select id="plan" name="plan" required>
-              <option value="" disabled selected>Loading plans…</option>
-            </select>
-            <p class="note" id="plan-note">Showing open plans. Change project to refresh.</p>
-          </div>
-        </div>
-        <div class="actions">
-          <button type="submit">Generate Report</button>
-        </div>
-      </form>
-    </div>
-  </div>
 </body>
 </html>

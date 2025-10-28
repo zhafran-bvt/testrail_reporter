@@ -14,7 +14,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Ensure .env overrides any existing env so local config is honored
+load_dotenv(override=True)
 
 
 # --- Default status mapping ---
@@ -72,6 +73,9 @@ def get_users_map(session, base_url):
     except Exception as e:
         print(f"Warning: could not load users: {e}", file=sys.stderr)
         return {}
+
+
+## Removed get_run helper as time-based trend was dropped
 
 
 def get_user(session, base_url, user_id: int):
@@ -376,6 +380,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     run_ids = [run] if run is not None else get_plan_runs(session, base_url, plan)  # type: ignore[arg-type]
     summary = {"total": 0, "Passed": 0, "Failed": 0}
     tables = []
+    # Time-based trend removed
 
     for rid in run_ids:
         results = get_results_for_run(session, base_url, rid)
@@ -408,6 +413,32 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         run_passed = counts.get("Passed", 0)
         run_failed = counts.get("Failed", 0)
         run_pass_rate = round((run_passed / run_total) * 100, 2) if run_total else 0.0
+        # Build run-level donut segments/style
+        def _build_segments(counts: dict[str, int]):
+            status_colors = {
+                "Passed": "#16a34a",
+                "Failed": "#ef4444",
+                "Blocked": "#f59e0b",
+                "Retest": "#3b82f6",
+                "Untested": "#9ca3af",
+            }
+            total = sum(counts.values())
+            segments = []
+            donut_style = "conic-gradient(#e5e7eb 0 100%)"
+            if total > 0:
+                cumulative = 0.0
+                colors_lc = {k.lower(): v for k, v in status_colors.items()}
+                for label, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+                    pct = (count / total) * 100.0
+                    start = cumulative
+                    end = cumulative + pct
+                    color = colors_lc.get(str(label).lower(), "#6b7280")
+                    segments.append({"label": label, "count": count, "percent": round(pct, 2), "start": start, "end": end, "color": color})
+                    cumulative = end
+                donut_style = "conic-gradient(" + ", ".join([f"{s['color']} {s['start']}% {s['end']}%" for s in segments]) + ")"
+            return segments, donut_style
+
+        segs, run_donut_style = _build_segments(counts)
         tables.append({
             "run_id": rid,
             "run_name": run_names.get(int(rid)) if run_names else None,
@@ -415,6 +446,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             "counts": counts,
             "total": run_total,
             "pass_rate": run_pass_rate,
+            "donut_style": run_donut_style,
+            "donut_legend": segs,
         })
         summary["total"] += run_total
         summary["Passed"] += run_passed
@@ -422,6 +455,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         for k, v in counts.items():
             summary.setdefault("by_status", {})
             summary["by_status"][k] = summary["by_status"].get(k, 0) + v
+        # No trend point tracking
 
     pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
     # Donut segments
@@ -488,145 +522,15 @@ def main():
     group.add_argument("--plan", type=int)
     args = ap.parse_args()
 
-    base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
-    user = env_or_die("TESTRAIL_USER")
-    api_key = env_or_die("TESTRAIL_API_KEY")
-
-    session = requests.Session()
-    session.auth = (user, api_key)
-
-    # Enrichment data
-    project = get_project(session, base_url, args.project)
-    project_name = project.get("name") or f"Project {args.project}"
-    plan_name = None
-    run_names = {}
-    if args.plan:
-        plan = get_plan(session, base_url, args.plan)
-        plan_name = plan.get("name") or f"Plan {args.plan}"
-        for entry in plan.get("entries", []):
-            for run in entry.get("runs", []):
-                rid = run.get("id")
-                if rid is not None:
-                    run_names[int(rid)] = run.get("name") or str(rid)
-
-    users_map = get_users_map(session, base_url)
-    priorities_map = get_priorities_map(session, base_url)
-    statuses_map = get_statuses_map(session, base_url)
-
-    run_ids = [args.run] if args.run else get_plan_runs(session, base_url, args.plan)
-    summary = {"total": 0, "Passed": 0, "Failed": 0}
-    tables = []
-
-    for rid in run_ids:
-        results = get_results_for_run(session, base_url, rid)
-        tests = get_tests_for_run(session, base_url, rid)
-        res_summary = summarize_results(results)
-        # Ensure assignee IDs are resolvable
-        try:
-            test_ids = {int(x) for x in pd.Series(tests).apply(lambda r: r.get("assignedto_id") if isinstance(r, dict) else None).dropna().tolist()}
-        except Exception:
-            test_ids = set()
-        try:
-            result_ids = {int(x) for x in pd.DataFrame(results).get("assignedto_id", pd.Series([], dtype="float")).dropna().astype(int).tolist()}
-        except Exception:
-            result_ids = set()
-        for uid in (test_ids | result_ids):
-            if uid not in users_map:
-                u = get_user(session, base_url, uid)
-                if isinstance(u, dict) and u.get("id") is not None:
-                    users_map[int(u["id"])] = u.get("name") or u.get("email") or str(u["id"])
-
-        table_df = build_test_table(pd.DataFrame(tests), res_summary["df"], users_map=users_map, priorities_map=priorities_map, status_map=statuses_map)
-        # Compute counts from the merged table (one row per test)
-        counts = table_df["status_name"].value_counts().to_dict()
-        # Normalize the keys to standard capitalization
-        normalized_counts = {}
-        for k, v in counts.items():
-            key = str(k)
-            normalized_counts[key] = normalized_counts.get(key, 0) + int(v)
-        counts = normalized_counts
-        run_total = len(table_df)
-        run_passed = counts.get("Passed", 0)
-        run_failed = counts.get("Failed", 0)
-        run_pass_rate = round((run_passed / run_total) * 100, 2) if run_total else 0.0
-        tables.append({
-            "run_id": rid,
-            "run_name": run_names.get(int(rid)) if run_names else None,
-            "rows": table_df.to_dict(orient="records"),
-            "counts": counts,
-            "total": run_total,
-            "pass_rate": run_pass_rate,
-        })
-        summary["total"] += run_total
-        summary["Passed"] += run_passed
-        summary["Failed"] += run_failed
-        # Aggregate by-status for project-level chart
-        for k, v in counts.items():
-            summary.setdefault("by_status", {})
-            summary["by_status"][k] = summary["by_status"].get(k, 0) + v
-        
-
-    pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
-    # Build donut chart gradients for project summary
-    status_colors = {
-        "Passed": "#16a34a",
-        "Failed": "#ef4444",
-        "Blocked": "#f59e0b",
-        "Retest": "#3b82f6",
-        "Untested": "#9ca3af",
-    }
-    status_counts = summary.get("by_status", {})
-    total_for_chart = sum(status_counts.values())
-    segments = []
-    if total_for_chart > 0:
-        cumulative = 0.0
-        # Use case-insensitive color lookup
-        colors_lc = {k.lower(): v for k, v in status_colors.items()}
-        for label, count in sorted(status_counts.items(), key=lambda kv: (-kv[1], kv[0])):
-            pct = (count / total_for_chart) * 100.0
-            start = cumulative
-            end = cumulative + pct
-            color = colors_lc.get(str(label).lower(), "#6b7280")
-            segments.append({"label": label, "count": count, "percent": round(pct, 2), "start": start, "end": end, "color": color})
-            cumulative = end
-        donut_style = ", ".join([f"{s['color']} {s['start']}% {s['end']}%" for s in segments])
-        donut_style = f"conic-gradient({donut_style})"
-    else:
-        donut_style = "conic-gradient(#e5e7eb 0 100%)"
-
-    # Report title uses the plan name when available
-    report_title = f"Testing Progress Report — {plan_name}" if plan_name else "Testing Progress Report"
-
-    context = {
-        "report_title": report_title,
-        "generated_at": datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M"),
-        "summary": {**summary, "pass_rate": pass_rate},
-        "tables": tables,
-        "notes": ["Generated automatically from TestRail API"],
-        "project_name": project_name,
-        "plan_name": plan_name,
-        "project_id": args.project,
-        "plan_id": args.plan,
-        "base_url": base_url,
-        "donut_style": donut_style,
-        "donut_legend": segments,
-        # Base JIRA URL for refs linking
-        "jira_base": "https://bvarta-project.atlassian.net/browse/",
-    }
-
-    def _safe_filename(name: str) -> str:
-        cleaned = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in name)
-        return cleaned.strip("_") or "Project"
-
-    date_str = datetime.now().strftime('%d%m%y')  # ddmmyy format
-    # Prefer plan name when available, fallback to project
-    base_name = plan_name if plan_name else project_name
-    name_slug = _safe_filename(base_name)
-    filename = f"Testing_Progress_Report_{name_slug}_{date_str}.html"
-    out_file = Path("out") / filename
-    context["output_filename"] = filename
-    path = render_html(context, out_file)
-    print(f"✅ Report saved to: {path}")
+    try:
+        path = generate_report(project=args.project, plan=args.plan, run=args.run)
+        print(f"✅ Report saved to: {path}")
+    except (ValueError, requests.exceptions.RequestException) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

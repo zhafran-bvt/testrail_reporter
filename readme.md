@@ -63,10 +63,47 @@ API endpoints:
 - `GET /api/report?project=1&run=1234` → generates and returns `{ path, url }`
 - `GET /reports/<file.html>` → serves previously generated HTML
 - `GET /healthz` → health check
+ - `GET /api/debug/smtp` → current SMTP settings (masked) for debugging
 
 Notes:
 - Provide exactly one of `plan` or `run`.
 - Project defaults to `1` in most flows, but can be passed explicitly.
+- UI behavior:
+  - "Send Report" submits via fetch and shows a success/error toast (no page navigation).
+  - "Preview Report" opens the generated HTML in a new tab.
+  - Plans list auto-loads open plans first; if none, it falls back to all plans.
+
+## Email via Gmail (SMTP)
+
+You can send reports via Gmail or Google Workspace using an App Password.
+
+- In `.env` set:
+  - `SMTP_USER=your@gmail.com`
+  - `SMTP_PASSWORD=<App Password>` (requires 2‑Step Verification)
+  - `SMTP_SERVER=smtp.gmail.com`
+  - `SMTP_PORT=587`
+  - `SMTP_USE_SSL=false`
+  - `SMTP_STARTTLS=true`
+
+Quick test without TestRail:
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+python scripts/send_test_email.py --to you@domain.com --subject "SMTP test" --body "Hello"
+```
+
+If you see an authentication error, regenerate the Gmail App Password.
+
+## Debugging
+
+- SMTP in use: open `GET /api/debug/smtp` to verify the active SMTP server, port, and user (masked). Useful if host env vars override `.env`.
+- Health: `GET /healthz` returns `{ "ok": true }` when the app is up.
+- Plans fetching:
+  - The UI first calls `/api/plans?project=ID&is_completed=0` (open plans).
+  - If none are found, it retries `/api/plans?project=ID` and shows a note.
+  - If errors persist, check server logs and verify `TESTRAIL_*` env values.
 
 ## How it works (data sources)
 - Runs in a plan are enumerated via `get_plan/<plan_id>`.

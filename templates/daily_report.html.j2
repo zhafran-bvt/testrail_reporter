@@ -110,20 +110,57 @@
     <p>Total: {{ summary.total }} | Passed: {{ summary.Passed }} | Failed: {{ summary.Failed }} | Pass Rate: {{ summary.pass_rate }}%</p>
   </div>
 
+  {# Time-based trend removed per request #}
+
   {% for t in tables %}
   <div class="card run-card" id="run-{{ t.run_id }}" data-run-id="{{ t.run_id }}">
     <h3>Run #{{ t.run_id }}{% if t.run_name %} - {{ t.run_name }}{% endif %}</h3>
-    <p>
-      Pass Rate: {{ t.pass_rate }}% |
-      Passed: {{ t.counts['Passed'] | default(0) }} |
-      Untested: {{ t.counts['Untested'] | default(0) }} |
-      Failed: {{ t.counts['Failed'] | default(0) }} |
-      Blocked: {{ t.counts['Blocked'] | default(0) }} |
-      Obsolete: {{ t.counts['Obsolete'] | default(0) }} |
-      Retest: {{ t.counts['Retest'] | default(0) }}
-    </p>
+    <div class="muted" style="margin:6px 0 4px;">Pass Rate: {{ t.pass_rate }}%</div>
+    <div class="run-chips" data-run-id="{{ t.run_id }}" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+      <button type="button" class="btn" data-status="">All</button>
+      {% for label in ['Failed','Blocked','Retest','Untested','Passed'] %}
+        {% set c = t.counts[label] | default(0) %}
+        {% if c > 0 %}
+          <button type="button" class="btn" data-status="{{ label }}">{{ label }} ({{ c }})</button>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:8px 0;">
+      <div class="donut" style="width:110px; height:110px; background: {{ t.donut_style }}"></div>
+      <div>
+        {% for seg in t.donut_legend %}
+          <div style="display:flex; align-items:center; gap:8px; font-size:12px;">
+            <span style="display:inline-block; width:10px; height:10px; background: {{ seg.color }}; border-radius:2px;"></span>
+            <span>{{ seg.label }}: {{ seg.count }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
     <div class="table-controls" data-run-id="{{ t.run_id }}">
-      <label>Rows visible:
+      <label>Search: <input type="search" class="table-filter" placeholder="keyword..." data-run-id="{{ t.run_id }}"></label>
+      <label>Status:
+        <select class="filter-status" data-run-id="{{ t.run_id }}">
+          <option value="">All</option>
+          <option value="Passed">Passed</option>
+          <option value="Failed">Failed</option>
+          <option value="Blocked">Blocked</option>
+          <option value="Retest">Retest</option>
+          <option value="Untested">Untested</option>
+        </select>
+      </label>
+      <label>Assignee:
+        <select class="filter-assignee" data-run-id="{{ t.run_id }}">
+          <option value="">All</option>
+        </select>
+      </label>
+      <label>Priority:
+        <select class="filter-priority" data-run-id="{{ t.run_id }}">
+          <option value="">All</option>
+        </select>
+      </label>
+      <label><input type="checkbox" class="filter-hide-untested" data-run-id="{{ t.run_id }}"> Hide Untested</label>
+      <label>Rows:
         <select class="page-size" data-run-id="{{ t.run_id }}">
           <option value="10" selected>10</option>
           <option value="15">15</option>
@@ -145,13 +182,24 @@
       </colgroup>
       <thead>
         <tr>
-          <th>ID</th><th>Title</th><th>Status</th><th>Assignee</th><th>Refs</th><th>Priority</th>
+          <th data-sort-by="test_id">ID</th>
+          <th data-sort-by="title">Title</th>
+          <th data-sort-by="status_name">Status</th>
+          <th data-sort-by="assignee">Assignee</th>
+          <th data-sort-by="refs">Refs</th>
+          <th data-sort-by="priority">Priority</th>
         </tr>
       </thead>
       <tbody id="rows-{{ t.run_id }}">
         {% for r in t.rows %}
-        <tr>
-          <td>{{ r.test_id }}</td>
+        <tr data-status="{{ (r.status_name or '')|string|lower }}" data-assignee="{{ (r.assignee or '')|string|lower }}" data-priority="{{ (r.priority or '')|string|lower }}">
+          <td>
+            {% if base_url and r.test_id %}
+              <a href="{{ base_url }}/index.php?/tests/view/{{ r.test_id }}" target="_blank" rel="noopener">{{ r.test_id }}</a>
+            {% else %}
+              {{ r.test_id }}
+            {% endif %}
+          </td>
           <td>{{ r.title }}</td>
           <td>
             {% if r.status_name == 'Passed' %}
@@ -224,6 +272,95 @@
       document.addEventListener('DOMContentLoaded', function(){
         document.querySelectorAll('.run-card').forEach(card => {
           setupRun(card.getAttribute('data-run-id'));
+        });
+      });
+    })();
+  </script>
+  <script>
+    (function() {
+      function setupInteractiveTable(runId) {
+        const table = document.getElementById('table-' + runId);
+        const tbody = document.getElementById('rows-' + runId);
+        const filterInput = document.querySelector('.table-filter[data-run-id="' + runId + '"]');
+        const statusSel = document.querySelector('.filter-status[data-run-id="' + runId + '"]');
+        const assigneeSel = document.querySelector('.filter-assignee[data-run-id="' + runId + '"]');
+        const prioritySel = document.querySelector('.filter-priority[data-run-id="' + runId + '"]');
+        const hideUntested = document.querySelector('.filter-hide-untested[data-run-id="' + runId + '"]');
+        const chips = document.querySelectorAll('.run-chips[data-run-id="' + runId + '"] [data-status]');
+        if (!table || !tbody || !filterInput) return;
+
+        // Populate assignee & priority options from rows
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const uniq = (arr)=> Array.from(new Set(arr)).filter(Boolean).sort((a,b)=> a.localeCompare(b));
+        const assignees = uniq(rows.map(r=> (r.dataset.assignee||'').trim()).filter(Boolean));
+        const priorities = uniq(rows.map(r=> (r.dataset.priority||'').trim()).filter(Boolean));
+        if (assigneeSel && assignees.length){ assigneeSel.innerHTML = '<option value="">All</option>' + assignees.map(a=> `<option>${a}</option>`).join(''); }
+        if (prioritySel && priorities.length){ prioritySel.innerHTML = '<option value="">All</option>' + priorities.map(p=> `<option>${p}</option>`).join(''); }
+
+        // Filtering
+        function applyFilters(){
+          const text = (filterInput.value || '').toLowerCase();
+          const status = (statusSel && statusSel.value) || '';
+          const assignee = (assigneeSel && assigneeSel.value || '').toLowerCase();
+          const priority = (prioritySel && prioritySel.value || '').toLowerCase();
+          const hideU = !!(hideUntested && hideUntested.checked);
+          rows.forEach(row => {
+            const rowText = row.textContent.toLowerCase();
+            const rs = (row.dataset.status || '');
+            const ra = (row.dataset.assignee || '');
+            const rp = (row.dataset.priority || '');
+            let visible = true;
+            if (text && !rowText.includes(text)) visible = false;
+            if (visible && status && rs !== status.toLowerCase()) visible = false;
+            if (visible && assignee && ra !== assignee) visible = false;
+            if (visible && priority && rp !== priority) visible = false;
+            if (visible && hideU && rs === 'untested') visible = false;
+            row.style.display = visible ? '' : 'none';
+          });
+        }
+        filterInput.addEventListener('keyup', applyFilters);
+        if (statusSel) statusSel.addEventListener('change', applyFilters);
+        if (assigneeSel) assigneeSel.addEventListener('change', applyFilters);
+        if (prioritySel) prioritySel.addEventListener('change', applyFilters);
+        if (hideUntested) hideUntested.addEventListener('change', applyFilters);
+
+        // Quick presets removed per request
+
+        // Status chips click → apply status filter immediately
+        chips.forEach(ch => {
+          ch.addEventListener('click', () => {
+            const v = ch.getAttribute('data-status') || '';
+            if (statusSel) statusSel.value = v;
+            applyFilters();
+          });
+        });
+
+        // Sorting
+        table.querySelectorAll('thead th[data-sort-by]').forEach(header => {
+          header.style.cursor = 'pointer';
+          header.addEventListener('click', () => {
+            const sortBy = header.getAttribute('data-sort-by');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const sortDir = header.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+            header.setAttribute('data-sort-dir', sortDir);
+
+            rows.sort((a, b) => {
+              const aText = a.querySelector(`td:nth-child(${header.cellIndex + 1})`).textContent.trim();
+              const bText = b.querySelector(`td:nth-child(${header.cellIndex + 1})`).textContent.trim();
+              
+              if (aText < bText) return sortDir === 'asc' ? -1 : 1;
+              if (aText > bText) return sortDir === 'asc' ? 1 : -1;
+              return 0;
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+          });
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', function(){
+        document.querySelectorAll('.run-card').forEach(card => {
+          setupInteractiveTable(card.getAttribute('data-run-id'));
         });
       });
     })();
