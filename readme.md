@@ -96,6 +96,17 @@ python scripts/send_test_email.py --to you@domain.com --subject "SMTP test" --bo
 
 If you see an authentication error, regenerate the Gmail App Password.
 
+### When SMTP is blocked on your PaaS
+Some platforms restrict outbound SMTP (e.g., ports 25/465/587) which results in errors like `[Errno 101] Network is unreachable`. In that case, use an HTTP email API provider instead of SMTP.
+
+Send via SendGrid API:
+
+1) Set env vars:
+   - `EMAIL_PROVIDER=sendgrid`
+   - `SMTP_USER=sender@yourdomain.com` (used as From)
+   - `SENDGRID_API_KEY=…`
+2) Redeploy/restart. The app will call SendGrid’s HTTPS API and attach the generated HTML.
+
 ## Debugging
 
 - SMTP in use: open `GET /api/debug/smtp` to verify the active SMTP server, port, and user (masked). Useful if host env vars override `.env`.

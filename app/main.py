@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 from testrail_daily_report import generate_report, get_plans_for_project, env_or_die
 import requests
 import glob
+import base64
+import mimetypes
 
 # Ensure local .env overrides host/env settings to avoid stale provider configs
 load_dotenv(override=True)
@@ -54,14 +56,9 @@ def _humanize_smtp_error(e: Exception, server: str) -> str:
     return msg
 
 
-def send_email(recipient: str, subject: str, body: str, attachment_path: str):
-    sender_email = env_or_die("SMTP_USER")
-    password = env_or_die("SMTP_PASSWORD")
-    smtp_server = env_or_die("SMTP_SERVER")
-    smtp_port = int(env_or_die("SMTP_PORT"))
-    use_ssl = _parse_bool_env("SMTP_USE_SSL", False)
-    use_starttls = _parse_bool_env("SMTP_STARTTLS", True)
-
+def _send_email_via_smtp(sender_email: str, password: str, smtp_server: str, smtp_port: int, use_ssl: bool, use_starttls: bool,
+                         recipient: str, subject: str, body: str, attachment_path: str):
+    """Send using direct SMTP (STARTTLS or SSL)."""
     msg = MIMEMultipart()
     msg["From"] = sender_email
     msg["To"] = recipient
@@ -82,11 +79,11 @@ def send_email(recipient: str, subject: str, body: str, attachment_path: str):
 
     try:
         if use_ssl:
-            with smtplib.SMTP_SSL(smtp_server, smtp_port) as server:
+            with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=15) as server:
                 server.login(sender_email, password)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
+            with smtplib.SMTP(smtp_server, smtp_port, timeout=15) as server:
                 server.ehlo()
                 if use_starttls:
                     server.starttls()
@@ -94,10 +91,68 @@ def send_email(recipient: str, subject: str, body: str, attachment_path: str):
                 server.login(sender_email, password)
                 server.send_message(msg)
     except smtplib.SMTPAuthenticationError as auth_err:
-        # Raise a clearer message for the UI to display
         raise HTTPException(status_code=401, detail=_humanize_smtp_error(auth_err, smtp_server))
-    except smtplib.SMTPException as smtp_err:
-        raise HTTPException(status_code=502, detail=_humanize_smtp_error(smtp_err, smtp_server))
+    except (smtplib.SMTPException, OSError) as smtp_err:
+        # Network issues (e.g., [Errno 101] Network is unreachable) → likely provider egress block on SMTP
+        detail = str(smtp_err)
+        if isinstance(smtp_err, OSError) and getattr(smtp_err, 'errno', None) == 101:
+            detail = (
+                "Outbound SMTP appears blocked from this environment (Network is unreachable). "
+                "On some PaaS (e.g., Render free tier), SMTP ports are restricted. "
+                "Use an email API provider (e.g., SendGrid) or enable SMTP egress."
+            )
+        raise HTTPException(status_code=502, detail=detail)
+
+
+def _send_email_via_sendgrid(sender_email: str, recipient: str, subject: str, body: str, attachment_path: str):
+    api_key = env_or_die("SENDGRID_API_KEY")
+    mime, _ = mimetypes.guess_type(attachment_path)
+    if not mime:
+        mime = "application/octet-stream"
+    with open(attachment_path, "rb") as f:
+        content_b64 = base64.b64encode(f.read()).decode("ascii")
+    payload = {
+        "personalizations": [{"to": [{"email": recipient}]}],
+        "from": {"email": sender_email},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": body}],
+        "attachments": [{
+            "content": content_b64,
+            "filename": os.path.basename(attachment_path),
+            "type": mime,
+            "disposition": "attachment"
+        }],
+    }
+    try:
+        r = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=20,
+        )
+        if r.status_code >= 400:
+            raise HTTPException(status_code=502, detail=f"SendGrid error {r.status_code}: {r.text}")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"SendGrid network error: {e}")
+
+
+def send_email(recipient: str, subject: str, body: str, attachment_path: str):
+    sender_email = env_or_die("SMTP_USER")
+    provider = os.getenv("EMAIL_PROVIDER", "smtp").strip().lower()
+    if provider == "sendgrid":
+        _send_email_via_sendgrid(sender_email, recipient, subject, body, attachment_path)
+        return
+    # default: SMTP
+    password = env_or_die("SMTP_PASSWORD")
+    smtp_server = env_or_die("SMTP_SERVER")
+    smtp_port = int(env_or_die("SMTP_PORT"))
+    use_ssl = _parse_bool_env("SMTP_USE_SSL", False)
+    use_starttls = _parse_bool_env("SMTP_STARTTLS", True)
+    _send_email_via_smtp(sender_email, password, smtp_server, smtp_port, use_ssl, use_starttls,
+                         recipient, subject, body, attachment_path)
 
 @app.get("/healthz")
 def healthz():
