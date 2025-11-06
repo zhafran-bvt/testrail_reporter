@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 import pandas as pd
 
-from testrail_daily_report import summarize_results, build_test_table, get_plans_for_project
+from testrail_daily_report import summarize_results, build_test_table, get_plans_for_project, extract_refs
 
 
 class TestSummarizeResults(unittest.TestCase):
@@ -70,7 +70,24 @@ class TestPlansAPIShapes(unittest.TestCase):
         plans = get_plans_for_project(object(), "http://x", 2)
         self.assertEqual([p.get("id") for p in plans], [5])
 
+class TestExtractRefs(unittest.TestCase):
+    def test_extract_refs_from_dicts(self):
+        items = [
+            {"refs": "ORB-1, ORB-2"},
+            {"refs": "ORB-2, ORB-3"},
+            {"refs": None},
+            {},
+        ]
+        refs = extract_refs(items)
+        self.assertEqual(refs, ["ORB-1", "ORB-2", "ORB-3"])
+
+    def test_extract_refs_from_dataframe(self):
+        df = pd.DataFrame([
+            {"refs": "ABC-1"},
+            {"refs": "ABC-2, ABC-3"},
+        ])
+        refs = extract_refs(df)
+        self.assertEqual(refs, ["ABC-1", "ABC-2", "ABC-3"])
 
 if __name__ == "__main__":
     unittest.main()
-

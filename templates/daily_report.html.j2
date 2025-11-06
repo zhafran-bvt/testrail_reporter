@@ -43,6 +43,7 @@
     .table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: auto; box-shadow: var(--shadow); position: relative; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 13px; vertical-align: top; word-break: break-word; background: var(--card-bg); }
+    td { position: relative; }
     thead th {
       background: var(--card-bg); /* solid background to prevent overlap */
       text-align: left;
@@ -65,6 +66,29 @@
     .table-controls label { display:inline-flex; align-items:center; gap:6px; color: var(--muted); font-size: 12px; }
     .table-controls select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); }
     .muted { color:var(--muted); font-size:12px; }
+    .comment-text { font-size: 12px; color: var(--muted); margin-bottom: 6px; white-space: pre-wrap; }
+    .attachment-trigger { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; border:1px solid var(--primary); background: transparent; color: var(--primary); font-size:12px; cursor:pointer; }
+    .attachment-trigger:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+    .attachment-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:8px; border:1px solid var(--border); background: rgba(148,163,184,0.15); font-size:11px; color: var(--muted); }
+    .modal-backdrop { position: fixed; inset:0; background: rgba(15,23,42,0.55); display:none; align-items:center; justify-content:center; z-index:9999; padding:24px; }
+    .modal-backdrop.open { display:flex; }
+    .modal { background: var(--card-bg); color: var(--text); border-radius:16px; max-width: 900px; width:100%; max-height: 90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 20px 45px rgba(15,23,42,0.35); }
+    .modal-header { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid var(--border); }
+    .modal-body { padding:16px 18px; overflow:auto; }
+    .modal-footer { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-top:1px solid var(--border); gap:12px; flex-wrap:wrap; }
+    .modal-close { background:none; border:none; font-size:20px; cursor:pointer; color: var(--muted); }
+    .modal-close:hover { color: var(--text); }
+    .slide-nav { display:flex; gap:10px; align-items:center; }
+    .slide-nav button { padding:8px 12px; border-radius:8px; border:1px solid var(--border); background: transparent; cursor:pointer; }
+    .slide-nav button:hover { background: rgba(59,130,246,0.08); }
+    .modal-image-wrap { display:flex; justify-content:center; margin-bottom:14px; }
+    .modal-image-wrap img { max-width:100%; max-height:55vh; border-radius:12px; box-shadow:0 6px 18px rgba(15,23,42,0.25); }
+    .modal-comment { font-size:13px; color:var(--muted); margin-bottom:12px; white-space:pre-wrap; }
+    .attachment-list { display:flex; flex-direction:column; gap:6px; font-size:12px; }
+    @media (max-width:640px){
+      .modal { max-height: 85vh; }
+      .modal-body { padding:12px; }
+    }
   </style>
 </head>
 <body>
@@ -116,6 +140,14 @@
   <div class="card run-card" id="run-{{ t.run_id }}" data-run-id="{{ t.run_id }}">
     <h3>Run #{{ t.run_id }}{% if t.run_name %} - {{ t.run_name }}{% endif %}</h3>
     <div class="muted" style="margin:6px 0 4px;">Pass Rate: {{ t.pass_rate }}%</div>
+    {% if t.refs %}
+      <div class="muted" style="margin:4px 0 8px;">
+        <b>Refs:</b>
+        {% for ref in t.refs %}
+          <a href="{{ jira_base }}{{ ref }}" target="_blank" rel="noopener">{{ ref }}</a>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
     <div class="run-chips" data-run-id="{{ t.run_id }}" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
       <button type="button" class="btn" data-status="">All</button>
       {% for label in ['Failed','Blocked','Retest','Untested','Passed'] %}
@@ -174,11 +206,11 @@
     <table id="table-{{ t.run_id }}">
       <colgroup>
         <col style="width:7%" />
-        <col style="width:45%" />
-        <col style="width:8%" />
-        <col style="width:25%" />
-        <col style="width:7%" />
-        <col style="width:8%" />
+        <col style="width:38%" />
+        <col style="width:15%" />
+        <col style="width:15%" />
+        <col style="width:15%" />
+        <col style="width:20%" />
       </colgroup>
       <thead>
         <tr>
@@ -186,8 +218,8 @@
           <th data-sort-by="title">Title</th>
           <th data-sort-by="status_name">Status</th>
           <th data-sort-by="assignee">Assignee</th>
-          <th data-sort-by="refs">Refs</th>
           <th data-sort-by="priority">Priority</th>
+          <th>Attachments</th>
         </tr>
       </thead>
       <tbody id="rows-{{ t.run_id }}">
@@ -211,18 +243,23 @@
             {% endif %}
           </td>
           <td>{{ r.assignee or '' }}</td>
+          <td>{{ r.priority or '' }}</td>
           <td>
-            {% if r.refs %}
-              {% set refs = (r.refs|string).split(',') %}
-              {% for ref in refs %}
-                {% set ref_trim = ref.strip() %}
-                {% if ref_trim %}
-                  <a href="{{ jira_base }}{{ ref_trim }}" target="_blank" rel="noopener">{{ ref_trim }}</a>{% if not loop.last %}, {% endif %}
-                {% endif %}
-              {% endfor %}
+            {% set attachments = r.attachments or [] %}
+            {% set attachment_count = attachments|length %}
+            {% if attachment_count > 0 or (r.comment and r.comment|length > 0) %}
+              <button type="button"
+                      class="attachment-trigger"
+                      data-run="{{ t.run_id }}"
+                      data-test="{{ r.test_id }}"
+                      data-title="{{ r.title|e }}"
+                      data-comment="{{ r.comment|default('', true)|e }}"
+                      data-attachments='{{ attachments|tojson }}'>
+                Attachment{% if attachment_count != 1 %}s{% endif %}
+                {% if attachment_count > 0 %}({{ attachment_count }}){% endif %}
+              </button>
             {% endif %}
           </td>
-          <td>{{ r.priority or '' }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -230,6 +267,34 @@
     </div>
   </div>
   {% endfor %}
+
+  <div class="modal-backdrop" id="attachmentModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="attachmentModalTitle">
+      <div class="modal-header">
+        <div>
+          <div id="attachmentModalTitle" style="font-weight:600;">Attachments</div>
+          <div id="attachmentModalSubtitle" class="muted" style="font-size:12px;"></div>
+        </div>
+        <button type="button" class="modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-comment" id="attachmentModalComment"></div>
+        <div class="modal-image-wrap">
+          <img id="attachmentModalImage" alt="Attachment evidence" style="display:none;" />
+        </div>
+        <div class="attachment-list" id="attachmentList"></div>
+      </div>
+      <div class="modal-footer">
+        <div class="slide-nav">
+          <button type="button" id="prevAttachment">⟨ Prev</button>
+          <div class="muted" id="attachmentCounter" style="min-width:90px; text-align:center;"></div>
+          <button type="button" id="nextAttachment">Next ⟩</button>
+        </div>
+        <button type="button" class="attachment-chip modal-close" style="border-color: var(--primary); color: var(--primary); background: transparent;">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     (function(){
       function setupRun(runId){
@@ -357,6 +422,110 @@
           });
         });
       }
+
+      const modal = document.getElementById('attachmentModal');
+      const imgEl = document.getElementById('attachmentModalImage');
+      const listEl = document.getElementById('attachmentList');
+      const commentEl = document.getElementById('attachmentModalComment');
+      const titleEl = document.getElementById('attachmentModalTitle');
+      const subtitleEl = document.getElementById('attachmentModalSubtitle');
+      const counterEl = document.getElementById('attachmentCounter');
+      const prevBtn = document.getElementById('prevAttachment');
+      const nextBtn = document.getElementById('nextAttachment');
+      const closeBtns = modal.querySelectorAll('.modal-close');
+      let attachmentsState = [];
+      let attachmentsIndex = 0;
+
+      function updateAttachmentView(){
+        if(!attachmentsState.length){
+          imgEl.style.display = 'none';
+          listEl.innerHTML = '<span class="muted">No attachments available.</span>';
+          counterEl.textContent = '';
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+          return;
+        }
+        const current = attachmentsState[attachmentsIndex];
+        if(current.is_image){
+          imgEl.src = current.path;
+          imgEl.alt = current.name || 'Attachment';
+          imgEl.style.display = 'block';
+        } else {
+          imgEl.style.display = 'none';
+        }
+        const items = attachmentsState.map((item, idx) => {
+          const isActive = idx === attachmentsIndex;
+          const wrapperClass = isActive ? 'attachment-chip' : 'muted';
+          const icon = item.is_image ? '🖼' : '📎';
+          return `<div class="${wrapperClass}"><a href="${item.path}" target="_blank" rel="noopener">${icon} ${item.name || 'Attachment'}</a></div>`;
+        });
+        listEl.innerHTML = items.join('');
+        counterEl.textContent = `${attachmentsIndex + 1} / ${attachmentsState.length}`;
+        prevBtn.disabled = attachmentsState.length <= 1;
+        nextBtn.disabled = attachmentsState.length <= 1;
+      }
+
+      function openAttachmentModal(detail){
+        attachmentsState = detail.attachments || [];
+        attachmentsIndex = 0;
+        titleEl.textContent = `Attachments — ${detail.title || ''}`;
+        subtitleEl.textContent = `Run ${detail.runId || ''} • Test ${detail.testId || ''}`;
+        if(detail.comment){
+          commentEl.textContent = detail.comment;
+          commentEl.style.display = 'block';
+        } else {
+          commentEl.textContent = '';
+          commentEl.style.display = 'none';
+        }
+        updateAttachmentView();
+        modal.classList.add('open');
+      }
+
+      function closeAttachmentModal(){
+        modal.classList.remove('open');
+        attachmentsState = [];
+        attachmentsIndex = 0;
+      }
+
+      document.addEventListener('click', function(ev){
+        const trigger = ev.target.closest('.attachment-trigger');
+        if(trigger){
+          let parsed = [];
+          try {
+            parsed = JSON.parse(trigger.dataset.attachments || '[]');
+          } catch (e) {
+            parsed = [];
+          }
+          openAttachmentModal({
+            attachments: parsed,
+            comment: trigger.dataset.comment || '',
+            runId: trigger.dataset.run || '',
+            testId: trigger.dataset.test || '',
+            title: trigger.dataset.title || ''
+          });
+        }
+        if(ev.target === modal){
+          closeAttachmentModal();
+        }
+      });
+
+      closeBtns.forEach(btn => btn.addEventListener('click', closeAttachmentModal));
+      prevBtn.addEventListener('click', function(){
+        if(attachmentsState.length <= 1) return;
+        attachmentsIndex = (attachmentsIndex - 1 + attachmentsState.length) % attachmentsState.length;
+        updateAttachmentView();
+      });
+      nextBtn.addEventListener('click', function(){
+        if(attachmentsState.length <= 1) return;
+        attachmentsIndex = (attachmentsIndex + 1) % attachmentsState.length;
+        updateAttachmentView();
+      });
+      document.addEventListener('keydown', function(ev){
+        if(!modal.classList.contains('open')) return;
+        if(ev.key === 'Escape'){ closeAttachmentModal(); }
+        if(ev.key === 'ArrowRight'){ nextBtn.click(); }
+        if(ev.key === 'ArrowLeft'){ prevBtn.click(); }
+      });
 
       document.addEventListener('DOMContentLoaded', function(){
         document.querySelectorAll('.run-card').forEach(card => {

@@ -10,13 +10,17 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.get_plan')
     @patch('testrail_daily_report.get_plan_runs')
     @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
     @patch('testrail_daily_report.get_results_for_run')
     @patch('testrail_daily_report.get_users_map')
     @patch('testrail_daily_report.get_priorities_map')
     @patch('testrail_daily_report.get_statuses_map')
     @patch('testrail_daily_report.render_html')
     @patch('testrail_daily_report.env_or_die')
-    def test_generate_report_plan(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map, mock_users_map, mock_results_for_run, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+    def test_generate_report_plan(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                  mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                  mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
         # Mock environment variables
         mock_env_or_die.side_effect = lambda key: {
             "TESTRAIL_BASE_URL": "http://fake-testrail.com",
@@ -33,9 +37,17 @@ class TestReportGenerator(unittest.TestCase):
             {"id": 2, "title": "Test Case 2", "status_id": 5, "priority_id": 2, "assignedto_id": 2},
         ]
         mock_results_for_run.return_value = [
-            {"test_id": 1, "status_id": 1},
-            {"test_id": 2, "status_id": 5},
+            {"id": 11, "test_id": 1, "status_id": 1, "comment": "Looks good"},
+            {"id": 12, "test_id": 2, "status_id": 5, "comment": "Needs fix"},
         ]
+        def attachments_side_effect(_session, _base_url, test_id):
+            mapping = {
+                1: [{"id": 101, "name": "pass.png", "result_id": 11}],
+                2: [{"id": 102, "name": "fail.png", "result_id": 12}, {"id": 103, "name": "fail.png", "result_id": 12}],
+            }
+            return mapping.get(test_id, [])
+        mock_get_attachments_for_test.side_effect = attachments_side_effect
+        mock_download_attachment.return_value = (b"fake-bytes", "image/png")
         mock_users_map.return_value = {1: "User A", 2: "User B"}
         mock_priorities_map.return_value = {1: "P1", 2: "P2"}
         mock_statuses_map.return_value = {1: "Passed", 5: "Failed"}
@@ -66,6 +78,60 @@ class TestReportGenerator(unittest.TestCase):
         labels = {seg.get('label') for seg in run_card['donut_legend']}
         self.assertIn('Passed', labels)
         self.assertIn('Failed', labels)
+        first_row = run_card['rows'][0]
+        self.assertEqual(first_row.get('comment'), "Needs fix")
+        attachments = first_row.get('attachments', [])
+        self.assertEqual(len(attachments), 2)
+        paths = {att['path'] for att in attachments}
+        self.assertEqual(paths, {
+            "attachments/run_101/test_2_att_102.png",
+            "attachments/run_101/test_2_att_103.png",
+        })
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_generate_report_attachments_failure(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                                 mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                                 mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Plan"}
+        mock_plan_runs.return_value = [99]
+        mock_tests_for_run.return_value = [
+            {"id": 7, "title": "Sample Test", "status_id": 1, "priority_id": 3, "assignedto_id": 9},
+        ]
+        mock_results_for_run.return_value = [
+            {"id": 701, "test_id": 7, "status_id": 1, "comment": "Commented"},
+        ]
+        mock_users_map.return_value = {9: "User Nine"}
+        mock_priorities_map.return_value = {3: "Medium"}
+        mock_statuses_map.return_value = {1: "Passed"}
+        mock_get_attachments_for_test.side_effect = RuntimeError("boom")
+        mock_download_attachment.return_value = (b"", "image/png")
+        mock_render_html.return_value = "/tmp/report.html"
+
+        path = generate_report(project=1, plan=55)
+        self.assertEqual(path, "/tmp/report.html")
+        context = mock_render_html.call_args[0][0]
+        self.assertIn('tables', context)
+        self.assertGreater(len(context['tables']), 0)
+        rows = context['tables'][0]['rows']
+        self.assertEqual(rows[0]['attachments'], [])
+        self.assertEqual(rows[0]['comment'], "Commented")
 
     def test_build_test_table(self):
         tests_df = pd.DataFrame([

@@ -8,8 +8,9 @@ Requires env vars:
     TESTRAIL_BASE_URL, TESTRAIL_USER, TESTRAIL_API_KEY
 """
 
-import os, sys, argparse, requests, pandas as pd
+import os, sys, argparse, requests, pandas as pd, mimetypes
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
 from dotenv import load_dotenv
@@ -230,6 +231,37 @@ def get_plans_for_project(session, base_url, project_id: int, *, is_completed: i
     return plans
 
 
+def get_attachments_for_test(session, base_url, test_id: int):
+    try:
+        data = api_get(session, base_url, f"get_attachments_for_test/{test_id}")
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            # Some instances may wrap in dict
+            return data.get("attachments", [])
+        return []
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return []
+        print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
+        return []
+    except Exception as e:
+        print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
+        return []
+
+
+def download_attachment(session, base_url, attachment_id: int):
+    url = f"{base_url}/index.php?/api/v2/get_attachment/{attachment_id}"
+    r = session.get(url)
+    r.raise_for_status()
+    return r.content, r.headers.get("Content-Type")
+
+
+def sanitize_filename(name: str) -> str:
+    cleaned = "".join(c if c.isalnum() or c in ("-", "_", ".", " ") else "_" for c in name)
+    return cleaned.strip().replace(" ", "_") or "attachment"
+
+
 def summarize_results(results, status_map=DEFAULT_STATUS_MAP):
     df = pd.DataFrame(results)
     # If no results or unexpected payload (e.g., missing test_id), return empty frame with expected columns
@@ -332,10 +364,30 @@ def build_test_table(tests_df: pd.DataFrame, results_df: pd.DataFrame, status_ma
         merged["priority"] = ""
 
     # Select and order columns for output
-    desired = ["test_id", "title", "status_name", "assignee", "refs", "priority"]
+    desired = ["test_id", "title", "status_name", "assignee", "priority"]
     cols = [c for c in desired if c in merged]
     cleaned = merged[cols].where(pd.notna(merged[cols]), None)
     return cleaned
+
+
+def extract_refs(items) -> list[str]:
+    """Return sorted unique refs extracted from iterable of dicts or DataFrame rows."""
+    refs_set: set[str] = set()
+    if isinstance(items, pd.DataFrame):
+        iterable = items.to_dict(orient="records")
+    else:
+        iterable = items
+    for item in iterable:
+        if not isinstance(item, dict):
+            continue
+        refs_val = item.get("refs")
+        if not refs_val:
+            continue
+        for ref in str(refs_val).split(","):
+            ref_trim = ref.strip()
+            if ref_trim:
+                refs_set.add(ref_trim)
+    return sorted(refs_set)
 
 
 def render_html(context: dict, out_path: Path):
@@ -381,6 +433,9 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     summary = {"total": 0, "Passed": 0, "Failed": 0}
     tables = []
     # Time-based trend removed
+
+    report_refs: set[str] = set()
+    attachment_workers = max(1, int(os.getenv("ATTACHMENT_WORKERS", "4")))
 
     for rid in run_ids:
         results = get_results_for_run(session, base_url, rid)
@@ -439,15 +494,150 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             return segments, donut_style
 
         segs, run_donut_style = _build_segments(counts)
+        run_refs = extract_refs(tests)
+        report_refs.update(run_refs)
+
+        latest_results_df = res_summary["df"]
+        comments_by_test: dict[int, str] = {}
+        latest_result_ids: dict[int, int] = {}
+        if not latest_results_df.empty:
+            latest_records = latest_results_df.to_dict(orient="records")
+            for rec in latest_records:
+                tid = rec.get("test_id")
+                if tid is None or pd.isna(tid):
+                    continue
+                tid_int = int(tid)
+                comment = rec.get("comment")
+                if comment:
+                    comments_by_test[tid_int] = comment
+                result_id = rec.get("id")
+                if result_id is not None and not pd.isna(result_id):
+                    latest_result_ids[tid_int] = int(result_id)
+        attachments_by_test: dict[int, list[dict]] = {}
+        for tid, result_id in latest_result_ids.items():
+            attachments_by_test.setdefault(tid, [])
+
+        def _fetch_metadata(test_id: int):
+            try:
+                data = get_attachments_for_test(session, base_url, test_id)
+                if not isinstance(data, list):
+                    if isinstance(data, dict):
+                        return test_id, data.get("attachments", [])
+                    return test_id, []
+                return test_id, data
+            except Exception as e:
+                print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
+                return test_id, []
+
+        metadata_map: dict[int, list] = {}
+        if latest_result_ids:
+            with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
+                futures = {executor.submit(_fetch_metadata, tid): tid for tid in latest_result_ids}
+                for future in as_completed(futures):
+                    tid = futures[future]
+                    try:
+                        _, payload = future.result()
+                    except Exception as e:
+                        print(f"Warning: attachments metadata future failed for test {tid}: {e}", file=sys.stderr)
+                        payload = []
+                    metadata_map[tid] = payload or []
+
+        download_jobs = []
+        for tid, payload in metadata_map.items():
+            if not payload:
+                continue
+            result_id = latest_result_ids.get(tid)
+            if result_id is None:
+                continue
+            for att in payload:
+                rid_match = att.get("result_id")
+                if rid_match is not None and int(rid_match) != result_id:
+                    continue
+                attachment_id = att.get("id") or att.get("attachment_id")
+                if attachment_id is None:
+                    continue
+                try:
+                    attachment_id = int(attachment_id)
+                except (TypeError, ValueError):
+                    continue
+                filename = att.get("name") or att.get("filename") or f"attachment_{attachment_id}"
+                safe_filename = sanitize_filename(filename)
+                inferred_type = att.get("content_type") or att.get("mime_type") or mimetypes.guess_type(filename)[0]
+                ext = Path(safe_filename).suffix
+                if not ext and inferred_type:
+                    guessed_ext = mimetypes.guess_extension(inferred_type)
+                    if guessed_ext:
+                        safe_filename = f"{safe_filename}{guessed_ext}"
+                        ext = guessed_ext
+                if not ext:
+                    ext = ""
+                unique_filename = f"test_{tid}_att_{attachment_id}{ext}"
+                rel_path = Path("attachments") / f"run_{rid}" / unique_filename
+                abs_path = Path("out") / rel_path
+                abs_path.parent.mkdir(parents=True, exist_ok=True)
+                download_jobs.append({
+                    "test_id": tid,
+                    "attachment_id": attachment_id,
+                    "filename": filename,
+                    "rel_path": rel_path,
+                    "abs_path": abs_path,
+                    "initial_type": inferred_type,
+                    "size": att.get("size"),
+                })
+
+        if download_jobs:
+            def _download(job):
+                attachment_id = job["attachment_id"]
+                data, content_type = download_attachment(session, base_url, attachment_id)
+                job["abs_path"].write_bytes(data)
+                return content_type
+
+            with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
+                future_map = {executor.submit(_download, job): job for job in download_jobs}
+                for future in as_completed(future_map):
+                    job = future_map[future]
+                    tid = job["test_id"]
+                    try:
+                        content_type = future.result()
+                    except Exception as e:
+                        print(f"Warning: download failed for attachment {job['attachment_id']}: {e}", file=sys.stderr)
+                        continue
+                    content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
+                    is_image = bool(content_type and content_type.startswith("image/"))
+                    attachments_by_test.setdefault(tid, []).append({
+                        "name": job["filename"],
+                        "path": str(job["rel_path"]).replace(os.sep, "/"),
+                        "content_type": content_type,
+                        "size": job["size"],
+                        "is_image": is_image,
+                    })
+
+        for tid in attachments_by_test:
+            attachments_by_test[tid].sort(key=lambda entry: entry["path"])
+
+        rows_payload = []
+        for record in table_df.to_dict(orient="records"):
+            tid = record.get("test_id")
+            tid_int = None
+            if tid is not None and not (isinstance(tid, float) and pd.isna(tid)):
+                try:
+                    tid_int = int(tid)
+                except (TypeError, ValueError):
+                    tid_int = None
+            record["comment"] = comments_by_test.get(tid_int, "")
+            record["attachments"] = attachments_by_test.get(tid_int, [])
+            rows_payload.append(record)
+
         tables.append({
             "run_id": rid,
             "run_name": run_names.get(int(rid)) if run_names else None,
-            "rows": table_df.to_dict(orient="records"),
+            "rows": rows_payload,
             "counts": counts,
             "total": run_total,
             "pass_rate": run_pass_rate,
             "donut_style": run_donut_style,
             "donut_legend": segs,
+            "refs": run_refs,
         })
         summary["total"] += run_total
         summary["Passed"] += run_passed
@@ -499,6 +689,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         "donut_style": donut_style,
         "donut_legend": segments,
         "jira_base": "https://bvarta-project.atlassian.net/browse/",
+        "report_refs": sorted(report_refs),
     }
 
     def _safe_filename(name: str) -> str:
