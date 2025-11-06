@@ -8,12 +8,14 @@ Requires env vars:
     TESTRAIL_BASE_URL, TESTRAIL_USER, TESTRAIL_API_KEY
 """
 
-import os, sys, argparse, requests, pandas as pd, mimetypes
+import os, sys, argparse, requests, pandas as pd, mimetypes, base64
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
+from io import BytesIO
 from dotenv import load_dotenv
+from PIL import Image
 
 # Ensure .env overrides any existing env so local config is honored
 load_dotenv(override=True)
@@ -390,6 +392,31 @@ def extract_refs(items) -> list[str]:
     return sorted(refs_set)
 
 
+def compress_image_data(data: bytes, content_type: str | None):
+    if not content_type or not str(content_type).lower().startswith("image/"):
+        return data, content_type
+    max_dim = int(os.getenv("ATTACHMENT_IMAGE_MAX_DIM", "1400"))
+    jpeg_quality = int(os.getenv("ATTACHMENT_JPEG_QUALITY", "75"))
+    try:
+        with Image.open(BytesIO(data)) as img:
+            img_format = (img.format or "").upper()
+            if max(img.size) > max_dim:
+                img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+            buffer = BytesIO()
+            if img_format in {"JPEG", "JPG"}:
+                img = img.convert("RGB")
+                img.save(buffer, format="JPEG", optimize=True, quality=jpeg_quality)
+                return buffer.getvalue(), "image/jpeg"
+            if img_format == "PNG":
+                img.save(buffer, format="PNG", optimize=True, compress_level=6)
+                return buffer.getvalue(), "image/png"
+            img = img.convert("RGB")
+            img.save(buffer, format="JPEG", optimize=True, quality=jpeg_quality)
+            return buffer.getvalue(), "image/jpeg"
+    except Exception:
+        return data, content_type
+
+
 def render_html(context: dict, out_path: Path):
     env = Environment(loader=FileSystemLoader("templates"), autoescape=select_autoescape())
     tpl = env.get_template("daily_report.html.j2")
@@ -613,6 +640,24 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             def _download(job):
                 attachment_id = job["attachment_id"]
                 data, content_type = download_attachment(session, base_url, attachment_id)
+                data, content_type = compress_image_data(data, content_type)
+                job["content_type"] = content_type
+                job["data_bytes"] = data
+                suffix_map = {
+                    "image/jpeg": ".jpg",
+                    "image/jpg": ".jpg",
+                    "image/png": ".png",
+                }
+                desired_suffix = suffix_map.get((content_type or "").lower())
+                if desired_suffix:
+                    current_suffix = job["abs_path"].suffix.lower()
+                    if current_suffix != desired_suffix:
+                        rel_path = job["rel_path"].with_suffix(desired_suffix)
+                        job["rel_path"] = rel_path
+                        job["abs_path"] = Path("out") / rel_path
+                        job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
+                        base_name = Path(job["filename"]).stem or Path(job["filename"]).name
+                        job["filename"] = f"{base_name}{desired_suffix}"
                 job["abs_path"].write_bytes(data)
                 return content_type
 
@@ -628,12 +673,22 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         continue
                     content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
                     is_image = bool(content_type and content_type.startswith("image/"))
+                    data_url = None
+                    payload = job.get("data_bytes")
+                    if payload is not None and is_image:
+                        try:
+                            data_b64 = base64.b64encode(payload).decode("ascii")
+                            mime = content_type or "application/octet-stream"
+                            data_url = f"data:{mime};base64,{data_b64}"
+                        except Exception:
+                            data_url = None
                     attachments_by_test.setdefault(tid, []).append({
                         "name": job["filename"],
                         "path": str(job["rel_path"]).replace(os.sep, "/"),
                         "content_type": content_type,
                         "size": job["size"],
                         "is_image": is_image,
+                        "data_url": data_url,
                     })
 
         for tid in attachments_by_test:

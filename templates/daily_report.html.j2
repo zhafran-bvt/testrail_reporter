@@ -446,8 +446,8 @@
           return;
         }
         const current = attachmentsState[attachmentsIndex];
-        if(current.is_image){
-          imgEl.src = current.path;
+        if(current.is_image && current.data_url){
+          imgEl.src = current.data_url;
           imgEl.alt = current.name || 'Attachment';
           imgEl.style.display = 'block';
         } else {
@@ -457,7 +457,9 @@
           const isActive = idx === attachmentsIndex;
           const wrapperClass = isActive ? 'attachment-chip' : 'muted';
           const icon = item.is_image ? '🖼' : '📎';
-          return `<div class="${wrapperClass}"><a href="${item.path}" target="_blank" rel="noopener">${icon} ${item.name || 'Attachment'}</a></div>`;
+          const href = item.data_url || item.path;
+          const downloadAttr = href && href.startsWith('data:') ? ` download="${item.name || 'attachment'}"` : '';
+          return `<div class="${wrapperClass}"><a href="${href}" target="_blank" rel="noopener"${downloadAttr}>${icon} ${item.name || 'Attachment'}</a></div>`;
         });
         listEl.innerHTML = items.join('');
         counterEl.textContent = `${attachmentsIndex + 1} / ${attachmentsState.length}`;

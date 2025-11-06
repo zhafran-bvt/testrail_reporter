@@ -90,6 +90,8 @@ class TestReportGenerator(unittest.TestCase):
         self.assertEqual(first_row.get('comment'), "Needs fix")
         attachments = first_row.get('attachments', [])
         self.assertEqual(len(attachments), 2)
+        for att in attachments:
+            self.assertTrue(att.get('data_url', '').startswith('data:image/png;base64,'))
         paths = {att['path'] for att in attachments}
         self.assertEqual(paths, {
             "attachments/run_101/test_2_att_102.png",
