@@ -399,10 +399,18 @@ def render_html(context: dict, out_path: Path):
     return str(out_path)
 
 
-def generate_report(project: int, plan: int | None = None, run: int | None = None) -> str:
+def generate_report(project: int, plan: int | None = None, run: int | None = None, run_ids: list[int] | None = None) -> str:
     """Generate a report for a plan or run and return the output HTML path."""
     if (plan is None and run is None) or (plan is not None and run is not None):
         raise ValueError("Provide exactly one of plan or run")
+    if run_ids is not None:
+        if plan is None:
+            raise ValueError("run_ids requires a plan")
+        if run is not None:
+            raise ValueError("Cannot combine run_ids with single run")
+        run_ids = [int(rid) for rid in run_ids]
+        if not run_ids:
+            raise ValueError("run_ids must include at least one run id")
 
     base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
     user = env_or_die("TESTRAIL_USER")
@@ -416,6 +424,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     project_name = project_obj.get("name") or f"Project {project}"
     plan_name = None
     run_names: dict[int, str] = {}
+    plan_run_ids: list[int] = []
     if plan is not None:
         plan_obj = get_plan(session, base_url, plan)
         plan_name = plan_obj.get("name") or f"Plan {plan}"
@@ -423,13 +432,28 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             for r in entry.get("runs", []):
                 rid = r.get("id")
                 if rid is not None:
-                    run_names[int(rid)] = r.get("name") or str(rid)
+                    rid_int = int(rid)
+                    run_names[rid_int] = r.get("name") or str(rid)
+                    plan_run_ids.append(rid_int)
+        if run_ids:
+            missing = [rid for rid in run_ids if rid not in plan_run_ids]
+            if missing:
+                raise ValueError(f"Run IDs not found in plan {plan}: {missing}")
 
     users_map = get_users_map(session, base_url)
     priorities_map = get_priorities_map(session, base_url)
     statuses_map = get_statuses_map(session, base_url)
 
-    run_ids = [run] if run is not None else get_plan_runs(session, base_url, plan)  # type: ignore[arg-type]
+    if run is not None:
+        run_ids_resolved = [int(run)]
+    else:
+        if run_ids:
+            run_ids_resolved = [rid for rid in run_ids if rid in plan_run_ids]
+        else:
+            run_ids_resolved = plan_run_ids or get_plan_runs(session, base_url, plan)  # type: ignore[arg-type]
+    if not run_ids_resolved:
+        raise ValueError("No runs available to generate report")
+
     summary = {"total": 0, "Passed": 0, "Failed": 0}
     tables = []
     # Time-based trend removed
@@ -437,7 +461,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     report_refs: set[str] = set()
     attachment_workers = max(1, int(os.getenv("ATTACHMENT_WORKERS", "4")))
 
-    for rid in run_ids:
+    for rid in run_ids_resolved:
         results = get_results_for_run(session, base_url, rid)
         tests = get_tests_for_run(session, base_url, rid)
         # Ensure assignee IDs are resolvable to names
@@ -711,10 +735,18 @@ def main():
     group = ap.add_mutually_exclusive_group(required=True)
     group.add_argument("--run", type=int)
     group.add_argument("--plan", type=int)
+    ap.add_argument(
+        "--runs",
+        type=int,
+        nargs="+",
+        help="Optional list of run IDs within the plan to include (use with --plan)",
+    )
     args = ap.parse_args()
 
     try:
-        path = generate_report(project=args.project, plan=args.plan, run=args.run)
+        if args.runs and not args.plan:
+            raise ValueError("--runs can only be used together with --plan")
+        path = generate_report(project=args.project, plan=args.plan, run=args.run, run_ids=args.runs)
         print(f"✅ Report saved to: {path}")
     except (ValueError, requests.exceptions.RequestException) as e:
         print(f"Error: {e}", file=sys.stderr)

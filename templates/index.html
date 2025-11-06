@@ -81,6 +81,24 @@
     @keyframes toast-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
     @keyframes toast-out { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(12px); } }
     .toast-item.closing { animation: toast-out .2s ease-in forwards; }
+    .runs-section { margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(15,23,42,0.02); }
+    .runs-header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .runs-title { font-weight:600; font-size:14px; color: var(--text); }
+    .runs-controls { margin:12px 0 8px; }
+    .run-search { width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background: var(--card-bg); color: var(--text); font-size:13px; }
+    .run-search:focus { outline:none; border-color: var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,0.18); }
+    .run-list-wrap { border:1px solid var(--border); border-radius:10px; padding:8px; background: var(--card-bg); max-height:260px; overflow:auto; }
+    .run-list { display:flex; flex-direction:column; gap:10px; }
+    .run-card { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background: var(--card-bg); transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease; cursor:pointer; }
+    .run-card:hover { border-color: var(--primary); box-shadow:0 4px 12px rgba(15,23,42,0.08); transform: translateY(-1px); }
+    .run-card input { width:18px; height:18px; margin-top:3px; }
+    .run-card-content { flex:1; display:flex; flex-direction:column; gap:2px; }
+    .run-card-title { font-weight:500; color: var(--text); font-size:13px; font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+    .run-card-id { font-size:12px; color: var(--muted); font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+    .run-empty { padding:12px; text-align:center; font-size:13px; color: var(--muted); display:none; }
+    .runs-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .runs-action-btn { padding:4px 10px; font-size:12px; border-radius:8px; border:1px solid var(--border); background: transparent; cursor:pointer; color: var(--muted); }
+    .runs-action-btn:hover { border-color: var(--primary); color: var(--primary); }
   </style>
 </head>
 <body>
@@ -91,7 +109,7 @@
     <h1>TestRail Reporter</h1>
     <p class="subtitle">Generate, preview, or email a TestRail plan report.</p>
     <div class="card">
-      <form method="post" action="/send-report" id="reportForm">
+      <form method="post" action="/generate" id="reportForm" target="_blank">
         <div class="grid">
           <div>
             <label>Project ID</label>
@@ -105,12 +123,24 @@
             <p class="note" id="plan-note">Showing open plans. Change project to refresh.</p>
           </div>
         </div>
-        <div>
-          <label>Email to</label>
-          <input type="email" name="recipient" placeholder="Enter recipient's email" />
+        <div id="runs-section" class="runs-section" data-available="0" style="display:none;">
+          <div class="runs-header">
+            <label class="runs-title">Test Runs</label>
+            <div class="runs-actions">
+              <button type="button" id="runSelectAll" class="runs-action-btn">Select All</button>
+              <button type="button" id="runClearAll" class="runs-action-btn">Clear</button>
+            </div>
+          </div>
+          <div class="runs-controls">
+            <input type="search" id="runSearch" class="run-search" placeholder="Search runs by name, suite, or ID…" />
+          </div>
+          <p class="note" id="runs-note">Runs will appear after selecting a plan.</p>
+          <div class="run-list-wrap">
+            <div id="run-list" class="run-list"></div>
+            <div id="run-empty" class="run-empty" style="display:none;">No runs match your search.</div>
+          </div>
         </div>
         <div class="actions">
-          <button type="button" id="sendReportBtn">Send Report</button>
           <button type="submit" id="previewReportBtn">Preview Report</button>
         </div>
       </form>
@@ -122,6 +152,139 @@
   <script>
     function escapeHtml(s){
       return String(s).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+    }
+
+    function renderRuns(runs){
+      const runList = document.getElementById('run-list');
+      const runEmpty = document.getElementById('run-empty');
+      if(!runList || !runEmpty) return;
+      if(!runs || runs.length === 0){
+        runList.innerHTML = '';
+        runEmpty.textContent = 'No runs found in this plan.';
+        runEmpty.style.display = 'block';
+        return;
+      }
+      runList.innerHTML = runs.map(run=>{
+        const name = escapeHtml(run.name || `Run ${run.id}`);
+        const searchTokens = `${run.id} ${run.name || ''}`.toLowerCase();
+        return `<label class="run-card" data-text="${escapeHtml(searchTokens)}">
+          <input type="checkbox" name="run_ids" value="${run.id}" checked>
+          <div class="run-card-content">
+            <span class="run-card-title">${name}</span>
+            <span class="run-card-id">Run ID: ${run.id}</span>
+            </div>
+        </label>`;
+      }).join('');
+      runEmpty.style.display = 'none';
+      runList.querySelectorAll('input[name="run_ids"]').forEach(cb=>{
+        cb.addEventListener('change', updateRunSummary);
+      });
+    }
+
+    function filterRuns(){
+      const runList = document.getElementById('run-list');
+      const runEmpty = document.getElementById('run-empty');
+      const runSearch = document.getElementById('runSearch');
+      if(!runList || !runEmpty || !runSearch) return;
+      const query = (runSearch.value || '').trim().toLowerCase();
+      let visible = 0;
+      runList.querySelectorAll('.run-card').forEach(card=>{
+        const matches = !query || card.dataset.text.includes(query);
+        card.style.display = matches ? '' : 'none';
+        if(matches) visible++;
+      });
+      if(visible === 0){
+        runEmpty.textContent = query ? 'No runs match your search.' : 'No runs found in this plan.';
+        runEmpty.style.display = 'block';
+      } else {
+        runEmpty.style.display = 'none';
+      }
+      updateRunSummary();
+    }
+
+    function updateRunSummary(){
+      const runsSection = document.getElementById('runs-section');
+      if(!runsSection || runsSection.dataset.available !== '1') return;
+      const runsNote = document.getElementById('runs-note');
+      const runList = document.getElementById('run-list');
+      if(!runsNote || !runList) return;
+      const cards = Array.from(runList.querySelectorAll('.run-card'));
+      const total = cards.length;
+      if(total === 0){
+        runsNote.textContent = 'No runs found in this plan.';
+        return;
+      }
+      const selected = runList.querySelectorAll('input[name="run_ids"]:checked').length;
+      const visible = cards.filter(card => card.style.display !== 'none').length;
+      const query = (document.getElementById('runSearch')?.value || '').trim();
+      let text = `Selected ${selected} of ${total} runs.`;
+      if(query){
+        text += ` Showing ${visible} matching runs.`;
+      }
+      runsNote.textContent = text;
+    }
+
+    async function loadRuns(){
+      const planSel = document.getElementById('plan');
+      const projectInput = document.getElementById('project');
+      const runsSection = document.getElementById('runs-section');
+      const runList = document.getElementById('run-list');
+      const runEmpty = document.getElementById('run-empty');
+      const runSearch = document.getElementById('runSearch');
+      const runsNote = document.getElementById('runs-note');
+      const planVal = planSel.value;
+      runList.innerHTML = '';
+      if(!planVal){
+        runsSection.style.display = 'none';
+        runsSection.dataset.available = '0';
+        runsNote.textContent = 'Runs will appear after selecting a plan.';
+        if(runEmpty){
+          runEmpty.textContent = 'Runs will appear after selecting a plan.';
+          runEmpty.style.display = 'block';
+        }
+        return;
+      }
+      runsSection.style.display = 'block';
+      runsSection.dataset.available = '0';
+      runsNote.textContent = 'Loading runs…';
+      if(runEmpty){
+        runEmpty.textContent = 'Loading runs…';
+        runEmpty.style.display = 'block';
+      }
+      if(runSearch){
+        runSearch.value = '';
+      }
+      try {
+        const resp = await fetch(`/api/runs?project=${encodeURIComponent(projectInput.value || '1')}&plan=${encodeURIComponent(planVal)}`);
+        if(!resp.ok){
+          const text = await resp.text().catch(()=> '');
+          throw new Error(text || `Failed to fetch runs for plan ${planVal}`);
+        }
+        const data = await resp.json();
+        const runs = Array.isArray(data.runs) ? data.runs : [];
+        if(runs.length === 0){
+          runsSection.dataset.available = '0';
+          runsNote.textContent = 'No runs found in this plan.';
+          if(runEmpty){
+            runEmpty.textContent = 'No runs found in this plan.';
+            runEmpty.style.display = 'block';
+          }
+          runList.innerHTML = '';
+          return;
+        }
+        runsSection.dataset.available = '1';
+        renderRuns(runs);
+        filterRuns();
+      } catch (e){
+        runsSection.dataset.available = '0';
+        runsNote.textContent = 'Error loading runs. Try refreshing.';
+        runList.innerHTML = '';
+        if(runEmpty){
+          runEmpty.textContent = 'Error loading runs.';
+          runEmpty.style.display = 'block';
+        }
+        showToast('Failed to load runs for the selected plan.', 'error');
+      }
     }
 
     async function loadPlans(){
@@ -169,6 +332,7 @@
       } finally {
         planSel.disabled = false;
       }
+      await loadRuns();
     }
 
     function ensurePlanSelected(){
@@ -180,13 +344,24 @@
       return true;
     }
 
-    function validateRecipient(){
-      const recipientInput = document.querySelector('input[name="recipient"]');
-      if(!recipientInput.value.trim()){
-        alert('Please enter a recipient email address.');
+    function ensureRunSelection(){
+      const runsSection = document.getElementById('runs-section');
+      if (!runsSection || runsSection.dataset.available !== '1') {
+        return true;
+      }
+      const checked = document.querySelectorAll('#run-list input[name="run_ids"]:checked').length;
+      if(checked === 0){
+        alert('Please select at least one Test Run.');
         return false;
       }
       return true;
+    }
+
+    function setRunSelections(state){
+      document.querySelectorAll('#run-list input[name="run_ids"]').forEach(cb => {
+        cb.checked = state;
+      });
+      updateRunSummary();
     }
 
     function showToast(message, type){
@@ -206,67 +381,38 @@
       setTimeout(removeToast, 6000);
     }
 
-    document.addEventListener('DOMContentLoaded', function(){
-      loadPlans();
-      const form = document.querySelector('.card form');
-      const sendReportBtn = document.getElementById('sendReportBtn');
-      const previewReportBtn = document.getElementById('previewReportBtn');
-
-      async function doSendReport(){
-        try {
-          const fd = new FormData(document.getElementById('reportForm'));
-          const resp = await fetch('/send-report', { method: 'POST', body: fd });
-          const ct = resp.headers.get('content-type') || '';
-          if (!resp.ok) {
-            let msg = 'Failed to send report';
-            if (ct.includes('application/json')) {
-              const data = await resp.json();
-              msg = data.detail || data.message || msg;
-            } else {
-              msg = await resp.text();
-            }
-            showToast(msg, 'error');
-          } else {
-            const data = ct.includes('application/json') ? await resp.json() : {};
-            const who = data.recipient ? ` to ${data.recipient}` : '';
-            showToast(`Report sent successfully${who}.`, 'success');
-          }
-        } catch (e) {
-          showToast('Network error while sending report.', 'error');
-        }
+    document.addEventListener('DOMContentLoaded', async function(){
+      await loadPlans();
+      const runSearch = document.getElementById('runSearch');
+      if(runSearch){
+        runSearch.addEventListener('input', filterRuns);
       }
-
-      sendReportBtn.addEventListener('click', async function(event){
-        if(!ensurePlanSelected() || !validateRecipient()){
-          event.preventDefault();
-          return;
-        }
-        event.preventDefault();
-        await doSendReport();
+      const planSel = document.getElementById('plan');
+      planSel.addEventListener('change', loadRuns);
+      const selectAllBtn = document.getElementById('runSelectAll');
+      const clearAllBtn = document.getElementById('runClearAll');
+      selectAllBtn.addEventListener('click', function(){
+        setRunSelections(true);
+        filterRuns();
+      });
+      clearAllBtn.addEventListener('click', function(){
+        setRunSelections(false);
+        filterRuns();
       });
 
-      // Handle Enter key submission: treat as send-report unless Preview button was used
-      const reportForm = document.getElementById('reportForm');
-      reportForm.addEventListener('submit', async function(e){
-        const submitter = e.submitter || document.activeElement;
-        const isPreview = submitter && submitter.id === 'previewReportBtn';
-        if (isPreview) {
-          // Let default proceed (opens preview in new tab)
-          if (!ensurePlanSelected()) { e.preventDefault(); }
-          return;
+      const form = document.querySelector('.card form');
+      const previewReportBtn = document.getElementById('previewReportBtn');
+
+      form.addEventListener('submit', function(event){
+        if(!ensurePlanSelected() || !ensureRunSelection()){
+          event.preventDefault();
         }
-        e.preventDefault();
-        if(!ensurePlanSelected() || !validateRecipient()) return;
-        await doSendReport();
       });
 
       previewReportBtn.addEventListener('click', function(event){
-        if(!ensurePlanSelected()){
+        if(!ensurePlanSelected() || !ensureRunSelection()){
           event.preventDefault();
-          return;
         }
-        form.action = '/generate';
-        form.setAttribute('target', '_blank');
       });
     });
   </script>

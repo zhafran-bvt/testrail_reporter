@@ -30,8 +30,16 @@ class TestReportGenerator(unittest.TestCase):
 
         # Mock API responses
         mock_project.return_value = {"name": "Test Project"}
-        mock_plan.return_value = {"name": "Test Plan"}
-        mock_plan_runs.return_value = [101]
+        mock_plan.return_value = {
+            "name": "Test Plan",
+            "entries": [
+                {"runs": [
+                    {"id": 101, "name": "Daily Run"},
+                    {"id": 202, "name": "Spare Run"},
+                ]}
+            ]
+        }
+        mock_plan_runs.return_value = [101, 202]
         mock_tests_for_run.return_value = [
             {"id": 1, "title": "Test Case 1", "status_id": 1, "priority_id": 1, "assignedto_id": 1},
             {"id": 2, "title": "Test Case 2", "status_id": 5, "priority_id": 2, "assignedto_id": 2},
@@ -54,7 +62,7 @@ class TestReportGenerator(unittest.TestCase):
         mock_render_html.return_value = "/path/to/report.html"
 
         # Run the report generator
-        report_path = generate_report(project=1, plan=241)
+        report_path = generate_report(project=1, plan=241, run_ids=[101])
 
         # Assertions
         self.assertEqual(report_path, "/path/to/report.html")
@@ -109,7 +117,12 @@ class TestReportGenerator(unittest.TestCase):
             "TESTRAIL_API_KEY": "key"
         }[key]
         mock_project.return_value = {"name": "Project"}
-        mock_plan.return_value = {"name": "Plan"}
+        mock_plan.return_value = {
+            "name": "Plan",
+            "entries": [
+                {"runs": [{"id": 99, "name": "Only Run"}]}
+            ]
+        }
         mock_plan_runs.return_value = [99]
         mock_tests_for_run.return_value = [
             {"id": 7, "title": "Sample Test", "status_id": 1, "priority_id": 3, "assignedto_id": 9},
@@ -132,6 +145,35 @@ class TestReportGenerator(unittest.TestCase):
         rows = context['tables'][0]['rows']
         self.assertEqual(rows[0]['attachments'], [])
         self.assertEqual(rows[0]['comment'], "Commented")
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_generate_report_invalid_run_ids(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                             mock_users_map, mock_results_for_run, mock_get_tests_for_run,
+                                             mock_get_plan_runs, mock_get_plan, mock_get_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_get_project.return_value = {"name": "Project"}
+        mock_get_plan.return_value = {
+            "name": "Plan",
+            "entries": [
+                {"runs": [{"id": 200, "name": "Valid Run"}]}
+            ]
+        }
+        mock_get_plan_runs.return_value = [200]
+        with self.assertRaises(ValueError):
+            generate_report(project=1, plan=99, run_ids=[111])
 
     def test_build_test_table(self):
         tests_df = pd.DataFrame([
