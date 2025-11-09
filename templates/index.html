@@ -99,6 +99,9 @@
     .runs-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .runs-action-btn { padding:4px 10px; font-size:12px; border-radius:8px; border:1px solid var(--border); background: transparent; cursor:pointer; color: var(--muted); }
     .runs-action-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .loading-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.45); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#fff; font-weight:600; font-size:14px; letter-spacing:.4px; z-index:9999; }
+    .spinner { width:32px; height:32px; border:3px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -148,6 +151,10 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+    <div class="spinner"></div>
+    <span>Generating report…</span>
+  </div>
 
   <script>
     function escapeHtml(s){
@@ -403,17 +410,52 @@
       const form = document.querySelector('.card form');
       const previewReportBtn = document.getElementById('previewReportBtn');
 
+      const overlay = document.getElementById('loadingOverlay');
+
+      let loadingTimeoutId = null;
+
+      function setLoading(state){
+        const btn = document.getElementById('previewReportBtn');
+        if(state){
+          overlay.style.display = 'flex';
+          btn.disabled = true;
+          btn.dataset.originalText = btn.textContent;
+          btn.textContent = 'Generating…';
+          if(loadingTimeoutId){
+            clearTimeout(loadingTimeoutId);
+          }
+          loadingTimeoutId = setTimeout(() => setLoading(false), 15000);
+        } else {
+          overlay.style.display = 'none';
+          btn.disabled = false;
+          if(btn.dataset.originalText){
+            btn.textContent = btn.dataset.originalText;
+          }
+          if(loadingTimeoutId){
+            clearTimeout(loadingTimeoutId);
+            loadingTimeoutId = null;
+          }
+        }
+      }
+
       form.addEventListener('submit', function(event){
         if(!ensurePlanSelected() || !ensureRunSelection()){
           event.preventDefault();
+          return;
         }
+        setLoading(true);
       });
 
       previewReportBtn.addEventListener('click', function(event){
         if(!ensurePlanSelected() || !ensureRunSelection()){
           event.preventDefault();
+          return;
         }
+        setLoading(true);
       });
+
+      window.addEventListener('focus', () => setLoading(false));
+      window.addEventListener('pageshow', () => setLoading(false));
     });
   </script>
 </body>

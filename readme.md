@@ -1,6 +1,6 @@
 # TestRail Reporter (HTML + API)
 
-Generate and serve clean HTML summaries for TestRail plans or runs. The report includes per‑run breakdowns (Passed/Untested/Failed/Blocked/Obsolete/Retest), fixed‑width tables with Title and Assignee emphasized, assignee and priority names, and a project‑level donut chart. Project and plan names link back to TestRail (and Refs link to JIRA).
+Generate and serve clean HTML summaries for TestRail plans or runs. The report includes per‑run breakdowns (Passed/Untested/Failed/Blocked/Obsolete/Retest), fixed‑width tables with Title and Assignee emphasized, assignee and priority names, and a project‑level donut chart. Project and plan names link back to TestRail (and Refs link to JIRA). Attachments are downloaded, lightly compressed, and embedded inline so the HTML works offline.
 
 ## Features
 - Project + Plan context with links to TestRail
@@ -9,6 +9,8 @@ Generate and serve clean HTML summaries for TestRail plans or runs. The report i
 - Assignee names resolved from TestRail users
 - Priority names resolved from TestRail priorities
 - Single project-level donut chart of status distribution
+- Multi-run selection UI (filterable list, select-all/clear) with loading overlay while preview builds
+- Attachments (screenshots/evidence) are compressed and embedded inline for offline viewing
 - Robust API handling (pagination, mixed payload shapes)
 
 ## Requirements
@@ -40,6 +42,12 @@ Run against a plan (aggregates all runs in the plan):
 python3 testrail_daily_report.py --project 1 --plan 241
 ```
 
+Limit to specific runs within the plan:
+
+```bash
+python3 testrail_daily_report.py --project 1 --plan 241 --runs 1001 1002 1003
+```
+
 Or a single run:
 
 ```bash
@@ -63,54 +71,19 @@ API endpoints:
 - `GET /api/report?project=1&run=1234` → generates and returns `{ path, url }`
 - `GET /reports/<file.html>` → serves previously generated HTML
 - `GET /healthz` → health check
- - `GET /api/debug/smtp` → current SMTP settings (masked) for debugging
 
 Notes:
 - Provide exactly one of `plan` or `run`.
 - Project defaults to `1` in most flows, but can be passed explicitly.
 - UI behavior:
-  - "Send Report" submits via fetch and shows a success/error toast (no page navigation).
-  - "Preview Report" opens the generated HTML in a new tab.
+  - Preview button opens the generated HTML in a new tab and shows a modal spinner until the file downloads.
   - Plans list auto-loads open plans first; if none, it falls back to all plans.
-
-## Email via Gmail (SMTP)
-
-You can send reports via Gmail or Google Workspace using an App Password.
-
-- In `.env` set:
-  - `SMTP_USER=your@gmail.com`
-  - `SMTP_PASSWORD=<App Password>` (requires 2‑Step Verification)
-  - `SMTP_SERVER=smtp.gmail.com`
-  - `SMTP_PORT=587`
-  - `SMTP_USE_SSL=false`
-  - `SMTP_STARTTLS=true`
-
-Quick test without TestRail:
-
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
-python scripts/send_test_email.py --to you@domain.com --subject "SMTP test" --body "Hello"
-```
-
-If you see an authentication error, regenerate the Gmail App Password.
-
-### When SMTP is blocked on your PaaS
-Some platforms restrict outbound SMTP (e.g., ports 25/465/587) which results in errors like `[Errno 101] Network is unreachable`. In that case, use an HTTP email API provider instead of SMTP.
-
-Send via SendGrid API:
-
-1) Set env vars:
-   - `EMAIL_PROVIDER=sendgrid`
-   - `SMTP_USER=sender@yourdomain.com` (used as From)
-   - `SENDGRID_API_KEY=…`
-2) Redeploy/restart. The app will call SendGrid’s HTTPS API and attach the generated HTML.
+  - Runs list appears after picking a plan; you can search/filter, select-all, or clear selections.
 
 ## Debugging
 
-- SMTP in use: open `GET /api/debug/smtp` to verify the active SMTP server, port, and user (masked). Useful if host env vars override `.env`.
 - Health: `GET /healthz` returns `{ "ok": true }` when the app is up.
+- Warm ping: set `KEEPALIVE_URL` (and optional `KEEPALIVE_INTERVAL`) so the server self-pings even when idle (useful on Render free tier).
 - Plans fetching:
   - The UI first calls `/api/plans?project=ID&is_completed=0` (open plans).
   - If none are found, it retries `/api/plans?project=ID` and shows a note.
@@ -123,9 +96,10 @@ Send via SendGrid API:
 - Assignee names come from `get_users` (with `get_user/<id>` fallback).
 - Priority names come from `get_priorities`.
 - Refs link to JIRA with base `https://bvarta-project.atlassian.net/browse/{REF}`.
+- Screenshots are downloaded, compressed (configurable max dimension + JPEG quality), and embedded inline (data URLs) so offline HTML still shows evidence.
 
 ## Columns and layout
-- Columns: `ID | Title | Status | Assignee | Refs | Priority`
+- Columns (default): `ID | Title | Status | Assignee | Priority | Attachments`
 - Fixed widths for consistent readability:
   - Title is the widest; Assignee is second widest.
   - Table uses `table-layout: fixed` and wraps long text.
@@ -137,6 +111,7 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 - Change column order or widths (update the `<colgroup>` and headers)
 - Add or remove fields shown per test
 - Adjust colors for the donut chart or status pills
+- Customize attachment cards/inline evidence in `templates/daily_report.html.j2`.
 
 ## CI/CD and Automation
 - GitHub Actions
@@ -148,6 +123,11 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 - Count mismatches: this script uses `get_tests` for status to match TestRail’s own counts. If you customize it to use results, deduplicate to the latest per `test_id`.
 - Missing names: if a user or priority is missing, the script falls back to the raw ID.
 - 404 on UI: confirm you started the server in the repo root with `uvicorn app.main:app --reload`, then open `http://127.0.0.1:8000/`.
+- Attachments not visible after download: ensure you regenerated the report after upgrading (older HTML lacked inline images). Inline rendering requires modern browsers that support data URLs.
+- Slow generation: adjust worker env vars:
+  - `RUN_WORKERS` – concurrent runs fetched (default 4)
+  - `ATTACHMENT_WORKERS` – concurrent attachment downloads (default 4)
+  - `ATTACHMENT_IMAGE_MAX_DIM` and `ATTACHMENT_JPEG_QUALITY` – controls compression
 
 ## Roadmap ideas
 - Optional per-run donut charts

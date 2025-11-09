@@ -1,3 +1,6 @@
+import threading
+import time
+
 from fastapi import FastAPI, Request, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +25,49 @@ if Path("assets").exists():
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 templates = Jinja2Templates(directory="templates")
+
+_keepalive_thread: threading.Thread | None = None
+_keepalive_stop = threading.Event()
+
+def _start_keepalive():
+    url = os.getenv("KEEPALIVE_URL")
+    if not url:
+        return
+    try:
+        interval = max(60, int(os.getenv("KEEPALIVE_INTERVAL", "240")))
+    except ValueError:
+        interval = 240
+
+    def _loop():
+        while not _keepalive_stop.is_set():
+            try:
+                requests.get(url, timeout=10)
+            except Exception:
+                pass
+            _keepalive_stop.wait(interval)
+
+    global _keepalive_thread
+    if _keepalive_thread and _keepalive_thread.is_alive():
+        return
+    _keepalive_thread = threading.Thread(target=_loop, name="keepalive-thread", daemon=True)
+    _keepalive_thread.start()
+
+def _stop_keepalive():
+    global _keepalive_thread
+    if not _keepalive_thread:
+        return
+    _keepalive_stop.set()
+    _keepalive_thread.join(timeout=5)
+    _keepalive_thread = None
+    _keepalive_stop.clear()
+
+@app.on_event("startup")
+def on_startup():
+    _start_keepalive()
+
+@app.on_event("shutdown")
+def on_shutdown():
+    _stop_keepalive()
 
 @app.get("/healthz")
 def healthz():

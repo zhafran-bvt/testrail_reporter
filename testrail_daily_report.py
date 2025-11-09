@@ -488,9 +488,27 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     report_refs: set[str] = set()
     attachment_workers = max(1, int(os.getenv("ATTACHMENT_WORKERS", "4")))
 
-    for rid in run_ids_resolved:
+    max_workers = max(1, int(os.getenv("RUN_WORKERS", "4")))
+
+    def _fetch_run_data(rid: int):
         results = get_results_for_run(session, base_url, rid)
         tests = get_tests_for_run(session, base_url, rid)
+        return rid, tests, results
+
+    run_data: list[tuple[int, list[dict], list[dict]]] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(_fetch_run_data, rid): rid for rid in run_ids_resolved}
+        for future in as_completed(futures):
+            try:
+                rid, tests, results = future.result()
+                run_data.append((rid, tests, results))
+            except Exception as e:
+                rid = futures[future]
+                print(f"Warning: failed to fetch run {rid}: {e}", file=sys.stderr)
+
+    run_data.sort(key=lambda item: run_ids_resolved.index(item[0]))
+
+    for rid, tests, results in run_data:
         # Ensure assignee IDs are resolvable to names
         try:
             test_ids = {int(x) for x in pd.Series(tests).apply(lambda r: r.get("assignedto_id") if isinstance(r, dict) else None).dropna().tolist()}

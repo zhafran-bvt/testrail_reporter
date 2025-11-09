@@ -40,14 +40,30 @@ class TestReportGenerator(unittest.TestCase):
             ]
         }
         mock_plan_runs.return_value = [101, 202]
-        mock_tests_for_run.return_value = [
-            {"id": 1, "title": "Test Case 1", "status_id": 1, "priority_id": 1, "assignedto_id": 1},
-            {"id": 2, "title": "Test Case 2", "status_id": 5, "priority_id": 2, "assignedto_id": 2},
-        ]
-        mock_results_for_run.return_value = [
-            {"id": 11, "test_id": 1, "status_id": 1, "comment": "Looks good"},
-            {"id": 12, "test_id": 2, "status_id": 5, "comment": "Needs fix"},
-        ]
+        def tests_side_effect(_session, _base_url, rid):
+            if rid == 101:
+                return [
+                    {"id": 1, "title": "Test Case 1", "status_id": 1, "priority_id": 1, "assignedto_id": 1},
+                    {"id": 2, "title": "Test Case 2", "status_id": 5, "priority_id": 2, "assignedto_id": 2},
+                ]
+            if rid == 202:
+                return [
+                    {"id": 10, "title": "Spare Test", "status_id": 1, "priority_id": 3, "assignedto_id": 3},
+                ]
+            return []
+        mock_tests_for_run.side_effect = tests_side_effect
+        def results_side_effect(_session, _base_url, rid):
+            if rid == 101:
+                return [
+                    {"id": 11, "test_id": 1, "status_id": 1, "comment": "Looks good"},
+                    {"id": 12, "test_id": 2, "status_id": 5, "comment": "Needs fix"},
+                ]
+            if rid == 202:
+                return [
+                    {"id": 21, "test_id": 10, "status_id": 1, "comment": "Spare pass"},
+                ]
+            return []
+        mock_results_for_run.side_effect = results_side_effect
         def attachments_side_effect(_session, _base_url, test_id):
             mapping = {
                 1: [{"id": 101, "name": "pass.png", "result_id": 11}],
@@ -56,8 +72,8 @@ class TestReportGenerator(unittest.TestCase):
             return mapping.get(test_id, [])
         mock_get_attachments_for_test.side_effect = attachments_side_effect
         mock_download_attachment.return_value = (b"fake-bytes", "image/png")
-        mock_users_map.return_value = {1: "User A", 2: "User B"}
-        mock_priorities_map.return_value = {1: "P1", 2: "P2"}
+        mock_users_map.return_value = {1: "User A", 2: "User B", 3: "User C"}
+        mock_priorities_map.return_value = {1: "P1", 2: "P2", 3: "P3"}
         mock_statuses_map.return_value = {1: "Passed", 5: "Failed"}
         mock_render_html.return_value = "/path/to/report.html"
 
