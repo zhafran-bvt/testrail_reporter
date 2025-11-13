@@ -99,9 +99,14 @@
     .runs-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .runs-action-btn { padding:4px 10px; font-size:12px; border-radius:8px; border:1px solid var(--border); background: transparent; cursor:pointer; color: var(--muted); }
     .runs-action-btn:hover { border-color: var(--primary); color: var(--primary); }
-    .loading-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.45); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#fff; font-weight:600; font-size:14px; letter-spacing:.4px; z-index:9999; }
+    .loading-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.45); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#fff; font-weight:600; font-size:14px; letter-spacing:.4px; z-index:9999; text-align:center; padding:0 16px; }
     .spinner { width:32px; height:32px; border:3px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; animation: spin 0.9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .report-meta { margin-top: 16px; border: 1px dashed var(--border); border-radius: var(--radius); padding: 12px; background: rgba(59,130,246,0.05); color: var(--muted); font-size: 13px; }
+    .report-meta-summary { margin: 0; font-weight: 500; color: var(--text); font-size: 13px; }
+    .report-meta-details { margin-top: 8px; }
+    .report-meta-calls { margin: 6px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+    .report-meta-calls li { margin-bottom: 4px; }
   </style>
 </head>
 <body>
@@ -146,6 +151,9 @@
         <div class="actions">
           <button type="submit" id="previewReportBtn">Preview Report</button>
         </div>
+        <div class="report-meta" id="reportMeta" aria-live="polite">
+          <p class="report-meta-summary">No report generated yet.</p>
+        </div>
       </form>
     </div>
   </div>
@@ -153,7 +161,7 @@
   <div class="toast" id="toast"></div>
   <div class="loading-overlay" id="loadingOverlay" style="display:none;">
     <div class="spinner"></div>
-    <span>Generating report…</span>
+    <span id="loadingOverlayText">Generating report…</span>
   </div>
 
   <script>
@@ -375,7 +383,8 @@
       const wrap = document.getElementById('toast');
       const div = document.createElement('div');
       div.className = 'toast-item ' + (type || 'info');
-      div.innerHTML = `<span class="toast-close" aria-label="Close">×</span>${message}`;
+      const safeMessage = escapeHtml(String(message ?? ''));
+      div.innerHTML = `<span class="toast-close" aria-label="Close">×</span>${safeMessage}`;
       wrap.appendChild(div);
       const closer = div.querySelector('.toast-close');
       function removeToast(){
@@ -388,7 +397,101 @@
       setTimeout(removeToast, 6000);
     }
 
+    async function requestJson(url, options){
+      const resp = await fetch(url, options);
+      const text = await resp.text();
+      let data = null;
+      if(text){
+        try {
+          data = JSON.parse(text);
+        } catch (_) {
+          data = null;
+        }
+      }
+      if(!resp.ok){
+        const detail = data && typeof data === 'object' ? (data.detail || data.error) : '';
+        throw new Error(detail || text || `Request to ${url} failed (${resp.status})`);
+      }
+      return data || {};
+    }
+
+    function jobStatusLabel(job){
+      if(!job || !job.status){
+        return 'Generating report…';
+      }
+      if(job.status === 'queued'){
+        if(typeof job.queue_position === 'number'){
+          if(job.queue_position === 0){
+            return 'Queued… almost ready';
+          }
+          return `Queued… ${job.queue_position} ahead of you`;
+        }
+        return 'Queued…';
+      }
+      if(job.status === 'running'){
+        return 'Generating report…';
+      }
+      return 'Working…';
+    }
+
+    function updateReportMeta(meta, params){
+      const container = document.getElementById('reportMeta');
+      if(!container){
+        return;
+      }
+      if(!meta || Object.keys(meta).length === 0){
+        container.innerHTML = '<p class="report-meta-summary">No report generated yet.</p>';
+        return;
+      }
+      const generated = meta.generated_at ? new Date(meta.generated_at).toLocaleString() : 'just now';
+      const durationText = typeof meta.duration_ms === 'number' ? `${(meta.duration_ms / 1000).toFixed(1)}s` : null;
+      const callCount = typeof meta.api_call_count === 'number' ? meta.api_call_count : null;
+      const scopeLabel = params?.plan ? `Plan ${params.plan}` : (params?.run ? `Run ${params.run}` : '');
+      const summaryParts = [];
+      if(scopeLabel){
+        summaryParts.push(scopeLabel);
+      }
+      summaryParts.push(`Generated ${generated}`);
+      if(durationText){
+        summaryParts.push(`Duration ${durationText}`);
+      }
+      if(callCount !== null){
+        summaryParts.push(`${callCount} TestRail call${callCount === 1 ? '' : 's'}`);
+      }
+      const safeSummary = summaryParts.map(part => escapeHtml(part)).join(' · ');
+      let html = `<p class="report-meta-summary">${safeSummary}</p>`;
+      const recentCalls = Array.isArray(meta.api_calls) ? meta.api_calls.slice(-10) : [];
+      if(recentCalls.length){
+        const items = recentCalls.map(call => {
+          const kind = escapeHtml(String(call?.kind || 'GET'));
+          const endpoint = escapeHtml(String(call?.endpoint || ''));
+          const elapsed = typeof call?.elapsed_ms === 'number' ? `${call.elapsed_ms.toFixed(1)} ms` : '';
+          const status = call?.status ? ` (${escapeHtml(String(call.status))})` : '';
+          const durationLabel = elapsed ? ` — ${elapsed}` : '';
+          return `<li><strong>${kind}</strong> ${endpoint}${durationLabel}${status}</li>`;
+        }).join('');
+        html += `<details class="report-meta-details">
+          <summary>Recent TestRail calls</summary>
+          <ul class="report-meta-calls">${items}</ul>
+        </details>`;
+      }
+      container.innerHTML = html;
+    }
+
+    function startReportJob(payload){
+      return requestJson('/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    }
+
+    function fetchJob(jobId){
+      return requestJson(`/api/report/${encodeURIComponent(jobId)}`);
+    }
+
     document.addEventListener('DOMContentLoaded', async function(){
+      updateReportMeta(null);
       await loadPlans();
       const runSearch = document.getElementById('runSearch');
       if(runSearch){
@@ -408,51 +511,136 @@
       });
 
       const form = document.querySelector('.card form');
-      const previewReportBtn = document.getElementById('previewReportBtn');
-
       const overlay = document.getElementById('loadingOverlay');
+      const overlayText = document.getElementById('loadingOverlayText');
 
-      let loadingTimeoutId = null;
-
-      function setLoading(state){
+      function setLoading(state, message){
         const btn = document.getElementById('previewReportBtn');
         if(state){
           overlay.style.display = 'flex';
+          overlayText.textContent = message || 'Generating report…';
           btn.disabled = true;
-          btn.dataset.originalText = btn.textContent;
-          btn.textContent = 'Generating…';
-          if(loadingTimeoutId){
-            clearTimeout(loadingTimeoutId);
+          if(!btn.dataset.originalText){
+            btn.dataset.originalText = btn.textContent;
           }
-          loadingTimeoutId = setTimeout(() => setLoading(false), 15000);
+          btn.textContent = 'Generating…';
         } else {
           overlay.style.display = 'none';
+          overlayText.textContent = 'Generating report…';
           btn.disabled = false;
           if(btn.dataset.originalText){
             btn.textContent = btn.dataset.originalText;
-          }
-          if(loadingTimeoutId){
-            clearTimeout(loadingTimeoutId);
-            loadingTimeoutId = null;
+            delete btn.dataset.originalText;
           }
         }
       }
 
-      form.addEventListener('submit', function(event){
-        if(!ensurePlanSelected() || !ensureRunSelection()){
-          event.preventDefault();
-          return;
+      async function pollJob(jobId){
+        const timeoutMs = 4 * 60 * 1000;
+        const start = Date.now();
+        let attempt = 0;
+        while(true){
+          const job = await fetchJob(jobId);
+          if(job.status === 'success' || job.status === 'error'){
+            return job;
+          }
+          setLoading(true, jobStatusLabel(job));
+          await new Promise(resolve => setTimeout(resolve, Math.min(5000, 1200 + attempt * 200)));
+          attempt += 1;
+          if(Date.now() - start > timeoutMs){
+            throw new Error('Timed out while waiting for report generation.');
+          }
         }
-        setLoading(true);
-      });
+      }
 
-      previewReportBtn.addEventListener('click', function(event){
+    function openReportUrl(reportUrl){
+      try {
+        const win = window.open(reportUrl, '_blank');
+        if(!win){
+          window.location.href = reportUrl;
+          showToast('Pop-up blocked by browser. Report opened in this tab instead.', 'info');
+        } else {
+          win.focus();
+        }
+      } catch (_) {
+        window.location.href = reportUrl;
+        showToast('Browser blocked pop-ups. Report opened in this tab.', 'info');
+      }
+    }
+
+    function handleJobSuccess(job){
+      const reportUrl = job?.url;
+      if(!reportUrl){
+        throw new Error('Server response missing report URL.');
+      }
+      openReportUrl(reportUrl);
+      const meta = job?.meta || {};
+      updateReportMeta(meta, job?.params || {});
+        const summaryBits = [];
+        if(typeof meta.duration_ms === 'number'){
+          summaryBits.push(`${(meta.duration_ms / 1000).toFixed(1)}s`);
+        }
+        if(typeof meta.api_call_count === 'number'){
+          summaryBits.push(`${meta.api_call_count} API call${meta.api_call_count === 1 ? '' : 's'}`);
+        }
+        if(meta.generated_at){
+          summaryBits.push(new Date(meta.generated_at).toLocaleString());
+        }
+        const suffix = summaryBits.length ? ` (${summaryBits.join(' · ')})` : '';
+        showToast(`Report ready${suffix}.`, 'success');
+      }
+
+      async function handlePreviewSubmit(event){
+        event.preventDefault();
         if(!ensurePlanSelected() || !ensureRunSelection()){
-          event.preventDefault();
           return;
         }
-        setLoading(true);
-      });
+        const formData = new FormData(form);
+        const projectValue = String(formData.get('project') || '').trim() || '1';
+        const planValue = String(formData.get('plan') || '').trim();
+        const selectedRuns = formData.getAll('run_ids')
+          .map(val => String(val || '').trim())
+          .filter(Boolean)
+          .map(val => Number(val));
+        const projectNumber = Number(projectValue);
+        const planNumber = planValue ? Number(planValue) : null;
+        const cleanedRuns = selectedRuns.filter(num => Number.isFinite(num));
+        const payload = {
+          project: Number.isFinite(projectNumber) ? projectNumber : 1,
+          plan: Number.isFinite(planNumber) ? planNumber : null,
+          run: null,
+          run_ids: cleanedRuns.length ? cleanedRuns : null,
+        };
+
+        try {
+          setLoading(true, 'Submitting report request…');
+          const job = await startReportJob(payload);
+          if(job.status === 'success'){
+            handleJobSuccess(job);
+            return;
+          }
+          if(job.status === 'error'){
+            throw new Error(job.error || 'Report job failed.');
+          }
+          if(!job.id){
+            throw new Error('Server did not provide a job id.');
+          }
+          showToast('Report queued. Large plans may take up to a minute.', 'info');
+          setLoading(true, jobStatusLabel(job));
+          const finalJob = await pollJob(job.id);
+          if(finalJob.status === 'error'){
+            throw new Error(finalJob.error || 'Report generation failed.');
+          }
+          handleJobSuccess(finalJob);
+        } catch (error){
+          const message = error?.message || 'Failed to generate report.';
+          showToast(`Failed to generate report: ${message}`, 'error');
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      form.addEventListener('submit', handlePreviewSubmit);
 
       window.addEventListener('focus', () => setLoading(false));
       window.addEventListener('pageshow', () => setLoading(false));

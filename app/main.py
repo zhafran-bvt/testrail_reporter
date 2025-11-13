@@ -1,15 +1,28 @@
 import threading
 import time
+import uuid
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, Request, Form, HTTPException, Query
+from fastapi import FastAPI, Request, Form, HTTPException, Query, Body, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pathlib import Path
 import os
 from dotenv import load_dotenv
+from pydantic import BaseModel, field_validator, model_validator
 
-from testrail_daily_report import generate_report, get_plans_for_project, get_plan, env_or_die
+from testrail_daily_report import (
+    generate_report,
+    get_plans_for_project,
+    get_plan,
+    env_or_die,
+    capture_telemetry,
+)
 import requests
 import glob
 
@@ -25,6 +38,199 @@ if Path("assets").exists():
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 templates = Jinja2Templates(directory="templates")
+
+
+class TTLCache:
+    def __init__(self, ttl_seconds: int = 120):
+        self.ttl = ttl_seconds
+        self._store: dict[tuple, tuple[float, Any]] = {}
+        self._lock = threading.Lock()
+
+    def get(self, key: tuple):
+        now = time.time()
+        with self._lock:
+            entry = self._store.get(key)
+            if not entry:
+                return None
+            expires_at, value = entry
+            if expires_at <= now:
+                self._store.pop(key, None)
+                return None
+        return value.copy() if isinstance(value, dict) else value, expires_at
+
+    def set(self, key: tuple, value: Any, ttl_seconds: int | None = None):
+        ttl = ttl_seconds if ttl_seconds is not None else self.ttl
+        expires_at = time.time() + max(1, ttl)
+        with self._lock:
+            self._store[key] = (expires_at, value.copy() if isinstance(value, dict) else value)
+        return expires_at
+
+    def clear(self):
+        with self._lock:
+            self._store.clear()
+
+
+plans_cache_ttl = int(os.getenv("PLANS_CACHE_TTL", "180"))
+runs_cache_ttl = int(os.getenv("RUNS_CACHE_TTL", "60"))
+_plans_cache = TTLCache(ttl_seconds=plans_cache_ttl)
+_runs_cache = TTLCache(ttl_seconds=runs_cache_ttl)
+
+
+def _cache_meta(hit: bool, expires_at: float):
+    return {
+        "cache": {
+            "hit": hit,
+            "expires_at": datetime.fromtimestamp(expires_at, timezone.utc).isoformat(),
+            "seconds_remaining": max(0, int(expires_at - time.time())),
+        }
+    }
+
+
+@dataclass
+class ReportJob:
+    id: str
+    params: dict[str, Any]
+    status: str = "queued"
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    path: str | None = None
+    url: str | None = None
+    error: str | None = None
+    meta: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "status": self.status,
+            "created_at": self.created_at.isoformat(),
+            "started_at": self.started_at.isoformat() if self.started_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "path": self.path,
+            "url": self.url,
+            "error": self.error,
+            "meta": self.meta,
+            "params": self.params,
+        }
+
+
+class ReportJobManager:
+    def __init__(self, max_workers: int = 2, max_history: int = 50):
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        self.jobs: dict[str, ReportJob] = {}
+        self.order: deque[str] = deque()
+        self.lock = threading.Lock()
+        self.max_history = max_history
+
+    def enqueue(self, params: dict[str, Any]) -> ReportJob:
+        job_id = uuid.uuid4().hex
+        job = ReportJob(id=job_id, params=params)
+        with self.lock:
+            self.jobs[job_id] = job
+            self.order.append(job_id)
+        self.executor.submit(self._run_job, job_id)
+        return job
+
+    def get(self, job_id: str) -> ReportJob | None:
+        with self.lock:
+            return self.jobs.get(job_id)
+
+    def serialize(self, job: ReportJob) -> dict[str, Any]:
+        data = job.to_dict()
+        data["queue_position"] = self.queue_position(job.id)
+        return data
+
+    def queue_position(self, job_id: str) -> int | None:
+        with self.lock:
+            position = 0
+            for jid in self.order:
+                job = self.jobs.get(jid)
+                if not job:
+                    continue
+                if jid == job_id:
+                    return position if job.status == "queued" else None
+                if job.status == "queued":
+                    position += 1
+        return None
+
+    def _trim_history(self):
+        with self.lock:
+            while len(self.order) > self.max_history:
+                oldest_id = self.order[0]
+                job = self.jobs.get(oldest_id)
+                if job and job.status not in {"success", "error"}:
+                    break
+                self.order.popleft()
+                self.jobs.pop(oldest_id, None)
+
+    def _run_job(self, job_id: str):
+        job = self.get(job_id)
+        if not job:
+            return
+        job.status = "running"
+        job.started_at = datetime.now(timezone.utc)
+        start = time.perf_counter()
+        try:
+            with capture_telemetry() as telemetry:
+                path = generate_report(**job.params)
+            duration_ms = (time.perf_counter() - start) * 1000.0
+            completed_at = datetime.now(timezone.utc)
+            job.completed_at = completed_at
+            job.path = path
+            job.url = "/reports/" + Path(path).name
+            api_calls = telemetry.get("api_calls", []) if isinstance(telemetry, dict) else []
+            job.meta = {
+                "generated_at": completed_at.isoformat(),
+                "duration_ms": round(duration_ms, 2),
+                "api_call_count": len(api_calls),
+                "api_calls": api_calls,
+            }
+            job.status = "success"
+        except Exception as exc:
+            job.error = str(exc)
+            job.status = "error"
+            job.completed_at = datetime.now(timezone.utc)
+        finally:
+            self._trim_history()
+
+
+report_worker_count = max(1, int(os.getenv("REPORT_WORKERS", "2")))
+job_history_limit = max(10, int(os.getenv("REPORT_JOB_HISTORY", "60")))
+_job_manager = ReportJobManager(max_workers=report_worker_count, max_history=job_history_limit)
+
+
+class ReportRequest(BaseModel):
+    project: int = 1
+    plan: int | None = None
+    run: int | None = None
+    run_ids: list[int] | None = None
+
+    @field_validator("run_ids", mode="before")
+    @classmethod
+    def _coerce_run_ids(cls, value):
+        if value is None:
+            return None
+        if isinstance(value, (str, int)):
+            value = [value]
+        if isinstance(value, tuple):
+            value = list(value)
+        cleaned: list[int] = []
+        for item in value:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if not text:
+                continue
+            cleaned.append(int(text))
+        return cleaned or None
+
+    @model_validator(mode="after")
+    def _validate_constraints(self):
+        if (self.plan is None and self.run is None) or (self.plan is not None and self.run is not None):
+            raise ValueError("Provide exactly one of plan or run")
+        if self.run_ids and self.plan is None:
+            raise ValueError("Run selection requires a plan")
+        return self
 
 _keepalive_thread: threading.Thread | None = None
 _keepalive_stop = threading.Event()
@@ -141,12 +347,12 @@ def generate_get():
 
 @app.get("/report")
 def report_alias(project: int = 1, plan: int | None = None, run: int | None = None):
-    # Alias for /api/report to avoid 404s from typos
-    return api_report(project=project, plan=plan, run=run)
+    # Alias for /api/report (synchronous legacy endpoint)
+    return api_report_sync(project=project, plan=plan, run=run)
 
 
 @app.get("/api/report")
-def api_report(
+def api_report_sync(
     project: int = 1,
     plan: int | None = None,
     run: int | None = None,
@@ -161,9 +367,30 @@ def api_report(
     return {"path": path, "url": url}
 
 
+@app.post("/api/report", status_code=status.HTTP_202_ACCEPTED)
+def api_report_async(payload: ReportRequest = Body(...)):
+    job = _job_manager.enqueue(payload.model_dump())
+    return _job_manager.serialize(job)
+
+
+@app.get("/api/report/{job_id}")
+def api_report_status(job_id: str):
+    job = _job_manager.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Report job not found")
+    return _job_manager.serialize(job)
+
+
 @app.get("/api/plans")
 def api_plans(project: int = 1, is_completed: int | None = None):
     """List plans for a project, optionally filter by completion (0 or 1)."""
+    cache_key = ("plans", project, is_completed)
+    cached = _plans_cache.get(cache_key)
+    if cached:
+        payload, expires_at = cached
+        data = payload.copy()
+        data["meta"] = _cache_meta(True, expires_at)
+        return data
     try:
         base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
         user = env_or_die("TESTRAIL_USER")
@@ -183,12 +410,23 @@ def api_plans(project: int = 1, is_completed: int | None = None):
         }
         for p in plans
     ]
-    return {"count": len(slim), "plans": slim}
+    base_payload = {"count": len(slim), "plans": slim}
+    expires_at = _plans_cache.set(cache_key, base_payload)
+    resp = base_payload.copy()
+    resp["meta"] = _cache_meta(False, expires_at)
+    return resp
 
 @app.get("/api/runs")
 def api_runs(plan: int, project: int = 1):
     if not plan:
         raise HTTPException(status_code=400, detail="plan is required")
+    cache_key = ("runs", project, plan)
+    cached = _runs_cache.get(cache_key)
+    if cached:
+        payload, expires_at = cached
+        data = payload.copy()
+        data["meta"] = _cache_meta(True, expires_at)
+        return data
     try:
         base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
         user = env_or_die("TESTRAIL_USER")
@@ -216,7 +454,11 @@ def api_runs(plan: int, project: int = 1):
             })
     runs.sort(key=lambda item: (item.get("is_completed", 0), item.get("name", "")))
     print(f"[api_runs] plan={plan} returned {len(runs)} runs", flush=True)
-    return {"count": len(runs), "runs": runs}
+    base_payload = {"count": len(runs), "runs": runs}
+    expires_at = _runs_cache.set(cache_key, base_payload)
+    data = base_payload.copy()
+    data["meta"] = _cache_meta(False, expires_at)
+    return data
 
 @app.get("/ui", response_class=HTMLResponse)
 def ui_alias(request: Request):

@@ -9,6 +9,9 @@ Requires env vars:
 """
 
 import os, sys, argparse, requests, pandas as pd, mimetypes, base64
+import time
+import contextvars
+import contextlib
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -19,6 +22,34 @@ from PIL import Image
 
 # Ensure .env overrides any existing env so local config is honored
 load_dotenv(override=True)
+
+
+# --- Telemetry helpers ---
+_telemetry_ctx: contextvars.ContextVar[dict | None] = contextvars.ContextVar("testrail_reporter_telemetry", default=None)
+
+@contextlib.contextmanager
+def capture_telemetry():
+    """Capture API call telemetry for the current thread."""
+    data = {"api_calls": []}
+    token = _telemetry_ctx.set(data)
+    try:
+        yield data
+    finally:
+        _telemetry_ctx.reset(token)
+
+
+def record_api_call(kind: str, endpoint: str, elapsed_ms: float, status: str, error: str | None = None):
+    telemetry = _telemetry_ctx.get()
+    if not telemetry:
+        return
+    telemetry.setdefault("api_calls", []).append({
+        "kind": kind,
+        "endpoint": endpoint,
+        "elapsed_ms": round(elapsed_ms, 2),
+        "status": status,
+        "error": error,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
 
 
 # --- Default status mapping ---
@@ -41,14 +72,20 @@ def env_or_die(key: str) -> str:
 
 def api_get(session: requests.Session, base_url: str, endpoint: str):
     url = f"{base_url}/index.php?/api/v2/{endpoint}"
-    r = session.get(url)
-    r.raise_for_status()
-    data = r.json()
-    # Surface TestRail API error payloads early
-    if isinstance(data, dict) and any(k in data for k in ("error", "message")):
-        msg = data.get("error") or data.get("message") or str(data)
-        raise RuntimeError(f"API error for '{endpoint}': {msg}")
-    return data
+    start = time.perf_counter()
+    try:
+        r = session.get(url)
+        r.raise_for_status()
+        data = r.json()
+        # Surface TestRail API error payloads early
+        if isinstance(data, dict) and any(k in data for k in ("error", "message")):
+            msg = data.get("error") or data.get("message") or str(data)
+            raise RuntimeError(f"API error for '{endpoint}': {msg}")
+        record_api_call("GET", endpoint, (time.perf_counter() - start) * 1000.0, "ok")
+        return data
+    except Exception as exc:
+        record_api_call("GET", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
+        raise
 
 
 def get_project(session, base_url, project_id: int):
@@ -254,9 +291,15 @@ def get_attachments_for_test(session, base_url, test_id: int):
 
 def download_attachment(session, base_url, attachment_id: int):
     url = f"{base_url}/index.php?/api/v2/get_attachment/{attachment_id}"
-    r = session.get(url)
-    r.raise_for_status()
-    return r.content, r.headers.get("Content-Type")
+    start = time.perf_counter()
+    try:
+        r = session.get(url)
+        r.raise_for_status()
+        record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "ok")
+        return r.content, r.headers.get("Content-Type")
+    except Exception as exc:
+        record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "error", str(exc))
+        raise
 
 
 def sanitize_filename(name: str) -> str:
