@@ -8,7 +8,7 @@ Requires env vars:
     TESTRAIL_BASE_URL, TESTRAIL_USER, TESTRAIL_API_KEY
 """
 
-import os, sys, argparse, requests, pandas as pd, mimetypes, base64
+import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math
 import time
 import contextvars
 import contextlib
@@ -438,24 +438,55 @@ def extract_refs(items) -> list[str]:
 def compress_image_data(data: bytes, content_type: str | None):
     if not content_type or not str(content_type).lower().startswith("image/"):
         return data, content_type
-    max_dim = int(os.getenv("ATTACHMENT_IMAGE_MAX_DIM", "1400"))
-    jpeg_quality = int(os.getenv("ATTACHMENT_JPEG_QUALITY", "75"))
+    max_dim = int(os.getenv("ATTACHMENT_IMAGE_MAX_DIM", "1200"))
+    jpeg_quality = int(os.getenv("ATTACHMENT_JPEG_QUALITY", "65"))
+    min_quality = int(os.getenv("ATTACHMENT_MIN_JPEG_QUALITY", "40"))
+    max_bytes = int(os.getenv("ATTACHMENT_MAX_IMAGE_BYTES", "450000"))
+    min_quality = max(15, min(min_quality, jpeg_quality))
+
     try:
         with Image.open(BytesIO(data)) as img:
-            img_format = (img.format or "").upper()
-            if max(img.size) > max_dim:
-                img.thumbnail((max_dim, max_dim), Image.LANCZOS)
-            buffer = BytesIO()
-            if img_format in {"JPEG", "JPG"}:
-                img = img.convert("RGB")
-                img.save(buffer, format="JPEG", optimize=True, quality=jpeg_quality)
-                return buffer.getvalue(), "image/jpeg"
-            if img_format == "PNG":
-                img.save(buffer, format="PNG", optimize=True, compress_level=6)
+            work = img.copy()
+            if max(work.size) > max_dim:
+                work.thumbnail((max_dim, max_dim), Image.LANCZOS)
+
+            def save_png(image_obj):
+                buffer = BytesIO()
+                image_obj.save(buffer, format="PNG", optimize=True, compress_level=6)
                 return buffer.getvalue(), "image/png"
-            img = img.convert("RGB")
-            img.save(buffer, format="JPEG", optimize=True, quality=jpeg_quality)
-            return buffer.getvalue(), "image/jpeg"
+
+            def save_jpeg(image_obj, quality):
+                buffer = BytesIO()
+                image_obj.convert("RGB").save(buffer, format="JPEG", optimize=True, quality=quality)
+                return buffer.getvalue(), "image/jpeg"
+
+            img_format = (img.format or "").upper()
+            if img_format == "PNG":
+                out_bytes, out_type = save_png(work)
+            else:
+                out_bytes, out_type = save_jpeg(work, jpeg_quality)
+
+            def enforce_size(bytes_payload, image_obj, current_type):
+                if max_bytes <= 0 or len(bytes_payload) <= max_bytes:
+                    return bytes_payload, current_type
+                target_quality = min(jpeg_quality, 80)
+                while target_quality > min_quality:
+                    target_quality = max(min_quality, target_quality - 10)
+                    candidate, candidate_type = save_jpeg(image_obj, target_quality)
+                    if len(candidate) <= max_bytes or target_quality == min_quality:
+                        return candidate, candidate_type
+                if len(bytes_payload) <= max_bytes:
+                    return bytes_payload, current_type
+                shrink_ratio = math.sqrt(max_bytes / len(bytes_payload))
+                if shrink_ratio < 0.98:
+                    new_dim = max(320, int(max(image_obj.size) * shrink_ratio))
+                    shrunk = image_obj.copy()
+                    shrunk.thumbnail((new_dim, new_dim), Image.LANCZOS)
+                    return save_jpeg(shrunk, min_quality)
+                return bytes_payload, current_type
+
+            out_bytes, out_type = enforce_size(out_bytes, work, out_type)
+            return out_bytes, out_type
     except Exception:
         return data, content_type
 
@@ -532,6 +563,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     attachment_workers = 1  # serialize attachment downloads to stay within low-memory limits
 
     max_workers = 1  # fetch runs sequentially to minimize concurrency footprint
+    inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
 
     def _fetch_run_data(rid: int):
         results = get_results_for_run(session, base_url, rid)
@@ -698,12 +730,15 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 })
 
         if download_jobs:
+            inline_limit = max(0, inline_embed_limit)
             def _download(job):
                 attachment_id = job["attachment_id"]
                 data, content_type = download_attachment(session, base_url, attachment_id)
                 data, content_type = compress_image_data(data, content_type)
                 job["content_type"] = content_type
-                job["data_bytes"] = data
+                job["size_bytes"] = len(data)
+                if inline_limit and len(data) <= inline_limit:
+                    job["inline_data"] = data
                 suffix_map = {
                     "image/jpeg": ".jpg",
                     "image/jpg": ".jpg",
@@ -735,7 +770,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
                     is_image = bool(content_type and content_type.startswith("image/"))
                     data_url = None
-                    payload = job.get("data_bytes")
+                    payload = job.pop("inline_data", None)
                     if payload is not None and is_image:
                         try:
                             data_b64 = base64.b64encode(payload).decode("ascii")
@@ -743,13 +778,16 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                             data_url = f"data:{mime};base64,{data_b64}"
                         except Exception:
                             data_url = None
+                        finally:
+                            payload = None
                     attachments_by_test.setdefault(tid, []).append({
                         "name": job["filename"],
                         "path": str(job["rel_path"]).replace(os.sep, "/"),
                         "content_type": content_type,
-                        "size": job["size"],
+                        "size": job.get("size") or job.get("size_bytes"),
                         "is_image": is_image,
                         "data_url": data_url,
+                        "inline_embedded": bool(data_url),
                     })
 
         for tid in attachments_by_test:
