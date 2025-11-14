@@ -529,9 +529,9 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     # Time-based trend removed
 
     report_refs: set[str] = set()
-    attachment_workers = max(1, int(os.getenv("ATTACHMENT_WORKERS", "4")))
+    attachment_workers = 1  # serialize attachment downloads to stay within low-memory limits
 
-    max_workers = max(1, int(os.getenv("RUN_WORKERS", "4")))
+    max_workers = 1  # fetch runs sequentially to minimize concurrency footprint
 
     def _fetch_run_data(rid: int):
         results = get_results_for_run(session, base_url, rid)
