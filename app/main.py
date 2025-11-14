@@ -194,7 +194,7 @@ class ReportJobManager:
             self._trim_history()
 
 
-report_worker_count = max(1, int(os.getenv("REPORT_WORKERS", "2")))
+report_worker_count = max(1, int(os.getenv("REPORT_WORKERS", "1")))
 job_history_limit = max(10, int(os.getenv("REPORT_JOB_HISTORY", "60")))
 _job_manager = ReportJobManager(max_workers=report_worker_count, max_history=job_history_limit)
 
