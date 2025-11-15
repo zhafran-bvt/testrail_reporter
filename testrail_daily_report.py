@@ -96,6 +96,10 @@ def get_plan(session, base_url, plan_id: int):
     return api_get(session, base_url, f"get_plan/{plan_id}")
 
 
+class UserLookupForbidden(Exception):
+    """Raised when TestRail denies access to user lookup endpoints."""
+
+
 def get_users_map(session, base_url):
     try:
         users = api_get(session, base_url, "get_users")
@@ -110,6 +114,11 @@ def get_users_map(session, base_url):
                 if uid is not None:
                     mapping[uid] = u.get("name") or u.get("email") or str(uid)
         return mapping
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 403:
+            raise UserLookupForbidden("TestRail denied access to get_users") from e
+        print(f"Warning: could not load users: {e}", file=sys.stderr)
+        return {}
     except Exception as e:
         print(f"Warning: could not load users: {e}", file=sys.stderr)
         return {}
@@ -121,6 +130,11 @@ def get_users_map(session, base_url):
 def get_user(session, base_url, user_id: int):
     try:
         return api_get(session, base_url, f"get_user/{user_id}")
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 403:
+            raise UserLookupForbidden("TestRail denied access to get_user") from e
+        print(f"Warning: get_user({user_id}) failed: {e}", file=sys.stderr)
+        return None
     except Exception as e:
         print(f"Warning: get_user({user_id}) failed: {e}", file=sys.stderr)
         return None
@@ -500,8 +514,18 @@ def render_html(context: dict, out_path: Path):
     return str(out_path)
 
 
-def generate_report(project: int, plan: int | None = None, run: int | None = None, run_ids: list[int] | None = None) -> str:
+def generate_report(project: int, plan: int | None = None, run: int | None = None,
+                    run_ids: list[int] | None = None, progress=None) -> str:
     """Generate a report for a plan or run and return the output HTML path."""
+    def notify(stage: str, **payload):
+        log_payload = {k: payload.get(k) for k in sorted(payload)}
+        print(f"[report-log] stage={stage} payload={log_payload}", flush=True)
+        if progress:
+            try:
+                progress(stage, payload)
+            except Exception:
+                pass
+
     if (plan is None and run is None) or (plan is not None and run is not None):
         raise ValueError("Provide exactly one of plan or run")
     if run_ids is not None:
@@ -541,7 +565,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             if missing:
                 raise ValueError(f"Run IDs not found in plan {plan}: {missing}")
 
-    users_map = get_users_map(session, base_url)
+    user_lookup_allowed = True
+    users_map = {}
+    try:
+        users_map = get_users_map(session, base_url)
+    except UserLookupForbidden as err:
+        # Bulk endpoint forbidden; fall back to per-user lookups until they fail too.
+        users_map = {}
+        print(f"Warning: bulk user lookup forbidden ({err}); falling back to get_user per ID", file=sys.stderr)
     priorities_map = get_priorities_map(session, base_url)
     statuses_map = get_statuses_map(session, base_url)
 
@@ -555,6 +586,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     if not run_ids_resolved:
         raise ValueError("No runs available to generate report")
 
+    notify("initializing", plan=plan, run=run, run_count=len(run_ids or []))
     summary = {"total": 0, "Passed": 0, "Failed": 0}
     tables = []
     # Time-based trend removed
@@ -564,6 +596,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
     max_workers = 1  # fetch runs sequentially to minimize concurrency footprint
     inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
+    attachment_inline_limit = inline_embed_limit
+    attachment_size_limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "520000000"))
 
     def _fetch_run_data(rid: int):
         results = get_results_for_run(session, base_url, rid)
@@ -583,19 +617,28 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
     run_data.sort(key=lambda item: run_ids_resolved.index(item[0]))
 
-    for rid, tests, results in run_data:
+    total_runs = len(run_data)
+    for idx, (rid, tests, results) in enumerate(run_data, start=1):
+        notify("processing_run", run_id=rid, index=idx, total=total_runs)
         # Ensure assignee IDs are resolvable to names
-        try:
-            test_ids = {int(x) for x in pd.Series(tests).apply(lambda r: r.get("assignedto_id") if isinstance(r, dict) else None).dropna().tolist()}
-        except Exception:
-            test_ids = set()
-        try:
-            result_ids = {int(x) for x in pd.DataFrame(results).get("assignedto_id", pd.Series([], dtype="float")).dropna().astype(int).tolist()}
-        except Exception:
-            result_ids = set()
-        for uid in (test_ids | result_ids):
-            if uid not in users_map:
-                u = get_user(session, base_url, uid)
+        if user_lookup_allowed:
+            try:
+                test_ids = {int(x) for x in pd.Series(tests).apply(lambda r: r.get("assignedto_id") if isinstance(r, dict) else None).dropna().tolist()}
+            except Exception:
+                test_ids = set()
+            try:
+                result_ids = {int(x) for x in pd.DataFrame(results).get("assignedto_id", pd.Series([], dtype="float")).dropna().astype(int).tolist()}
+            except Exception:
+                result_ids = set()
+            for uid in (test_ids | result_ids):
+                if uid in users_map:
+                    continue
+                try:
+                    u = get_user(session, base_url, uid)
+                except UserLookupForbidden as err:
+                    user_lookup_allowed = False
+                    print(f"Warning: disabling per-user lookups ({err})", file=sys.stderr)
+                    break
                 if isinstance(u, dict) and u.get("id") is not None:
                     users_map[int(u["id"])] = u.get("name") or u.get("email") or str(u["id"])
 
@@ -675,6 +718,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
         metadata_map: dict[int, list] = {}
         if latest_result_ids:
+            notify("fetching_attachment_metadata", run_id=rid, count=len(latest_result_ids))
             with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
                 futures = {executor.submit(_fetch_metadata, tid): tid for tid in latest_result_ids}
                 for future in as_completed(futures):
@@ -731,9 +775,34 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
         if download_jobs:
             inline_limit = max(0, inline_embed_limit)
-            def _download(job):
+            total_downloads = len(download_jobs)
+            notify("downloading_attachments", run_id=rid, total=total_downloads)
+            inline_limit = max(0, inline_embed_limit)
+            for index, job in enumerate(download_jobs, start=1):
                 attachment_id = job["attachment_id"]
+                notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
                 data, content_type = download_attachment(session, base_url, attachment_id)
+                data_size = len(data)
+                if attachment_size_limit and data_size > attachment_size_limit:
+                    stripped = {
+                        "attachment_id": attachment_id,
+                        "size_bytes": data_size,
+                        "limit_bytes": attachment_size_limit,
+                        "skipped": True,
+                    }
+                    notify("attachment_skipped", run_id=rid, **stripped)
+                    attachments_by_test.setdefault(job["test_id"], []).append({
+                        "name": job["filename"],
+                        "path": None,
+                        "content_type": content_type,
+                        "size": job.get("size") or data_size,
+                        "is_image": False,
+                        "is_video": bool(content_type and content_type.startswith("video/")),
+                        "data_url": None,
+                        "inline_embedded": False,
+                        "skipped": True,
+                    })
+                    continue
                 data, content_type = compress_image_data(data, content_type)
                 job["content_type"] = content_type
                 job["size_bytes"] = len(data)
@@ -755,40 +824,31 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         base_name = Path(job["filename"]).stem or Path(job["filename"]).name
                         job["filename"] = f"{base_name}{desired_suffix}"
                 job["abs_path"].write_bytes(data)
-                return content_type
-
-            with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
-                future_map = {executor.submit(_download, job): job for job in download_jobs}
-                for future in as_completed(future_map):
-                    job = future_map[future]
-                    tid = job["test_id"]
+                content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
+                is_image = bool(content_type and content_type.startswith("image/"))
+                data_url = None
+                payload = job.pop("inline_data", None)
+                if payload is not None and is_image:
                     try:
-                        content_type = future.result()
-                    except Exception as e:
-                        print(f"Warning: download failed for attachment {job['attachment_id']}: {e}", file=sys.stderr)
-                        continue
-                    content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
-                    is_image = bool(content_type and content_type.startswith("image/"))
-                    data_url = None
-                    payload = job.pop("inline_data", None)
-                    if payload is not None and is_image:
-                        try:
-                            data_b64 = base64.b64encode(payload).decode("ascii")
-                            mime = content_type or "application/octet-stream"
-                            data_url = f"data:{mime};base64,{data_b64}"
-                        except Exception:
-                            data_url = None
-                        finally:
-                            payload = None
-                    attachments_by_test.setdefault(tid, []).append({
-                        "name": job["filename"],
-                        "path": str(job["rel_path"]).replace(os.sep, "/"),
-                        "content_type": content_type,
-                        "size": job.get("size") or job.get("size_bytes"),
-                        "is_image": is_image,
-                        "data_url": data_url,
-                        "inline_embedded": bool(data_url),
-                    })
+                        data_b64 = base64.b64encode(payload).decode("ascii")
+                        mime = content_type or "application/octet-stream"
+                        data_url = f"data:{mime};base64,{data_b64}"
+                    except Exception:
+                        data_url = None
+                    finally:
+                        payload = None
+                public_path = "/reports/" + str(job["rel_path"]).replace(os.sep, "/")
+                is_video = bool(content_type and content_type.startswith("video/"))
+                attachments_by_test.setdefault(job["test_id"], []).append({
+                    "name": job["filename"],
+                    "path": public_path,
+                    "content_type": content_type,
+                    "size": job.get("size") or job.get("size_bytes"),
+                    "is_image": is_image,
+                    "is_video": is_video,
+                    "data_url": data_url,
+                    "inline_embedded": bool(data_url),
+                })
 
         for tid in attachments_by_test:
             attachments_by_test[tid].sort(key=lambda entry: entry["path"])
@@ -853,6 +913,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         donut_style = "conic-gradient(#e5e7eb 0 100%)"
 
     report_title = f"Testing Progress Report — {plan_name}" if plan_name else "Testing Progress Report"
+    notify("rendering_report", total_runs=total_runs)
     context = {
         "report_title": report_title,
         "generated_at": datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M"),

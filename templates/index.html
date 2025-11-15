@@ -415,9 +415,44 @@
       return data || {};
     }
 
+    function formatStage(job){
+      const meta = job?.meta || {};
+      const stage = meta.stage;
+      const payload = meta.stage_payload || {};
+      if(!stage) return null;
+      switch(stage){
+        case 'processing_run':
+          if(payload.run_id){
+            const idx = payload.index || 0;
+            const total = payload.total || '?';
+            return `Processing run ${payload.run_id} (${idx}/${total})…`;
+          }
+          return 'Processing runs…';
+        case 'fetching_attachment_metadata':
+          return `Fetching attachment metadata (${payload.count || 0})…`;
+        case 'downloading_attachments':
+          return `Downloading attachments (${payload.total || 0} items)…`;
+        case 'downloading_attachment':
+          if(payload.total){
+            return `Downloading attachment ${payload.current || 0}/${payload.total}…`;
+          }
+          return 'Downloading attachments…';
+        case 'rendering_report':
+          return 'Rendering HTML report…';
+        case 'initializing':
+          return 'Starting report job…';
+        default:
+          return null;
+      }
+    }
+
     function jobStatusLabel(job){
       if(!job || !job.status){
         return 'Generating report…';
+      }
+      const stageMessage = formatStage(job);
+      if(stageMessage){
+        return stageMessage;
       }
       if(job.status === 'queued'){
         if(typeof job.queue_position === 'number'){
@@ -536,8 +571,6 @@
       }
 
       async function pollJob(jobId){
-        const timeoutMs = 4 * 60 * 1000;
-        const start = Date.now();
         let attempt = 0;
         while(true){
           const job = await fetchJob(jobId);
@@ -547,9 +580,6 @@
           setLoading(true, jobStatusLabel(job));
           await new Promise(resolve => setTimeout(resolve, Math.min(5000, 1200 + attempt * 200)));
           attempt += 1;
-          if(Date.now() - start > timeoutMs){
-            throw new Error('Timed out while waiting for report generation.');
-          }
         }
       }
 

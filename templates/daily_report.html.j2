@@ -83,6 +83,7 @@
     .slide-nav button:hover { background: rgba(59,130,246,0.08); }
     .modal-image-wrap { display:flex; justify-content:center; margin-bottom:14px; }
     .modal-image-wrap img { max-width:100%; max-height:55vh; border-radius:12px; box-shadow:0 6px 18px rgba(15,23,42,0.25); }
+    .modal-image-wrap video { width:100%; max-height:55vh; border-radius:12px; box-shadow:0 6px 18px rgba(15,23,42,0.25); display:none; background:#000; }
     .modal-comment { font-size:13px; color:var(--muted); margin-bottom:12px; white-space:pre-wrap; }
     .attachment-list { display:flex; flex-direction:column; gap:6px; font-size:12px; }
     @media (max-width:640px){
@@ -258,6 +259,12 @@
                 Attachment{% if attachment_count != 1 %}s{% endif %}
                 {% if attachment_count > 0 %}({{ attachment_count }}){% endif %}
               </button>
+              {% set skipped_count = attachments|selectattr('skipped')|list|length %}
+              {% if skipped_count > 0 %}
+                <div class="muted" style="font-size:11px;">
+                  {{ skipped_count }} attachment{% if skipped_count != 1 %}s{% endif %} too large to include.
+                </div>
+              {% endif %}
             {% endif %}
           </td>
         </tr>
@@ -281,6 +288,7 @@
         <div class="modal-comment" id="attachmentModalComment"></div>
         <div class="modal-image-wrap">
           <img id="attachmentModalImage" alt="Attachment evidence" style="display:none;" />
+          <video id="attachmentModalVideo" controls playsinline style="display:none;"></video>
         </div>
         <div class="attachment-list" id="attachmentList"></div>
       </div>
@@ -425,6 +433,7 @@
 
       const modal = document.getElementById('attachmentModal');
       const imgEl = document.getElementById('attachmentModalImage');
+      const videoEl = document.getElementById('attachmentModalVideo');
       const listEl = document.getElementById('attachmentList');
       const commentEl = document.getElementById('attachmentModalComment');
       const titleEl = document.getElementById('attachmentModalTitle');
@@ -439,6 +448,12 @@
       function updateAttachmentView(){
         if(!attachmentsState.length){
           imgEl.style.display = 'none';
+          if(videoEl){
+            videoEl.pause();
+            videoEl.removeAttribute('src');
+            videoEl.load();
+            videoEl.style.display = 'none';
+          }
           listEl.innerHTML = '<span class="muted">No attachments available.</span>';
           counterEl.textContent = '';
           prevBtn.disabled = true;
@@ -446,6 +461,12 @@
           return;
         }
         const current = attachmentsState[attachmentsIndex];
+        if(videoEl){
+          videoEl.pause();
+          videoEl.removeAttribute('src');
+          videoEl.load();
+          videoEl.style.display = 'none';
+        }
         if(current.is_image && current.data_url){
           imgEl.src = current.data_url;
           imgEl.alt = current.name || 'Attachment';
@@ -453,11 +474,17 @@
         } else {
           imgEl.style.display = 'none';
         }
+        if(current.is_video && current.path && videoEl){
+          imgEl.style.display = 'none';
+          videoEl.style.display = 'block';
+          videoEl.src = current.path;
+          videoEl.load();
+        }
         const items = attachmentsState.map((item, idx) => {
           const isActive = idx === attachmentsIndex;
           const wrapperClass = isActive ? 'attachment-chip' : 'muted';
-          const icon = item.is_image ? '🖼' : '📎';
-          const href = item.data_url || item.path;
+          const icon = item.is_image ? '🖼' : (item.is_video ? '🎬' : '📎');
+          const href = item.data_url || item.path || '#';
           const downloadAttr = href && href.startsWith('data:') ? ` download="${item.name || 'attachment'}"` : '';
           return `<div class="${wrapperClass}"><a href="${href}" target="_blank" rel="noopener"${downloadAttr}>${icon} ${item.name || 'Attachment'}</a></div>`;
         });
@@ -487,6 +514,13 @@
         modal.classList.remove('open');
         attachmentsState = [];
         attachmentsIndex = 0;
+        if(videoEl){
+          videoEl.pause();
+          videoEl.removeAttribute('src');
+          videoEl.load();
+          videoEl.style.display = 'none';
+        }
+        imgEl.style.display = 'none';
       }
 
       document.addEventListener('click', function(ev){

@@ -163,6 +163,25 @@ class ReportJobManager:
                 self.order.popleft()
                 self.jobs.pop(oldest_id, None)
 
+    def report_progress(self, job_id: str, stage: str, payload: dict | None = None):
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if not job:
+                return
+            job.meta.setdefault("progress_updates", [])
+            update = {
+                "stage": stage,
+                "payload": payload or {},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            job.meta["stage"] = stage
+            job.meta["stage_payload"] = payload or {}
+            job.meta["updated_at"] = update["timestamp"]
+            job.meta["progress_updates"].append(update)
+            # keep only recent few entries
+            if len(job.meta["progress_updates"]) > 25:
+                job.meta["progress_updates"] = job.meta["progress_updates"][-25:]
+
     def _run_job(self, job_id: str):
         job = self.get(job_id)
         if not job:
@@ -170,9 +189,11 @@ class ReportJobManager:
         job.status = "running"
         job.started_at = datetime.now(timezone.utc)
         start = time.perf_counter()
+        print(f"[report-job] {job_id} started with params={job.params}", flush=True)
         try:
+            reporter = lambda stage, payload=None: self.report_progress(job_id, stage, payload or {})
             with capture_telemetry() as telemetry:
-                path = generate_report(**job.params)
+                path = generate_report(**job.params, progress=reporter)
             duration_ms = (time.perf_counter() - start) * 1000.0
             completed_at = datetime.now(timezone.utc)
             job.completed_at = completed_at
@@ -186,10 +207,12 @@ class ReportJobManager:
                 "api_calls": api_calls,
             }
             job.status = "success"
+            print(f"[report-job] {job_id} completed in {duration_ms:.0f}ms -> {job.url}", flush=True)
         except Exception as exc:
             job.error = str(exc)
             job.status = "error"
             job.completed_at = datetime.now(timezone.utc)
+            print(f"[report-job] {job_id} failed: {exc}", flush=True)
         finally:
             self._trim_history()
 
