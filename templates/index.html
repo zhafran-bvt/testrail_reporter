@@ -569,6 +569,27 @@
       return { percent, label: jobStatusLabel(job), etaMs };
     }
 
+    function formatDuration(ms){
+      if(ms === null || ms === undefined){
+        return null;
+      }
+      const secs = Math.max(0, Math.round(ms / 1000));
+      if(secs >= 3600){
+        const hours = Math.floor(secs / 3600);
+        const mins = Math.floor((secs % 3600) / 60);
+        return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+      }
+      if(secs >= 90){
+        const mins = Math.floor(secs / 60);
+        const rem = secs % 60;
+        return rem > 0 ? `${mins}m ${rem}s` : `${mins}m`;
+      }
+      if(secs >= 60){
+        return `1m ${secs - 60}s`;
+      }
+      return `${secs}s`;
+    }
+
     function updateReportMeta(meta, params){
       const container = document.getElementById('reportMeta');
       if(!container){
@@ -724,9 +745,9 @@
           overlay.style.display = 'flex';
           let displayMessage = message || 'Generating report…';
           if(progress && typeof progress.etaMs === 'number'){
-            const secs = Math.round(progress.etaMs / 1000);
-            if(secs >= 0){
-              displayMessage += ` (~${secs}s remaining)`;
+            const etaLabel = formatDuration(progress.etaMs);
+            if(etaLabel){
+              displayMessage += ` (~${etaLabel} remaining)`;
             }
           }
           overlayText.textContent = displayMessage;

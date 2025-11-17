@@ -739,6 +739,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     max_workers = max(1, min(run_workers_ceiling, min(max(1, len(run_ids_resolved)), run_workers_env)))
 
     inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
+    video_inline_limit = int(os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES", str(max(0, inline_embed_limit))))
     attachment_inline_limit = inline_embed_limit
     attachment_size_limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "520000000"))
 
@@ -921,6 +922,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
         if download_jobs:
             inline_limit = max(0, inline_embed_limit)
+            inline_video_limit = max(0, video_inline_limit)
             total_downloads = len(download_jobs)
             notify("downloading_attachments", run_id=rid, total=total_downloads)
             inline_limit = max(0, inline_embed_limit)
@@ -1007,7 +1009,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         with open(tmp_path, "rb") as src, open(job["abs_path"], "wb") as dst:
                             shutil.copyfileobj(src, dst, length=64 * 1024)
                     size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
-                    if inline_limit and size_bytes <= inline_limit and size_bytes > 0:
+                    if inline_video_limit and size_bytes <= inline_video_limit and size_bytes > 0:
                         try:
                             inline_payload = job["abs_path"].read_bytes()
                         except Exception:
