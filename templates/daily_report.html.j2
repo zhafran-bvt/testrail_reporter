@@ -474,11 +474,16 @@
         } else {
           imgEl.style.display = 'none';
         }
-        if(current.is_video && current.path && videoEl){
-          imgEl.style.display = 'none';
-          videoEl.style.display = 'block';
-          videoEl.src = current.path;
-          videoEl.load();
+        if(current.is_video && videoEl){
+          const videoSrc = current.data_url || current.path;
+          if(videoSrc){
+            imgEl.style.display = 'none';
+            videoEl.style.display = 'block';
+            videoEl.src = videoSrc;
+            videoEl.load();
+          } else {
+            videoEl.style.display = 'none';
+          }
         }
         const items = attachmentsState.map((item, idx) => {
           const isActive = idx === attachmentsIndex;

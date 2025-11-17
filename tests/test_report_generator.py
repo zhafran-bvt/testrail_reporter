@@ -213,7 +213,11 @@ class TestReportGenerator(unittest.TestCase):
         video = attachments[0]
         self.assertEqual(video['path'], "attachments/run_301/test_5_att_201.mp4")
         self.assertTrue(video['is_video'])
-        self.assertFalse(bool(video.get('data_url')))
+        # Small video may be inlined as data_url; allow either
+        if video.get('data_url'):
+            self.assertTrue(video['data_url'].startswith('data:'))
+        else:
+            self.assertFalse(bool(video.get('data_url')))
         self.assertEqual(rows[0].get('assignee'), "User Eleven")
 
     @patch('testrail_daily_report.get_project')

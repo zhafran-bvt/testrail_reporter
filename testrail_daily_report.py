@@ -1007,6 +1007,11 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         with open(tmp_path, "rb") as src, open(job["abs_path"], "wb") as dst:
                             shutil.copyfileobj(src, dst, length=64 * 1024)
                     size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
+                    if inline_limit and size_bytes <= inline_limit and size_bytes > 0:
+                        try:
+                            inline_payload = job["abs_path"].read_bytes()
+                        except Exception:
+                            inline_payload = None
 
                 try:
                     Path(tmp_path).unlink(missing_ok=True)
@@ -1015,8 +1020,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
                 content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
                 is_image = bool(content_type and str(content_type).startswith("image/"))
+                suffix_lc = job["rel_path"].suffix.lower()
+                common_video_exts = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg"}
+                is_video = bool(
+                    (content_type and str(content_type).startswith("video/"))
+                    or suffix_lc in common_video_exts
+                )
                 data_url = None
-                if inline_payload is not None and is_image:
+                if inline_payload is not None and (is_image or is_video):
                     try:
                         data_b64 = base64.b64encode(inline_payload).decode("ascii")
                         mime = content_type or "application/octet-stream"
@@ -1025,12 +1036,6 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         data_url = None
                 # Use a relative path so the saved HTML works offline and under the /reports/ mount
                 public_path = str(job["rel_path"]).replace(os.sep, "/")
-                suffix_lc = job["rel_path"].suffix.lower()
-                common_video_exts = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg"}
-                is_video = bool(
-                    (content_type and str(content_type).startswith("video/"))
-                    or suffix_lc in common_video_exts
-                )
                 attachments_by_test.setdefault(job["test_id"], []).append({
                     "name": job["filename"],
                     "path": public_path,
