@@ -837,8 +837,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         data_url = None
                     finally:
                         payload = None
-                public_path = "/reports/" + str(job["rel_path"]).replace(os.sep, "/")
-                is_video = bool(content_type and content_type.startswith("video/"))
+                # Use a relative path so the saved HTML works offline and under the /reports/ mount
+                public_path = str(job["rel_path"]).replace(os.sep, "/")
+                suffix_lc = job["rel_path"].suffix.lower()
+                common_video_exts = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg"}
+                is_video = bool(
+                    (content_type and content_type.startswith("video/"))
+                    or suffix_lc in common_video_exts
+                )
                 attachments_by_test.setdefault(job["test_id"], []).append({
                     "name": job["filename"],
                     "path": public_path,

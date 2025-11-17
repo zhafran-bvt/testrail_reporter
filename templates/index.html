@@ -102,6 +102,10 @@
     .loading-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.45); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#fff; font-weight:600; font-size:14px; letter-spacing:.4px; z-index:9999; text-align:center; padding:0 16px; }
     .spinner { width:32px; height:32px; border:3px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; animation: spin 0.9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-progress { width: 260px; max-width: 90vw; background: rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); border-radius: 999px; overflow: hidden; display: none; flex-direction: column; align-items: stretch; }
+    .loading-progress-bar { height: 10px; width: 100%; background: rgba(255,255,255,0.08); position: relative; }
+    .loading-progress-fill { position:absolute; left:0; top:0; bottom:0; width:0%; background: linear-gradient(90deg, var(--primary), var(--primary-600)); }
+    .loading-progress-text { font-size:12px; color:#e2e8f0; margin-top:6px; letter-spacing:.2px; text-align:center; }
     .report-meta { margin-top: 16px; border: 1px dashed var(--border); border-radius: var(--radius); padding: 12px; background: rgba(59,130,246,0.05); color: var(--muted); font-size: 13px; }
     .report-meta-summary { margin: 0; font-weight: 500; color: var(--text); font-size: 13px; }
     .report-meta-details { margin-top: 8px; }
@@ -162,6 +166,12 @@
   <div class="loading-overlay" id="loadingOverlay" style="display:none;">
     <div class="spinner"></div>
     <span id="loadingOverlayText">Generating report…</span>
+    <div class="loading-progress" id="loadingProgress">
+      <div class="loading-progress-bar">
+        <div class="loading-progress-fill" id="loadingProgressFill"></div>
+      </div>
+      <div class="loading-progress-text" id="loadingProgressValue"></div>
+    </div>
   </div>
 
   <script>
@@ -469,6 +479,85 @@
       return 'Working…';
     }
 
+    function deriveProgress(job){
+      const meta = job?.meta || {};
+      const updates = Array.isArray(meta.progress_updates) ? meta.progress_updates : [];
+      const fallbackStage = meta.stage ? { stage: meta.stage, payload: meta.stage_payload || {} } : null;
+      const latest = updates.length ? updates[updates.length - 1] : fallbackStage;
+      let totalRuns = 1;
+      let currentRunIndex = 1;
+
+      for(let i = updates.length - 1; i >= 0; i -= 1){
+        const upd = updates[i];
+        if(upd && upd.stage === 'processing_run'){
+          const payload = upd.payload || {};
+          const t = Number(payload.total);
+          const idx = Number(payload.index);
+          if(Number.isFinite(t) && t > 0){
+            totalRuns = t;
+          }
+          if(Number.isFinite(idx) && idx > 0){
+            currentRunIndex = idx;
+          }
+          break;
+        }
+      }
+      if(latest && (!updates.length || currentRunIndex === 1)){
+        const p = latest.payload || {};
+        const t = Number(p.total);
+        const idx = Number(p.index);
+        if(Number.isFinite(t) && t > 0){
+          totalRuns = t;
+        }
+        if(Number.isFinite(idx) && idx > 0){
+          currentRunIndex = idx;
+        }
+      }
+
+      const stage = latest?.stage;
+      const payload = latest?.payload || {};
+      if(job?.status === 'queued'){
+        const pct = typeof job.queue_position === 'number' && job.queue_position === 0 ? 5 : 2;
+        return { percent: pct, label: jobStatusLabel(job) };
+      }
+      if(job?.status === 'error'){
+        return { percent: 100, label: jobStatusLabel(job) };
+      }
+      if(job?.status === 'success'){
+        return { percent: 100, label: 'Report ready' };
+      }
+
+      const basePerRun = 1 / Math.max(1, totalRuns);
+      const completedRunsPortion = Math.max(0, currentRunIndex - 1) * basePerRun;
+      let stageFractionWithinRun = 0.05;
+      if(stage === 'processing_run' || stage === 'initializing'){
+        stageFractionWithinRun = 0.05;
+      } else if(stage === 'fetching_attachment_metadata'){
+        stageFractionWithinRun = 0.18;
+      } else if(stage === 'downloading_attachments'){
+        const totalItems = Number(payload.total);
+        if(Number.isFinite(totalItems) && totalItems > 0){
+          stageFractionWithinRun = 0.2;
+        } else {
+          stageFractionWithinRun = 0.25;
+        }
+      } else if(stage === 'downloading_attachment'){
+        const cur = Number(payload.current);
+        const tot = Number(payload.total);
+        if(Number.isFinite(cur) && Number.isFinite(tot) && tot > 0){
+          stageFractionWithinRun = 0.2 + Math.min(1, cur / tot) * 0.65;
+        } else {
+          stageFractionWithinRun = 0.3;
+        }
+      } else if(stage === 'rendering_report'){
+        stageFractionWithinRun = 0.95;
+      }
+
+      const progressFraction = Math.min(0.995, completedRunsPortion + stageFractionWithinRun * basePerRun);
+      const percent = Math.round(progressFraction * 100);
+      return { percent, label: jobStatusLabel(job) };
+    }
+
     function updateReportMeta(meta, params){
       const container = document.getElementById('reportMeta');
       if(!container){
@@ -548,12 +637,82 @@
       const form = document.querySelector('.card form');
       const overlay = document.getElementById('loadingOverlay');
       const overlayText = document.getElementById('loadingOverlayText');
+      const progressWrap = document.getElementById('loadingProgress');
+      const progressFill = document.getElementById('loadingProgressFill');
+      const progressValue = document.getElementById('loadingProgressValue');
+      let activeJob = null;
 
-      function setLoading(state, message){
+      function SmoothProgress(wrapEl, fillEl, valueEl){
+        this.wrapEl = wrapEl;
+        this.fillEl = fillEl;
+        this.valueEl = valueEl;
+        this.current = 0;
+        this.target = 0;
+        this._raf = null;
+      }
+      SmoothProgress.prototype._step = function(){
+        const diff = this.target - this.current;
+        const delta = Math.sign(diff) * Math.max(0.25, Math.abs(diff) * 0.18);
+        this.current = this.current + delta;
+        if((diff > 0 && this.current >= this.target) || (diff < 0 && this.current <= this.target)){
+          this.current = this.target;
+        }
+        if(this.fillEl){
+          this.fillEl.style.width = `${Math.round(this.current)}%`;
+        }
+        if(this.valueEl){
+          this.valueEl.textContent = `${Math.round(this.current)}%`;
+        }
+        if(Math.abs(this.current - this.target) > 0.5){
+          this._raf = requestAnimationFrame(this._step.bind(this));
+        }
+      };
+      SmoothProgress.prototype.set = function(pct){
+        if(!this.wrapEl || !this.fillEl || !this.valueEl){
+          return;
+        }
+        const clamped = Math.max(0, Math.min(100, pct));
+        this.wrapEl.style.display = 'flex';
+        this.target = clamped;
+        if(this._raf){
+          cancelAnimationFrame(this._raf);
+        }
+        this._raf = requestAnimationFrame(this._step.bind(this));
+      };
+      SmoothProgress.prototype.hide = function(){
+        if(this._raf){
+          cancelAnimationFrame(this._raf);
+        }
+        this._raf = null;
+        this.target = 0;
+        this.current = 0;
+        if(this.wrapEl){
+          this.wrapEl.style.display = 'none';
+        }
+        if(this.fillEl){
+          this.fillEl.style.width = '0%';
+        }
+        if(this.valueEl){
+          this.valueEl.textContent = '';
+        }
+      };
+
+      const progressBar = new SmoothProgress(progressWrap, progressFill, progressValue);
+
+      function applyProgress(progress){
+        if(progress && typeof progress.percent === 'number'){
+          progressBar.set(progress.percent);
+        } else {
+          progressBar.hide();
+        }
+      }
+
+      function setLoading(state, message, progress){
         const btn = document.getElementById('previewReportBtn');
         if(state){
           overlay.style.display = 'flex';
           overlayText.textContent = message || 'Generating report…';
+          applyProgress(progress);
           btn.disabled = true;
           if(!btn.dataset.originalText){
             btn.dataset.originalText = btn.textContent;
@@ -562,6 +721,7 @@
         } else {
           overlay.style.display = 'none';
           overlayText.textContent = 'Generating report…';
+          applyProgress(null);
           btn.disabled = false;
           if(btn.dataset.originalText){
             btn.textContent = btn.dataset.originalText;
@@ -574,10 +734,12 @@
         let attempt = 0;
         while(true){
           const job = await fetchJob(jobId);
+          activeJob = job;
+          const progress = deriveProgress(job);
           if(job.status === 'success' || job.status === 'error'){
             return job;
           }
-          setLoading(true, jobStatusLabel(job));
+          setLoading(true, progress.label, progress);
           await new Promise(resolve => setTimeout(resolve, Math.min(5000, 1200 + attempt * 200)));
           attempt += 1;
         }
@@ -643,9 +805,11 @@
         };
 
         try {
-          setLoading(true, 'Submitting report request…');
+          setLoading(true, 'Submitting report request…', { percent: 5 });
           const job = await startReportJob(payload);
+          activeJob = job;
           if(job.status === 'success'){
+            setLoading(true, 'Opening report…', { percent: 100 });
             handleJobSuccess(job);
             return;
           }
@@ -656,24 +820,32 @@
             throw new Error('Server did not provide a job id.');
           }
           showToast('Report queued. Large plans may take up to a minute.', 'info');
-          setLoading(true, jobStatusLabel(job));
+          const initialProgress = deriveProgress(job);
+          setLoading(true, initialProgress.label, initialProgress);
           const finalJob = await pollJob(job.id);
           if(finalJob.status === 'error'){
             throw new Error(finalJob.error || 'Report generation failed.');
           }
+          setLoading(true, 'Opening report…', { percent: 100 });
           handleJobSuccess(finalJob);
         } catch (error){
           const message = error?.message || 'Failed to generate report.';
           showToast(`Failed to generate report: ${message}`, 'error');
         } finally {
           setLoading(false);
+          activeJob = null;
         }
       }
 
       form.addEventListener('submit', handlePreviewSubmit);
+      filterRuns();
 
-      window.addEventListener('focus', () => setLoading(false));
-      window.addEventListener('pageshow', () => setLoading(false));
+      document.addEventListener('visibilitychange', function(){
+        if(document.visibilityState === 'visible' && activeJob && activeJob.status !== 'success' && activeJob.status !== 'error'){
+          const progress = deriveProgress(activeJob);
+          setLoading(true, progress.label, progress);
+        }
+      });
     });
   </script>
 </body>

@@ -168,6 +168,58 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.get_plan')
     @patch('testrail_daily_report.get_plan_runs')
     @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_generate_report_video_attachment_paths(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                                    mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                                    mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Video Plan", "entries": [{"runs": [{"id": 301, "name": "Video Run"}]}]}
+        mock_plan_runs.return_value = [301]
+        mock_tests_for_run.return_value = [
+            {"id": 5, "title": "Has Video", "status_id": 1, "priority_id": 2, "assignedto_id": 11},
+        ]
+        mock_results_for_run.return_value = [
+            {"id": 501, "test_id": 5, "status_id": 1, "comment": "See clip"},
+        ]
+        mock_get_attachments_for_test.return_value = [
+            {"id": 201, "name": "clip.mp4", "result_id": 501, "size": 1234},
+        ]
+        mock_download_attachment.return_value = (b"video-bytes", "video/mp4")
+        mock_users_map.return_value = {11: "User Eleven"}
+        mock_priorities_map.return_value = {2: "P2"}
+        mock_statuses_map.return_value = {1: "Passed"}
+        mock_render_html.return_value = "/tmp/video-report.html"
+
+        path = generate_report(project=1, plan=77, run_ids=[301])
+
+        self.assertEqual(path, "/tmp/video-report.html")
+        context = mock_render_html.call_args[0][0]
+        rows = context['tables'][0]['rows']
+        self.assertEqual(len(rows), 1)
+        attachments = rows[0].get('attachments', [])
+        self.assertEqual(len(attachments), 1)
+        video = attachments[0]
+        self.assertEqual(video['path'], "attachments/run_301/test_5_att_201.mp4")
+        self.assertTrue(video['is_video'])
+        self.assertFalse(bool(video.get('data_url')))
+        self.assertEqual(rows[0].get('assignee'), "User Eleven")
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
     @patch('testrail_daily_report.get_results_for_run')
     @patch('testrail_daily_report.get_users_map')
     @patch('testrail_daily_report.get_priorities_map')
