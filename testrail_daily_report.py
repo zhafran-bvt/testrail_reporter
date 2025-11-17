@@ -17,6 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
 from io import BytesIO
+import tempfile
 from dotenv import load_dotenv
 from PIL import Image
 
@@ -345,13 +346,24 @@ def get_attachments_for_test(session, base_url, test_id: int):
 
 
 def download_attachment(session, base_url, attachment_id: int):
+    """Download an attachment.
+    Returns either (temp_path, content_type) when streaming, or (bytes, content_type) for backward-compatible mocks/tests.
+    """
     url = f"{base_url}/index.php?/api/v2/get_attachment/{attachment_id}"
     start = time.perf_counter()
     try:
-        r = session.get(url)
-        r.raise_for_status()
-        record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "ok")
-        return r.content, r.headers.get("Content-Type")
+        with session.get(url, stream=True) as r:
+            r.raise_for_status()
+            content_type = r.headers.get("Content-Type")
+            # Write to a temp file to avoid holding full content in memory
+            fd, tmp_path = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
+            tmp = Path(tmp_path)
+            with os.fdopen(fd, "wb") as f:
+                for chunk in r.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        f.write(chunk)
+            record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "ok")
+            return tmp, content_type
     except Exception as exc:
         record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "error", str(exc))
         raise
@@ -544,6 +556,78 @@ def compress_image_data(data: bytes, content_type: str | None):
             return out_bytes, out_type
     except Exception:
         return data, content_type
+
+
+def compress_image_file(input_path: Path, content_type: str | None, output_path: Path, inline_limit: int):
+    """Compress an image from disk to disk, returning (final_content_type, size_bytes, inline_payload or None)."""
+    max_dim = int(os.getenv("ATTACHMENT_IMAGE_MAX_DIM", "1200"))
+    jpeg_quality = int(os.getenv("ATTACHMENT_JPEG_QUALITY", "65"))
+    min_quality = int(os.getenv("ATTACHMENT_MIN_JPEG_QUALITY", "40"))
+    max_bytes = int(os.getenv("ATTACHMENT_MAX_IMAGE_BYTES", "450000"))
+    min_quality = max(15, min(min_quality, jpeg_quality))
+
+    try:
+        with Image.open(input_path) as img:
+            work = img.copy()
+            if max(work.size) > max_dim:
+                work.thumbnail((max_dim, max_dim), Image.LANCZOS)
+
+            def save_png(image_obj, target_path):
+                image_obj.save(target_path, format="PNG", optimize=True, compress_level=6)
+                return "image/png"
+
+            def save_jpeg(image_obj, target_path, quality):
+                image_obj.convert("RGB").save(target_path, format="JPEG", optimize=True, quality=quality)
+                return "image/jpeg"
+
+            img_format = (img.format or "").upper()
+            if img_format == "PNG":
+                out_type = save_png(work, output_path)
+            else:
+                out_type = save_jpeg(work, output_path, jpeg_quality)
+
+            def enforce_size(image_obj, current_type):
+                if max_bytes <= 0:
+                    return current_type
+                size_now = output_path.stat().st_size if output_path.exists() else 0
+                if size_now <= max_bytes:
+                    return current_type
+                target_quality = min(jpeg_quality, 80)
+                while target_quality > min_quality:
+                    target_quality = max(min_quality, target_quality - 10)
+                    out_type_local = save_jpeg(image_obj, output_path, target_quality)
+                    size_now = output_path.stat().st_size
+                    if size_now <= max_bytes or target_quality == min_quality:
+                        return out_type_local
+                size_now = output_path.stat().st_size
+                if size_now <= max_bytes:
+                    return current_type
+                shrink_ratio = math.sqrt(max_bytes / float(size_now))
+                if shrink_ratio < 0.98:
+                    new_dim = max(320, int(max(image_obj.size) * shrink_ratio))
+                    shrunk = image_obj.copy()
+                    shrunk.thumbnail((new_dim, new_dim), Image.LANCZOS)
+                    out_type_local = save_jpeg(shrunk, output_path, min_quality)
+                    return out_type_local
+                return current_type
+
+            out_type = enforce_size(work, out_type)
+            size_bytes = output_path.stat().st_size if output_path.exists() else 0
+            inline_payload = None
+            if inline_limit and size_bytes <= inline_limit and size_bytes > 0:
+                inline_payload = output_path.read_bytes()
+            return out_type, size_bytes, inline_payload
+    except Exception:
+        # Fallback: copy original bytes
+        try:
+            output_path.write_bytes(input_path.read_bytes())
+            size_bytes = output_path.stat().st_size
+            inline_payload = None
+            if inline_limit and size_bytes <= inline_limit and size_bytes > 0:
+                inline_payload = output_path.read_bytes()
+            return content_type, size_bytes, inline_payload
+        except Exception:
+            return content_type, 0, None
 
 
 def render_html(context: dict, out_path: Path):
@@ -828,8 +912,25 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
                 if index % 5 == 0:
                     log_memory(f"download_progress_{rid}_{index}")
-                data, content_type = download_attachment(session, base_url, attachment_id)
-                data_size = len(data)
+                resp = download_attachment(session, base_url, attachment_id)
+                tmp_path = None
+                content_type = None
+                if isinstance(resp, tuple) and len(resp) == 2 and isinstance(resp[0], (bytes, bytearray)):
+                    # Backward-compatible: caller returned bytes (e.g., tests/mocks)
+                    content_type = resp[1]
+                    fd, tmp = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
+                    with os.fdopen(fd, "wb") as f:
+                        f.write(resp[0])
+                    tmp_path = Path(tmp)
+                elif isinstance(resp, tuple) and len(resp) == 2:
+                    tmp_path, content_type = resp
+                else:
+                    raise RuntimeError(f"Unexpected download_attachment response for {attachment_id}: {type(resp)}")
+
+                if tmp_path is None or not Path(tmp_path).exists():
+                    raise RuntimeError(f"Attachment temp path missing for {attachment_id}")
+
+                data_size = Path(tmp_path).stat().st_size
                 if attachment_size_limit and data_size > attachment_size_limit:
                     stripped = {
                         "attachment_id": attachment_id,
@@ -849,12 +950,13 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         "inline_embedded": False,
                         "skipped": True,
                     })
+                    try:
+                        Path(tmp_path).unlink(missing_ok=True)
+                    except Exception:
+                        pass
                     continue
-                data, content_type = compress_image_data(data, content_type)
-                job["content_type"] = content_type
-                job["size_bytes"] = len(data)
-                if inline_limit and len(data) <= inline_limit:
-                    job["inline_data"] = data
+
+                is_image_type = bool(content_type and str(content_type).lower().startswith("image/"))
                 suffix_map = {
                     "image/jpeg": ".jpg",
                     "image/jpg": ".jpg",
@@ -870,33 +972,48 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
                         base_name = Path(job["filename"]).stem or Path(job["filename"]).name
                         job["filename"] = f"{base_name}{desired_suffix}"
-                job["abs_path"].write_bytes(data)
+
+                inline_payload = None
+                if is_image_type:
+                    content_type, size_bytes, inline_payload = compress_image_file(
+                        Path(tmp_path),
+                        content_type,
+                        job["abs_path"],
+                        inline_limit,
+                    )
+                else:
+                    job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
+                    Path(tmp_path).replace(job["abs_path"])
+                    size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
+
+                try:
+                    Path(tmp_path).unlink(missing_ok=True)
+                except Exception:
+                    pass
+
                 content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
-                is_image = bool(content_type and content_type.startswith("image/"))
+                is_image = bool(content_type and str(content_type).startswith("image/"))
                 data_url = None
-                payload = job.pop("inline_data", None)
-                if payload is not None and is_image:
+                if inline_payload is not None and is_image:
                     try:
-                        data_b64 = base64.b64encode(payload).decode("ascii")
+                        data_b64 = base64.b64encode(inline_payload).decode("ascii")
                         mime = content_type or "application/octet-stream"
                         data_url = f"data:{mime};base64,{data_b64}"
                     except Exception:
                         data_url = None
-                    finally:
-                        payload = None
                 # Use a relative path so the saved HTML works offline and under the /reports/ mount
                 public_path = str(job["rel_path"]).replace(os.sep, "/")
                 suffix_lc = job["rel_path"].suffix.lower()
                 common_video_exts = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg"}
                 is_video = bool(
-                    (content_type and content_type.startswith("video/"))
+                    (content_type and str(content_type).startswith("video/"))
                     or suffix_lc in common_video_exts
                 )
                 attachments_by_test.setdefault(job["test_id"], []).append({
                     "name": job["filename"],
                     "path": public_path,
                     "content_type": content_type,
-                    "size": job.get("size") or job.get("size_bytes"),
+                    "size": job.get("size") or size_bytes,
                     "is_image": is_image,
                     "is_video": is_video,
                     "data_url": data_url,
