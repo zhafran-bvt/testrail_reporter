@@ -20,6 +20,16 @@ from io import BytesIO
 from dotenv import load_dotenv
 from PIL import Image
 
+try:
+    import resource  # type: ignore
+except ImportError:  # pragma: no cover - resource not available on all platforms
+    resource = None  # type: ignore
+
+try:
+    import psutil  # type: ignore
+except ImportError:  # pragma: no cover - psutil optional
+    psutil = None  # type: ignore
+
 # Ensure .env overrides any existing env so local config is honored
 load_dotenv(override=True)
 
@@ -68,6 +78,37 @@ def env_or_die(key: str) -> str:
         print(f"Missing env var: {key}", file=sys.stderr)
         sys.exit(2)
     return v
+
+
+def _memory_usage_mb() -> float | None:
+    """Return current RSS memory usage in MB if detectable."""
+    if psutil:
+        try:
+            proc = psutil.Process(os.getpid())
+            return proc.memory_info().rss / (1024 * 1024)
+        except Exception:
+            pass
+    if resource:
+        try:
+            usage = resource.getrusage(resource.RUSAGE_SELF)
+            # ru_maxrss is KB on Linux, bytes on macOS. Detect large values to adjust.
+            rss = float(getattr(usage, "ru_maxrss", 0.0))
+            if rss <= 0:
+                return None
+            if rss > 10 * (1024 ** 2):  # looks like bytes
+                return rss / (1024 * 1024)
+            return rss / 1024.0  # assume KB
+        except Exception:
+            return None
+    return None
+
+
+def log_memory(label: str):
+    """Log current memory usage to stderr with a consistent prefix."""
+    mem_mb = _memory_usage_mb()
+    if mem_mb is None:
+        return
+    print(f"[mem-log] stage={label} rss_mb={mem_mb:.2f}", file=sys.stderr, flush=True)
 
 
 def api_get(session: requests.Session, base_url: str, endpoint: str):
@@ -540,6 +581,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
     user = env_or_die("TESTRAIL_USER")
     api_key = env_or_die("TESTRAIL_API_KEY")
+    log_memory("start")
 
     session = requests.Session()
     session.auth = (user, api_key)
@@ -611,11 +653,13 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             try:
                 rid, tests, results = future.result()
                 run_data.append((rid, tests, results))
+                log_memory(f"fetched_run_data_{rid}")
             except Exception as e:
                 rid = futures[future]
                 print(f"Warning: failed to fetch run {rid}: {e}", file=sys.stderr)
 
     run_data.sort(key=lambda item: run_ids_resolved.index(item[0]))
+    log_memory("after_fetch_runs")
 
     total_runs = len(run_data)
     for idx, (rid, tests, results) in enumerate(run_data, start=1):
@@ -729,6 +773,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         print(f"Warning: attachments metadata future failed for test {tid}: {e}", file=sys.stderr)
                         payload = []
                     metadata_map[tid] = payload or []
+            log_memory(f"after_attachment_metadata_{rid}")
 
         download_jobs = []
         for tid, payload in metadata_map.items():
@@ -855,6 +900,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     "data_url": data_url,
                     "inline_embedded": bool(data_url),
                 })
+            log_memory(f"after_attachment_downloads_{rid}")
 
         for tid in attachments_by_test:
             attachments_by_test[tid].sort(key=lambda entry: entry["path"])
@@ -890,6 +936,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             summary.setdefault("by_status", {})
             summary["by_status"][k] = summary["by_status"].get(k, 0) + v
         # No trend point tracking
+        log_memory(f"run_complete_{rid}")
 
     pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
     # Donut segments
@@ -947,7 +994,9 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     filename = f"Testing_Progress_Report_{name_slug}_{date_str}.html"
     out_file = Path("out") / filename
     context["output_filename"] = filename
-    return render_html(context, out_file)
+    rendered = render_html(context, out_file)
+    log_memory("report_rendered")
+    return rendered
 
 
 def main():
