@@ -18,6 +18,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pathlib import Path
 from io import BytesIO
 import tempfile
+import shutil
 from dotenv import load_dotenv
 from PIL import Image
 
@@ -983,7 +984,12 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     )
                 else:
                     job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
-                    Path(tmp_path).replace(job["abs_path"])
+                    try:
+                        shutil.copyfile(tmp_path, job["abs_path"])
+                    except OSError:
+                        # Last resort: read/write the chunks
+                        with open(tmp_path, "rb") as src, open(job["abs_path"], "wb") as dst:
+                            shutil.copyfileobj(src, dst, length=64 * 1024)
                     size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
 
                 try:
