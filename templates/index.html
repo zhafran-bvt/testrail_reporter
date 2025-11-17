@@ -518,13 +518,13 @@
       const payload = latest?.payload || {};
       if(job?.status === 'queued'){
         const pct = typeof job.queue_position === 'number' && job.queue_position === 0 ? 5 : 2;
-        return { percent: pct, label: jobStatusLabel(job) };
+        return { percent: pct, label: jobStatusLabel(job), etaMs: null };
       }
       if(job?.status === 'error'){
-        return { percent: 100, label: jobStatusLabel(job) };
+        return { percent: 100, label: jobStatusLabel(job), etaMs: null };
       }
       if(job?.status === 'success'){
-        return { percent: 100, label: 'Report ready' };
+        return { percent: 100, label: 'Report ready', etaMs: 0 };
       }
 
       const basePerRun = 1 / Math.max(1, totalRuns);
@@ -555,7 +555,18 @@
 
       const progressFraction = Math.min(0.995, completedRunsPortion + stageFractionWithinRun * basePerRun);
       const percent = Math.round(progressFraction * 100);
-      return { percent, label: jobStatusLabel(job) };
+
+      let etaMs = null;
+      const startedAt = job?.started_at ? Date.parse(job.started_at) : null;
+      if(Number.isFinite(startedAt) && startedAt > 0){
+        const elapsedMs = Date.now() - startedAt;
+        if(elapsedMs > 0 && progressFraction > 0){
+          const projectedTotal = elapsedMs / Math.max(progressFraction, 0.05);
+          etaMs = Math.max(0, projectedTotal - elapsedMs);
+        }
+      }
+
+      return { percent, label: jobStatusLabel(job), etaMs };
     }
 
     function updateReportMeta(meta, params){
@@ -711,7 +722,14 @@
         const btn = document.getElementById('previewReportBtn');
         if(state){
           overlay.style.display = 'flex';
-          overlayText.textContent = message || 'Generating report…';
+          let displayMessage = message || 'Generating report…';
+          if(progress && typeof progress.etaMs === 'number'){
+            const secs = Math.round(progress.etaMs / 1000);
+            if(secs >= 0){
+              displayMessage += ` (~${secs}s remaining)`;
+            }
+          }
+          overlayText.textContent = displayMessage;
           applyProgress(progress);
           btn.disabled = true;
           if(!btn.dataset.originalText){

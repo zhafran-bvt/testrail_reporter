@@ -22,6 +22,7 @@ from testrail_daily_report import (
     get_plan,
     env_or_die,
     capture_telemetry,
+    log_memory,
 )
 import requests
 import glob
@@ -271,6 +272,8 @@ class ReportRequest(BaseModel):
 
 _keepalive_thread: threading.Thread | None = None
 _keepalive_stop = threading.Event()
+_memlog_thread: threading.Thread | None = None
+_memlog_stop = threading.Event()
 
 def _start_keepalive():
     url = os.getenv("KEEPALIVE_URL")
@@ -295,6 +298,26 @@ def _start_keepalive():
     _keepalive_thread = threading.Thread(target=_loop, name="keepalive-thread", daemon=True)
     _keepalive_thread.start()
 
+def _start_memlog():
+    try:
+        interval = max(30, int(os.getenv("MEM_LOG_INTERVAL", "60")))
+    except ValueError:
+        interval = 60
+
+    def _loop():
+        while not _memlog_stop.is_set():
+            try:
+                log_memory("heartbeat")
+            except Exception:
+                pass
+            _memlog_stop.wait(interval)
+
+    global _memlog_thread
+    if _memlog_thread and _memlog_thread.is_alive():
+        return
+    _memlog_thread = threading.Thread(target=_loop, name="memlog-thread", daemon=True)
+    _memlog_thread.start()
+
 def _stop_keepalive():
     global _keepalive_thread
     if not _keepalive_thread:
@@ -304,13 +327,24 @@ def _stop_keepalive():
     _keepalive_thread = None
     _keepalive_stop.clear()
 
+def _stop_memlog():
+    global _memlog_thread
+    if not _memlog_thread:
+        return
+    _memlog_stop.set()
+    _memlog_thread.join(timeout=5)
+    _memlog_thread = None
+    _memlog_stop.clear()
+
 @app.on_event("startup")
 def on_startup():
     _start_keepalive()
+    _start_memlog()
 
 @app.on_event("shutdown")
 def on_shutdown():
     _stop_keepalive()
+    _stop_memlog()
 
 @app.get("/healthz")
 def healthz():

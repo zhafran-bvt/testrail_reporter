@@ -719,9 +719,25 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     # Time-based trend removed
 
     report_refs: set[str] = set()
-    attachment_workers = 1  # serialize attachment downloads to stay within low-memory limits
+    # Allow tuning concurrency with env while keeping conservative defaults
+    try:
+        attachment_workers_env = int(os.getenv("ATTACHMENT_WORKERS", "2"))
+    except ValueError:
+        attachment_workers_env = 2
+    attachment_workers = max(1, min(4, attachment_workers_env))
 
-    max_workers = 1  # fetch runs sequentially to minimize concurrency footprint
+    try:
+        run_workers_env = int(os.getenv("RUN_WORKERS", "2"))
+    except ValueError:
+        run_workers_env = 2
+    # Allow higher ceiling if explicitly requested
+    try:
+        run_workers_ceiling = int(os.getenv("RUN_WORKERS_MAX", "4"))
+    except ValueError:
+        run_workers_ceiling = 4
+    run_workers_ceiling = max(1, min(8, run_workers_ceiling))
+    max_workers = max(1, min(run_workers_ceiling, min(max(1, len(run_ids_resolved)), run_workers_env)))
+
     inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
     attachment_inline_limit = inline_embed_limit
     attachment_size_limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "520000000"))
