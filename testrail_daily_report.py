@@ -826,6 +826,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             for index, job in enumerate(download_jobs, start=1):
                 attachment_id = job["attachment_id"]
                 notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
+                if index % 5 == 0:
+                    log_memory(f"download_progress_{rid}_{index}")
                 data, content_type = download_attachment(session, base_url, attachment_id)
                 data_size = len(data)
                 if attachment_size_limit and data_size > attachment_size_limit:

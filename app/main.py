@@ -33,7 +33,21 @@ app = FastAPI(title="TestRail Reporter", version="0.1.0")
 
 # Serve generated reports and static assets
 Path("out").mkdir(exist_ok=True)
-app.mount("/reports", StaticFiles(directory="out"), name="reports")
+
+
+class NoCacheStaticFiles(StaticFiles):
+    """StaticFiles with no-cache headers to ensure refreshed report content."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
+app.mount("/reports", NoCacheStaticFiles(directory="out"), name="reports")
 if Path("assets").exists():
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
