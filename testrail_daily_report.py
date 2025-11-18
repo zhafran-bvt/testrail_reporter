@@ -346,28 +346,49 @@ def get_attachments_for_test(session, base_url, test_id: int):
         return []
 
 
-def download_attachment(session, base_url, attachment_id: int):
+def download_attachment(session, base_url, attachment_id: int, *, max_retries: int = 4):
     """Download an attachment.
     Returns either (temp_path, content_type) when streaming, or (bytes, content_type) for backward-compatible mocks/tests.
     """
     url = f"{base_url}/index.php?/api/v2/get_attachment/{attachment_id}"
     start = time.perf_counter()
-    try:
-        with session.get(url, stream=True) as r:
-            r.raise_for_status()
-            content_type = r.headers.get("Content-Type")
-            # Write to a temp file to avoid holding full content in memory
-            fd, tmp_path = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
-            tmp = Path(tmp_path)
-            with os.fdopen(fd, "wb") as f:
-                for chunk in r.iter_content(chunk_size=64 * 1024):
-                    if chunk:
-                        f.write(chunk)
-            record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "ok")
-            return tmp, content_type
-    except Exception as exc:
-        record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "error", str(exc))
-        raise
+    backoff = 3.0
+    attempt = 0
+    while True:
+        try:
+            with session.get(url, stream=True) as r:
+                if r.status_code == 429:
+                    retry_after = r.headers.get("Retry-After")
+                    wait_for = backoff
+                    try:
+                        if retry_after:
+                            wait_for = max(backoff, float(retry_after))
+                    except Exception:
+                        wait_for = backoff
+                    attempt += 1
+                    if attempt > max_retries:
+                        r.raise_for_status()
+                    time.sleep(wait_for)
+                    backoff *= 1.8
+                    continue
+                r.raise_for_status()
+                content_type = r.headers.get("Content-Type")
+                # Write to a temp file to avoid holding full content in memory
+                fd, tmp_path = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
+                tmp = Path(tmp_path)
+                with os.fdopen(fd, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=64 * 1024):
+                        if chunk:
+                            f.write(chunk)
+                record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "ok")
+                return tmp, content_type
+        except Exception as exc:
+            attempt += 1
+            if attempt >= max_retries:
+                record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "error", str(exc))
+                raise
+            time.sleep(backoff)
+            backoff *= 1.8
 
 
 def sanitize_filename(name: str) -> str:
@@ -746,6 +767,11 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     if video_inline_limit < inline_embed_limit:
         video_inline_limit = inline_embed_limit
     attachment_inline_limit = inline_embed_limit
+    try:
+        attachment_retry_limit = int(os.getenv("ATTACHMENT_RETRY_ATTEMPTS", "4"))
+    except ValueError:
+        attachment_retry_limit = 4
+    attachment_retry_limit = max(1, min(10, attachment_retry_limit))
     attachment_size_limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "520000000"))
 
     def _fetch_run_data(rid: int):
@@ -936,7 +962,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
                 if index % 5 == 0:
                     log_memory(f"download_progress_{rid}_{index}")
-                resp = download_attachment(session, base_url, attachment_id)
+                resp = download_attachment(session, base_url, attachment_id, max_retries=attachment_retry_limit)
                 tmp_path = None
                 content_type = None
                 if isinstance(resp, tuple) and len(resp) == 2 and isinstance(resp[0], (bytes, bytearray)):
