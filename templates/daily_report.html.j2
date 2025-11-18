@@ -65,6 +65,9 @@
     .table-controls { display:flex; align-items:center; gap:12px; margin:8px 0; flex-wrap:wrap; justify-content:flex-end; }
     .table-controls label { display:inline-flex; align-items:center; gap:6px; color: var(--muted); font-size: 12px; }
     .table-controls select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); }
+    .column-toggles { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .column-toggles label { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:12px; border:1px solid var(--border); background: color-mix(in srgb, var(--card-bg) 90%, var(--bg) 10%); color: var(--text); font-size:12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .column-toggles input[type="checkbox"] { accent-color: var(--primary); width:14px; height:14px; }
     .muted { color:var(--muted); font-size:12px; }
     .comment-text { font-size: 12px; color: var(--muted); margin-bottom: 6px; white-space: pre-wrap; }
     .attachment-trigger { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; border:1px solid var(--primary); background: transparent; color: var(--primary); font-size:12px; cursor:pointer; }
@@ -422,6 +425,17 @@
         if (prioritySel) prioritySel.addEventListener('change', applyFilters);
         if (hideUntested) hideUntested.addEventListener('change', applyFilters);
 
+        function setColumnVisibility(colKey, visible){
+          document.querySelectorAll('[data-run-id=\"' + runId + '\"][data-col=\"' + colKey + '\"]').forEach(el=>{
+            el.style.display = visible ? '' : 'none';
+          });
+        }
+        document.querySelectorAll('.toggle-col[data-run-id=\"' + runId + '\"]').forEach(cb=>{
+          const col = cb.dataset.col;
+          setColumnVisibility(col, cb.checked);
+          cb.addEventListener('change', ()=> setColumnVisibility(col, cb.checked));
+        });
+
         // Quick presets removed per request
 
         // Status chips click → apply status filter immediately
@@ -504,6 +518,11 @@
           if(videoSrc){
             imgEl.style.display = 'none';
             videoEl.style.display = 'block';
+            if(current.content_type){
+              videoEl.setAttribute('type', current.content_type);
+            } else {
+              videoEl.removeAttribute('type');
+            }
             videoEl.src = videoSrc;
             videoEl.load();
           } else {
