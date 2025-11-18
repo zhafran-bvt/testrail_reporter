@@ -42,7 +42,7 @@
     .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 14px 0; box-shadow: var(--shadow); }
     .table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: auto; box-shadow: var(--shadow); position: relative; }
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; font-size: 13px; vertical-align: top; word-break: break-word; background: var(--card-bg); }
+    th, td { border-bottom: 1px solid var(--border); padding: 6px 8px; font-size: 13px; vertical-align: top; word-break: break-word; background: var(--card-bg); line-height: 20px; }
     td { position: relative; }
     thead th {
       background: var(--card-bg); /* solid background to prevent overlap */
@@ -51,6 +51,8 @@
       top: 0;
       z-index: 5;
       box-shadow: 0 1px 0 var(--border), 0 2px 6px rgba(0,0,0,0.04);
+      padding-top: 4px;
+      padding-bottom: 4px;
     }
     tbody tr:nth-child(odd){ background: rgba(0,0,0,0.02); }
     tbody tr:hover { background: rgba(0,0,0,0.04); }
@@ -65,6 +67,9 @@
     .table-controls { display:flex; align-items:center; gap:12px; margin:8px 0; flex-wrap:wrap; justify-content:flex-end; }
     .table-controls label { display:inline-flex; align-items:center; gap:6px; color: var(--muted); font-size: 12px; }
     .table-controls select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); }
+    .table-pager { display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-top:6px; font-size:12px; color: var(--muted); flex-wrap:wrap; }
+    .table-pager button { padding:4px 8px; border-radius:8px; border:1px solid var(--border); background: var(--card-bg); color: var(--text); cursor:pointer; }
+    .table-pager button:disabled { opacity:0.5; cursor:not-allowed; }
     .muted { color:var(--muted); font-size:12px; }
     .comment-text { font-size: 12px; color: var(--muted); margin-bottom: 6px; white-space: pre-wrap; }
     .attachment-trigger { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; border:1px solid var(--primary); background: transparent; color: var(--primary); font-size:12px; cursor:pointer; }
@@ -206,11 +211,12 @@
     <div class="table-wrap" id="wrap-{{ t.run_id }}">
     <table id="table-{{ t.run_id }}">
       <colgroup>
-        <col style="width:7%" />
-        <col style="width:38%" />
-        <col style="width:15%" />
-        <col style="width:15%" />
+        <col style="width:8%" />
+        <col style="width:36%" />
         <col style="width:12%" />
+        <col style="width:15%" />
+        <col style="width:10%" />
+        <col style="width:9%" />
         <col style="width:20%" />
       </colgroup>
       <thead>
@@ -280,6 +286,11 @@
       </tbody>
     </table>
     </div>
+    <div class="table-pager" data-run-id="{{ t.run_id }}">
+      <button type="button" class="pager-prev" data-run-id="{{ t.run_id }}">Prev</button>
+      <button type="button" class="pager-next" data-run-id="{{ t.run_id }}">Next</button>
+      <span class="pager-info" data-run-id="{{ t.run_id }}"></span>
+    </div>
   </div>
   {% endfor %}
 
@@ -312,52 +323,6 @@
   </div>
 
   <script>
-    (function(){
-      function setupRun(runId){
-        const tbody = document.getElementById('rows-' + runId);
-        const table = document.getElementById('table-' + runId);
-        const wrap = document.getElementById('wrap-' + runId);
-        if(!tbody || !table || !wrap) return;
-        const rows = Array.from(tbody.querySelectorAll('tr'));
-        const total = rows.length;
-        const ctrl = document.querySelector('.table-controls[data-run-id="' + runId + '"]');
-        const sizeSel = ctrl ? ctrl.querySelector('.page-size') : null;
-        const key = 'report_rows_visible';
-        let rowsVisible = parseInt(localStorage.getItem(key) || '10', 10);
-        if (isNaN(rowsVisible) || rowsVisible <= 0) rowsVisible = 10;
-
-        function applyHeight(){
-          const headerH = table.tHead ? table.tHead.getBoundingClientRect().height : 36;
-          const firstRow = rows[0];
-          const rowH = firstRow ? firstRow.getBoundingClientRect().height : 36;
-          const desired = Math.round(headerH + rowH * rowsVisible + 2);
-          wrap.style.maxHeight = desired + 'px';
-        }
-
-        if (sizeSel) {
-          sizeSel.value = String(rowsVisible);
-          sizeSel.addEventListener('change', () => {
-            const v = parseInt(sizeSel.value || '10', 10);
-            rowsVisible = isNaN(v) ? 10 : v;
-            localStorage.setItem(key, String(rowsVisible));
-            applyHeight();
-          });
-        }
-
-        // Initial height
-        applyHeight();
-        // Also adjust on window resize as row height may change
-        window.addEventListener('resize', applyHeight);
-      }
-
-      document.addEventListener('DOMContentLoaded', function(){
-        document.querySelectorAll('.run-card').forEach(card => {
-          setupRun(card.getAttribute('data-run-id'));
-        });
-      });
-    })();
-  </script>
-  <script>
     (function() {
       function setupInteractiveTable(runId) {
         const table = document.getElementById('table-' + runId);
@@ -367,16 +332,41 @@
         const assigneeSel = document.querySelector('.filter-assignee[data-run-id="' + runId + '"]');
         const prioritySel = document.querySelector('.filter-priority[data-run-id="' + runId + '"]');
         const hideUntested = document.querySelector('.filter-hide-untested[data-run-id="' + runId + '"]');
+        const pageSizeSel = document.querySelector('.page-size[data-run-id="' + runId + '"]');
+        const pager = document.querySelector('.table-pager[data-run-id="' + runId + '"]');
+        const prevBtn = pager ? pager.querySelector('.pager-prev') : null;
+        const nextBtn = pager ? pager.querySelector('.pager-next') : null;
+        const pagerInfo = pager ? pager.querySelector('.pager-info') : null;
         const chips = document.querySelectorAll('.run-chips[data-run-id="' + runId + '"] [data-status]');
         if (!table || !tbody || !filterInput) return;
 
-        // Populate assignee & priority options from rows
-        const rows = Array.from(tbody.querySelectorAll('tr'));
+        let rows = Array.from(tbody.querySelectorAll('tr'));
         const uniq = (arr)=> Array.from(new Set(arr)).filter(Boolean).sort((a,b)=> a.localeCompare(b));
         const assignees = uniq(rows.map(r=> (r.dataset.assignee||'').trim()).filter(Boolean));
         const priorities = uniq(rows.map(r=> (r.dataset.priority||'').trim()).filter(Boolean));
         if (assigneeSel && assignees.length){ assigneeSel.innerHTML = '<option value="">All</option>' + assignees.map(a=> `<option>${a}</option>`).join(''); }
         if (prioritySel && priorities.length){ prioritySel.innerHTML = '<option value="">All</option>' + priorities.map(p=> `<option>${p}</option>`).join(''); }
+
+        const pageSizeKey = 'report_page_size_' + runId;
+        let pageSize = parseInt(localStorage.getItem(pageSizeKey) || (pageSizeSel ? pageSizeSel.value : '10'), 10);
+        if (isNaN(pageSize) || pageSize <= 0) pageSize = 10;
+        let pageIndex = 0;
+        let filteredRows = rows.slice();
+
+        function renderPage(){
+          const start = pageIndex * pageSize;
+          const end = start + pageSize;
+          rows.forEach(r => r.style.display = 'none');
+          filteredRows.slice(start, end).forEach(r => r.style.display = '');
+          const total = filteredRows.length;
+          if(pagerInfo){
+            const shownStart = total ? start + 1 : 0;
+            const shownEnd = Math.min(total, end);
+            pagerInfo.textContent = `${shownStart}-${shownEnd} of ${total}`;
+          }
+          if(prevBtn) prevBtn.disabled = pageIndex <= 0;
+          if(nextBtn) nextBtn.disabled = end >= filteredRows.length;
+        }
 
         // Filtering
         function applyFilters(){
@@ -385,49 +375,49 @@
           const assignee = (assigneeSel && assigneeSel.value || '').toLowerCase();
           const priority = (prioritySel && prioritySel.value || '').toLowerCase();
           const hideU = !!(hideUntested && hideUntested.checked);
-          rows.forEach(row => {
+          filteredRows = rows.filter(row => {
             const rowText = row.textContent.toLowerCase();
             const rs = (row.dataset.status || '');
             const ra = (row.dataset.assignee || '');
             const rp = (row.dataset.priority || '');
-            let visible = true;
-            if (text && !rowText.includes(text)) visible = false;
-            if (visible && status && rs !== status.toLowerCase()) visible = false;
-            if (visible && assignee && ra !== assignee) visible = false;
-            if (visible && priority && rp !== priority) visible = false;
-            if (visible && hideU && rs === 'untested') visible = false;
-            row.style.display = visible ? '' : 'none';
+            if (text && !rowText.includes(text)) return false;
+            if (status && rs !== status.toLowerCase()) return false;
+            if (assignee && ra !== assignee) return false;
+            if (priority && rp !== priority) return false;
+            if (hideU && rs === 'untested') return false;
+            return true;
           });
+          pageIndex = 0;
+          renderPage();
         }
-        function setColumnVisibility(colKey, visible){
-          document.querySelectorAll('[data-run-id="' + runId + '"][data-col="' + colKey + '"]').forEach(el=>{
-            el.style.display = visible ? '' : 'none';
-          });
-        }
-        const colToggles = document.querySelectorAll('.toggle-col[data-run-id="' + runId + '"]');
-        colToggles.forEach(cb=>{
-          const col = cb.dataset.col;
-          setColumnVisibility(col, cb.checked);
-          cb.addEventListener('change', ()=> setColumnVisibility(col, cb.checked));
-        });
+
         filterInput.addEventListener('keyup', applyFilters);
         if (statusSel) statusSel.addEventListener('change', applyFilters);
         if (assigneeSel) assigneeSel.addEventListener('change', applyFilters);
         if (prioritySel) prioritySel.addEventListener('change', applyFilters);
         if (hideUntested) hideUntested.addEventListener('change', applyFilters);
 
-        function setColumnVisibility(colKey, visible){
-          document.querySelectorAll('[data-run-id=\"' + runId + '\"][data-col=\"' + colKey + '\"]').forEach(el=>{
-            el.style.display = visible ? '' : 'none';
+        if(pageSizeSel){
+          pageSizeSel.value = String(pageSize);
+          pageSizeSel.addEventListener('change', ()=>{
+            const v = parseInt(pageSizeSel.value || '10', 10);
+            pageSize = isNaN(v) || v <= 0 ? 10 : v;
+            localStorage.setItem(pageSizeKey, String(pageSize));
+            pageIndex = 0;
+            renderPage();
           });
         }
-        document.querySelectorAll('.toggle-col[data-run-id=\"' + runId + '\"]').forEach(cb=>{
-          const col = cb.dataset.col;
-          setColumnVisibility(col, cb.checked);
-          cb.addEventListener('change', ()=> setColumnVisibility(col, cb.checked));
-        });
-
-        // Quick presets removed per request
+        if(prevBtn){
+          prevBtn.addEventListener('click', ()=>{
+            if(pageIndex > 0){ pageIndex -= 1; renderPage(); }
+          });
+        }
+        if(nextBtn){
+          nextBtn.addEventListener('click', ()=>{
+            const maxPage = Math.max(0, Math.ceil(filteredRows.length / pageSize) - 1);
+            if(pageIndex < maxPage){ pageIndex += 1; renderPage(); }
+          });
+        }
 
         // Status chips click → apply status filter immediately
         chips.forEach(ch => {
@@ -443,22 +433,25 @@
           header.style.cursor = 'pointer';
           header.addEventListener('click', () => {
             const sortBy = header.getAttribute('data-sort-by');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const currentRows = Array.from(tbody.querySelectorAll('tr'));
             const sortDir = header.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
             header.setAttribute('data-sort-dir', sortDir);
 
-            rows.sort((a, b) => {
+            currentRows.sort((a, b) => {
               const aText = a.querySelector(`td:nth-child(${header.cellIndex + 1})`).textContent.trim();
               const bText = b.querySelector(`td:nth-child(${header.cellIndex + 1})`).textContent.trim();
-              
               if (aText < bText) return sortDir === 'asc' ? -1 : 1;
               if (aText > bText) return sortDir === 'asc' ? 1 : -1;
               return 0;
             });
 
-            rows.forEach(row => tbody.appendChild(row));
+            currentRows.forEach(row => tbody.appendChild(row));
+            rows = Array.from(tbody.querySelectorAll('tr'));
+            applyFilters();
           });
         });
+
+        applyFilters();
       }
 
       const modal = document.getElementById('attachmentModal');
