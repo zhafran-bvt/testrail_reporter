@@ -124,10 +124,13 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 - Missing names: if a user or priority is missing, the script falls back to the raw ID.
 - 404 on UI: confirm you started the server in the repo root with `uvicorn app.main:app --reload`, then open `http://127.0.0.1:8000/`.
 - Attachments not visible after download: ensure you regenerated the report after upgrading (older HTML lacked inline images). Inline rendering requires modern browsers that support data URLs.
-- Slow generation: adjust worker env vars:
-  - `RUN_WORKERS` – concurrent runs fetched (default 4)
-  - `ATTACHMENT_WORKERS` – concurrent attachment downloads (default 4)
+- Slow generation: adjust worker/attachment env vars:
+  - `RUN_WORKERS` / `RUN_WORKERS_MAX` – concurrent runs fetched (defaults 2/4, hard cap 8)
+  - `ATTACHMENT_WORKERS` – concurrent attachment downloads (default 2, max 4)
   - `ATTACHMENT_IMAGE_MAX_DIM` and `ATTACHMENT_JPEG_QUALITY` – controls compression
+  - `ATTACHMENT_INLINE_MAX_BYTES` (default 250000) – inline small images; set 0 to disable
+  - `ATTACHMENT_VIDEO_INLINE_MAX_BYTES` (defaults to image inline limit) – inline small videos for offline playback
+  - `ATTACHMENT_MAX_BYTES` – skip attachments above this size
 
 ## Roadmap ideas
 - Optional per-run donut charts

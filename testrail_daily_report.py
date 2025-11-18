@@ -477,7 +477,7 @@ def build_test_table(tests_df: pd.DataFrame, results_df: pd.DataFrame, status_ma
         merged["priority"] = ""
 
     # Select and order columns for output
-    desired = ["test_id", "title", "status_name", "assignee", "priority"]
+    desired = ["test_id", "title", "status_name", "assignee", "priority", "refs"]
     cols = [c for c in desired if c in merged]
     cleaned = merged[cols].where(pd.notna(merged[cols]), None)
     return cleaned
@@ -739,7 +739,12 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     max_workers = max(1, min(run_workers_ceiling, min(max(1, len(run_ids_resolved)), run_workers_env)))
 
     inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
-    video_inline_limit = int(os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES", str(max(0, inline_embed_limit))))
+    try:
+        video_inline_limit = int(os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES", "15000000"))
+    except ValueError:
+        video_inline_limit = 15000000
+    if video_inline_limit < inline_embed_limit:
+        video_inline_limit = inline_embed_limit
     attachment_inline_limit = inline_embed_limit
     attachment_size_limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "520000000"))
 
@@ -1020,14 +1025,24 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 except Exception:
                     pass
 
+                suffix_lc = job["rel_path"].suffix.lower()
                 content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
                 is_image = bool(content_type and str(content_type).startswith("image/"))
-                suffix_lc = job["rel_path"].suffix.lower()
                 common_video_exts = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg"}
                 is_video = bool(
                     (content_type and str(content_type).startswith("video/"))
                     or suffix_lc in common_video_exts
                 )
+                if is_video and not content_type:
+                    content_type = {
+                        ".mp4": "video/mp4",
+                        ".mov": "video/quicktime",
+                        ".webm": "video/webm",
+                        ".mkv": "video/x-matroska",
+                        ".avi": "video/x-msvideo",
+                        ".mpg": "video/mpeg",
+                        ".mpeg": "video/mpeg",
+                    }.get(suffix_lc, content_type)
                 data_url = None
                 if inline_payload is not None and (is_image or is_video):
                     try:
@@ -1064,6 +1079,15 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     tid_int = None
             record["comment"] = comments_by_test.get(tid_int, "")
             record["attachments"] = attachments_by_test.get(tid_int, [])
+            refs_val = record.get("refs")
+            if refs_val is None:
+                record["refs"] = []
+            elif isinstance(refs_val, str):
+                record["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
+            elif isinstance(refs_val, list):
+                record["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
+            else:
+                record["refs"] = [str(refs_val)]
             rows_payload.append(record)
 
         tables.append({

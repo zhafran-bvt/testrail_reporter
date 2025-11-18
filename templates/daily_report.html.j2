@@ -202,6 +202,11 @@
           <option value="50">50</option>
         </select>
       </label>
+      <div class="column-toggles">
+        <label><input type="checkbox" class="toggle-col" data-run-id="{{ t.run_id }}" data-col="priority" checked> Priority</label>
+        <label><input type="checkbox" class="toggle-col" data-run-id="{{ t.run_id }}" data-col="attachments" checked> Attachments</label>
+        <label><input type="checkbox" class="toggle-col" data-run-id="{{ t.run_id }}" data-col="refs"> Refs</label>
+      </div>
     </div>
     <div class="table-wrap" id="wrap-{{ t.run_id }}">
     <table id="table-{{ t.run_id }}">
@@ -210,8 +215,9 @@
         <col style="width:38%" />
         <col style="width:15%" />
         <col style="width:15%" />
-        <col style="width:15%" />
-        <col style="width:20%" />
+        <col style="width:15%" data-col="priority" data-run-id="{{ t.run_id }}" />
+        <col style="width:12%" data-col="refs" data-run-id="{{ t.run_id }}" style="display:none;" />
+        <col style="width:20%" data-col="attachments" data-run-id="{{ t.run_id }}" />
       </colgroup>
       <thead>
         <tr>
@@ -219,8 +225,9 @@
           <th data-sort-by="title">Title</th>
           <th data-sort-by="status_name">Status</th>
           <th data-sort-by="assignee">Assignee</th>
-          <th data-sort-by="priority">Priority</th>
-          <th>Attachments</th>
+          <th data-sort-by="priority" data-col="priority" data-run-id="{{ t.run_id }}">Priority</th>
+          <th data-col="refs" data-run-id="{{ t.run_id }}" style="display:none;">Refs</th>
+          <th data-col="attachments" data-run-id="{{ t.run_id }}">Attachments</th>
         </tr>
       </thead>
       <tbody id="rows-{{ t.run_id }}">
@@ -244,8 +251,15 @@
             {% endif %}
           </td>
           <td>{{ r.assignee or '' }}</td>
-          <td>{{ r.priority or '' }}</td>
-          <td>
+          <td data-col="priority" data-run-id="{{ t.run_id }}">{{ r.priority or '' }}</td>
+          <td data-col="refs" data-run-id="{{ t.run_id }}" style="display:none;">
+            {% if r.refs %}
+              {% for ref in r.refs %}
+                <a href="{{ jira_base }}{{ ref }}" target="_blank" rel="noopener">{{ ref }}</a>{% if not loop.last %}, {% endif %}
+              {% endfor %}
+            {% endif %}
+          </td>
+          <td data-col="attachments" data-run-id="{{ t.run_id }}">
             {% set attachments = r.attachments or [] %}
             {% set attachment_count = attachments|length %}
             {% if attachment_count > 0 or (r.comment and r.comment|length > 0) %}
@@ -391,6 +405,17 @@
             row.style.display = visible ? '' : 'none';
           });
         }
+        function setColumnVisibility(colKey, visible){
+          document.querySelectorAll('[data-run-id="' + runId + '"][data-col="' + colKey + '"]').forEach(el=>{
+            el.style.display = visible ? '' : 'none';
+          });
+        }
+        const colToggles = document.querySelectorAll('.toggle-col[data-run-id="' + runId + '"]');
+        colToggles.forEach(cb=>{
+          const col = cb.dataset.col;
+          setColumnVisibility(col, cb.checked);
+          cb.addEventListener('change', ()=> setColumnVisibility(col, cb.checked));
+        });
         filterInput.addEventListener('keyup', applyFilters);
         if (statusSel) statusSel.addEventListener('change', applyFilters);
         if (assigneeSel) assigneeSel.addEventListener('change', applyFilters);
