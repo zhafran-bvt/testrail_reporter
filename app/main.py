@@ -2,9 +2,10 @@ import threading
 import time
 import uuid
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
+import queue
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import importlib
 from pathlib import Path
 from typing import Any
 
@@ -16,14 +17,6 @@ import os
 from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator, model_validator
 
-from testrail_daily_report import (
-    generate_report,
-    get_plans_for_project,
-    get_plan,
-    env_or_die,
-    capture_telemetry,
-    log_memory,
-)
 import requests
 import glob
 
@@ -53,6 +46,29 @@ if Path("assets").exists():
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 templates = Jinja2Templates(directory="templates")
+
+
+_report_module = None
+_report_module_lock = threading.Lock()
+
+
+def _get_report_module():
+    global _report_module
+    if _report_module is None:
+        with _report_module_lock:
+            if _report_module is None:
+                _report_module = importlib.import_module("testrail_daily_report")
+    return _report_module
+
+
+def _maybe_log_memory(label: str):
+    module = _report_module
+    if not module:
+        return
+    try:
+        module.log_memory(label)
+    except Exception:
+        pass
 
 
 class TTLCache:
@@ -130,12 +146,19 @@ class ReportJob:
 
 
 class ReportJobManager:
-    def __init__(self, max_workers: int = 2, max_history: int = 50):
-        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+    def __init__(self, max_workers: int = 2, max_history: int = 50, min_workers: int | None = None, idle_seconds: int = 60):
+        self.max_workers = max(1, max_workers)
+        min_workers = min_workers if min_workers is not None else 1
+        self.min_workers = max(1, min(self.max_workers, min_workers))
+        self.idle_seconds = max(5, idle_seconds)
         self.jobs: dict[str, ReportJob] = {}
         self.order: deque[str] = deque()
         self.lock = threading.Lock()
         self.max_history = max_history
+        self._job_queue: queue.Queue[str] = queue.Queue()
+        self._worker_states: dict[str, dict[str, Any]] = {}
+        for _ in range(self.min_workers):
+            self._spawn_worker()
 
     def enqueue(self, params: dict[str, Any]) -> ReportJob:
         job_id = uuid.uuid4().hex
@@ -143,7 +166,8 @@ class ReportJobManager:
         with self.lock:
             self.jobs[job_id] = job
             self.order.append(job_id)
-        self.executor.submit(self._run_job, job_id)
+        self._job_queue.put(job_id)
+        self._scale_up_if_needed()
         return job
 
     def get(self, job_id: str) -> ReportJob | None:
@@ -178,6 +202,48 @@ class ReportJobManager:
                 self.order.popleft()
                 self.jobs.pop(oldest_id, None)
 
+    def _spawn_worker(self):
+        worker_name = f"report-worker-{uuid.uuid4().hex[:6]}"
+        thread = threading.Thread(target=self._worker_loop, args=(worker_name,), name=worker_name, daemon=True)
+        with self.lock:
+            self._worker_states[worker_name] = {"idle": True, "thread": thread}
+        thread.start()
+
+    def _worker_loop(self, worker_name: str):
+        while True:
+            try:
+                job_id = self._job_queue.get(timeout=self.idle_seconds)
+            except queue.Empty:
+                with self.lock:
+                    if len(self._worker_states) > self.min_workers:
+                        self._worker_states.pop(worker_name, None)
+                        return
+                continue
+            with self.lock:
+                state = self._worker_states.get(worker_name)
+                if state is not None:
+                    state["idle"] = False
+            try:
+                self._run_job(job_id)
+            finally:
+                with self.lock:
+                    state = self._worker_states.get(worker_name)
+                    if state is not None:
+                        state["idle"] = True
+                self._job_queue.task_done()
+
+    def _scale_up_if_needed(self):
+        spawn = 0
+        with self.lock:
+            idle_workers = sum(1 for state in self._worker_states.values() if state.get("idle"))
+            queued = self._job_queue.qsize()
+            available = self.max_workers - len(self._worker_states)
+            needed = queued - idle_workers
+            if needed > 0 and available > 0:
+                spawn = min(needed, available)
+        for _ in range(spawn):
+            self._spawn_worker()
+
     def report_progress(self, job_id: str, stage: str, payload: dict | None = None):
         with self.lock:
             job = self.jobs.get(job_id)
@@ -206,9 +272,10 @@ class ReportJobManager:
         start = time.perf_counter()
         print(f"[report-job] {job_id} started with params={job.params}", flush=True)
         try:
+            report_module = _get_report_module()
             reporter = lambda stage, payload=None: self.report_progress(job_id, stage, payload or {})
-            with capture_telemetry() as telemetry:
-                path = generate_report(**job.params, progress=reporter)
+            with report_module.capture_telemetry() as telemetry:
+                path = report_module.generate_report(**job.params, progress=reporter)
             duration_ms = (time.perf_counter() - start) * 1000.0
             completed_at = datetime.now(timezone.utc)
             job.completed_at = completed_at
@@ -232,9 +299,24 @@ class ReportJobManager:
             self._trim_history()
 
 
-report_worker_count = max(1, int(os.getenv("REPORT_WORKERS", "1")))
-job_history_limit = max(10, int(os.getenv("REPORT_JOB_HISTORY", "60")))
-_job_manager = ReportJobManager(max_workers=report_worker_count, max_history=job_history_limit)
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+report_workers_env = _int_env("REPORT_WORKERS", 1)
+report_workers_max = max(1, _int_env("REPORT_WORKERS_MAX", report_workers_env))
+report_workers_min = max(1, min(report_workers_max, _int_env("REPORT_WORKERS_MIN", 1)))
+report_worker_idle_secs = max(5, _int_env("REPORT_WORKER_IDLE_SECS", 60))
+job_history_limit = max(10, _int_env("REPORT_JOB_HISTORY", 60))
+_job_manager = ReportJobManager(
+    min_workers=report_workers_min,
+    max_workers=report_workers_max,
+    idle_seconds=report_worker_idle_secs,
+    max_history=job_history_limit,
+)
 
 
 class ReportRequest(BaseModel):
@@ -307,7 +389,7 @@ def _start_memlog():
     def _loop():
         while not _memlog_stop.is_set():
             try:
-                log_memory("heartbeat")
+                _maybe_log_memory("heartbeat")
             except Exception:
                 pass
             _memlog_stop.wait(interval)
@@ -338,13 +420,14 @@ def _stop_memlog():
 
 @app.on_event("startup")
 def on_startup():
-    report_workers = os.getenv("REPORT_WORKERS", "1")
     run_workers = os.getenv("RUN_WORKERS", "2")
+    run_workers_max = os.getenv("RUN_WORKERS_MAX", run_workers)
+    run_workers_autoscale = os.getenv("RUN_WORKERS_AUTOSCALE", "0")
     attachment_workers = os.getenv("ATTACHMENT_WORKERS", "2")
     
     print("--- Worker Configuration ---")
-    print(f"Report Workers:     {report_workers}")
-    print(f"Run Workers:          {run_workers}")
+    print(f"Report Workers:     min={_job_manager.min_workers} max={_job_manager.max_workers} idle={_job_manager.idle_seconds}s")
+    print(f"Run Workers:          base={run_workers} max={run_workers_max} autoscale={run_workers_autoscale}")
     print(f"Attachment Workers:   {attachment_workers}")
     print("--------------------------")
 
@@ -398,8 +481,9 @@ def generate(
         raise HTTPException(status_code=400, detail="Run selection requires a plan")
     if (plan is None and run is None) or (plan is not None and run is not None):
         raise HTTPException(status_code=400, detail="Provide exactly one of plan or run")
+    report_module = _get_report_module()
     try:
-        path = generate_report(project=project, plan=plan, run=run, run_ids=selected_run_ids)
+        path = report_module.generate_report(project=project, plan=plan, run=run, run_ids=selected_run_ids)
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {e}")
     except ValueError as e:
@@ -433,7 +517,8 @@ def api_report_sync(
         raise HTTPException(status_code=400, detail="Run selection requires a plan")
     if (plan is None and run is None) or (plan is not None and run is not None):
         raise HTTPException(status_code=400, detail="Provide exactly one of plan or run")
-    path = generate_report(project=project, plan=plan, run=run, run_ids=run_ids)
+    report_module = _get_report_module()
+    path = report_module.generate_report(project=project, plan=plan, run=run, run_ids=run_ids)
     url = "/reports/" + Path(path).name
     return {"path": path, "url": url}
 
@@ -462,15 +547,16 @@ def api_plans(project: int = 1, is_completed: int | None = None):
         data = payload.copy()
         data["meta"] = _cache_meta(True, expires_at)
         return data
+    report_module = _get_report_module()
     try:
-        base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
-        user = env_or_die("TESTRAIL_USER")
-        api_key = env_or_die("TESTRAIL_API_KEY")
+        base_url = report_module.env_or_die("TESTRAIL_BASE_URL").rstrip("/")
+        user = report_module.env_or_die("TESTRAIL_USER")
+        api_key = report_module.env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
         raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
     session = requests.Session()
     session.auth = (user, api_key)
-    plans = get_plans_for_project(session, base_url, project_id=project, is_completed=is_completed)
+    plans = report_module.get_plans_for_project(session, base_url, project_id=project, is_completed=is_completed)
     # return concise info
     slim = [
         {
@@ -498,16 +584,17 @@ def api_runs(plan: int, project: int = 1):
         data = payload.copy()
         data["meta"] = _cache_meta(True, expires_at)
         return data
+    report_module = _get_report_module()
     try:
-        base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
-        user = env_or_die("TESTRAIL_USER")
-        api_key = env_or_die("TESTRAIL_API_KEY")
+        base_url = report_module.env_or_die("TESTRAIL_BASE_URL").rstrip("/")
+        user = report_module.env_or_die("TESTRAIL_USER")
+        api_key = report_module.env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
         raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
     session = requests.Session()
     session.auth = (user, api_key)
     try:
-        plan_obj = get_plan(session, base_url, plan)
+        plan_obj = report_module.get_plan(session, base_url, plan)
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Error fetching plan runs: {e}")
     runs = []
