@@ -320,12 +320,10 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-          <div class="modal-comment mb-3" id="attachmentModalComment"></div>
           <div class="modal-image-wrap text-center mb-3">
             <img id="attachmentModalImage" alt="Attachment evidence" style="display:none;" />
             <video id="attachmentModalVideo" controls playsinline style="display:none;"></video>
           </div>
-          <div class="list-group" id="attachmentList"></div>
         </div>
         <div class="modal-footer justify-content-between">
             <div class="btn-group">
@@ -515,8 +513,6 @@
       const attachmentModal = new bootstrap.Modal(modalEl);
       const imgEl = document.getElementById('attachmentModalImage');
       const videoEl = document.getElementById('attachmentModalVideo');
-      const listEl = document.getElementById('attachmentList');
-      const commentEl = document.getElementById('attachmentModalComment');
       const titleEl = document.getElementById('attachmentModalTitle');
       const subtitleEl = document.getElementById('attachmentModalSubtitle');
       const counterEl = document.getElementById('attachmentCounter');
@@ -529,7 +525,6 @@
         if (!attachmentsState.length) {
           imgEl.style.display = 'none';
           videoEl.style.display = 'none';
-          listEl.innerHTML = '<div class="list-group-item">No attachments available.</div>';
           counterEl.textContent = '';
           prevBtn.disabled = true;
           nextBtn.disabled = true;
@@ -539,8 +534,8 @@
         videoEl.style.display = 'none';
         videoEl.pause();
         
-        if (current.is_image && current.data_url) {
-          imgEl.src = current.data_url;
+        if (current.is_image && (current.data_url || current.path)) {
+          imgEl.src = current.data_url || current.path;
           imgEl.alt = current.name || 'Attachment';
           imgEl.style.display = 'block';
         } else {
@@ -555,14 +550,6 @@
           videoEl.load();
         }
 
-        const items = attachmentsState.map((item, idx) => {
-          const isActive = idx === attachmentsIndex ? 'active' : '';
-          const icon = item.is_image ? '🖼️' : (item.is_video ? '🎬' : '📎');
-          const href = item.data_url || item.path || '#';
-          const downloadAttr = href.startsWith('data:') ? ` download="${item.name || 'attachment'}"` : '';
-          return `<a href="${href}" target="_blank" rel="noopener" class="list-group-item list-group-item-action ${isActive}" ${downloadAttr}>${icon} ${item.name || 'Attachment'}</a>`;
-        }).join('');
-        listEl.innerHTML = items;
         counterEl.textContent = `${attachmentsIndex + 1} / ${attachmentsState.length}`;
         prevBtn.disabled = attachmentsState.length <= 1;
         nextBtn.disabled = attachmentsState.length <= 1;
@@ -573,13 +560,6 @@
         attachmentsIndex = 0;
         titleEl.textContent = `Attachments — ${detail.title || ''}`;
         subtitleEl.textContent = `Run ${detail.runId || ''} • Test ${detail.testId || ''}`;
-        if (detail.comment) {
-          commentEl.textContent = detail.comment;
-          commentEl.style.display = 'block';
-        } else {
-          commentEl.textContent = '';
-          commentEl.style.display = 'none';
-        }
         updateAttachmentView();
         attachmentModal.show();
       }
