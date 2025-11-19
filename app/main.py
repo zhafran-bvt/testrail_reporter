@@ -424,12 +424,34 @@ def on_startup():
     run_workers_max = os.getenv("RUN_WORKERS_MAX", run_workers)
     run_workers_autoscale = os.getenv("RUN_WORKERS_AUTOSCALE", "0")
     attachment_workers = os.getenv("ATTACHMENT_WORKERS", "2")
+
+    def web_worker_count() -> int:
+        candidates = [
+            os.getenv("WEB_CONCURRENCY"),
+            os.getenv("UVICORN_WORKERS"),
+            os.getenv("GUNICORN_WORKERS"),
+        ]
+        for value in candidates:
+            if value is None:
+                continue
+            try:
+                parsed = int(str(value).strip())
+                if parsed > 0:
+                    return parsed
+            except ValueError:
+                continue
+        return 1
+
+    web_workers = web_worker_count()
     
     print("--- Worker Configuration ---")
     print(f"Report Workers:     min={_job_manager.min_workers} max={_job_manager.max_workers} idle={_job_manager.idle_seconds}s")
     print(f"Run Workers:          base={run_workers} max={run_workers_max} autoscale={run_workers_autoscale}")
     print(f"Attachment Workers:   {attachment_workers}")
+    print(f"Web Workers:          {web_workers}")
     print("--------------------------")
+    if web_workers > 1:
+        print("WARNING: WEB_CONCURRENCY > 1 will break async job polling; set Gunicorn workers to 1.", flush=True)
 
     _start_keepalive()
     _start_memlog()

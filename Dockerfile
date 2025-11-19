@@ -20,7 +20,7 @@ COPY . .
 EXPOSE 8080
 
 CMD gunicorn app.main:app \
-  --workers 2 \
+  --workers 1 \
   --worker-class uvicorn.workers.UvicornWorker \
   --bind 0.0.0.0:${PORT:-8080} \
   --max-requests 20 \

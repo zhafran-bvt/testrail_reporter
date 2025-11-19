@@ -75,6 +75,7 @@ API endpoints:
 Notes:
 - Provide exactly one of `plan` or `run`.
 - Project defaults to `1` in most flows, but can be passed explicitly.
+- **Single web process:** the async job queue keeps its state in-process, so production deployments must run FastAPI with a single Gunicorn/Uvicorn worker (this repo’s `Procfile`/`Dockerfile` already enforce `--workers 1`). `REPORT_WORKERS_*` controls report generation parallelism.
 - UI behavior:
   - Preview button opens the generated HTML in a new tab and shows a modal spinner until the file downloads.
   - Plans list auto-loads open plans first; if none, it falls back to all plans.

@@ -163,6 +163,15 @@ class UserLookupForbidden(Exception):
     """Raised when TestRail denies access to user lookup endpoints."""
 
 
+class AttachmentTooLarge(Exception):
+    """Raised when an attachment streaming download exceeds the allowed limit."""
+
+    def __init__(self, size_bytes: int, limit_bytes: int):
+        super().__init__(f"Attachment exceeded limit ({size_bytes} > {limit_bytes} bytes)")
+        self.size_bytes = size_bytes
+        self.limit_bytes = limit_bytes
+
+
 def get_users_map(session, base_url):
     try:
         users = api_get(session, base_url, "get_users")
@@ -366,7 +375,7 @@ def get_attachments_for_test(session, base_url, test_id: int):
         return []
 
 
-def download_attachment(session, base_url, attachment_id: int, *, max_retries: int = 4):
+def download_attachment(session, base_url, attachment_id: int, *, max_retries: int = 4, size_limit: int | None = None):
     """Download an attachment.
     Returns either (temp_path, content_type) when streaming, or (bytes, content_type) for backward-compatible mocks/tests.
     """
@@ -396,12 +405,27 @@ def download_attachment(session, base_url, attachment_id: int, *, max_retries: i
                 # Write to a temp file to avoid holding full content in memory
                 fd, tmp_path = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
                 tmp = Path(tmp_path)
-                with os.fdopen(fd, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=64 * 1024):
-                        if chunk:
+                try:
+                    bytes_downloaded = 0
+                    with os.fdopen(fd, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=64 * 1024):
+                            if not chunk:
+                                continue
+                            bytes_downloaded += len(chunk)
+                            if size_limit and size_limit > 0 and bytes_downloaded > size_limit:
+                                raise AttachmentTooLarge(bytes_downloaded, size_limit)
                             f.write(chunk)
+                except AttachmentTooLarge:
+                    try:
+                        tmp.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    raise
                 record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "ok")
                 return tmp, content_type
+        except AttachmentTooLarge as exc:
+            record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            raise
         except Exception as exc:
             attempt += 1
             if attempt >= max_retries:
@@ -709,8 +733,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     api_key = env_or_die("TESTRAIL_API_KEY")
     log_memory("start")
 
-    session = requests.Session()
-    session.auth = (user, api_key)
+    auth = (user, api_key)
+
+    def _make_session():
+        sess = requests.Session()
+        sess.auth = auth
+        return sess
+
+    session = _make_session()
 
     # Enrichment data
     project_obj = get_project(session, base_url, project)
@@ -780,7 +810,6 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         video_inline_limit = 15000000
     if video_inline_limit < inline_embed_limit:
         video_inline_limit = inline_embed_limit
-    attachment_inline_limit = inline_embed_limit
     try:
         attachment_retry_limit = int(os.getenv("ATTACHMENT_RETRY_ATTEMPTS", "4"))
     except ValueError:
@@ -790,9 +819,13 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     attachments_enabled = not _env_flag("DISABLE_ATTACHMENTS", False)
 
     def _fetch_run_data(rid: int):
-        results = get_results_for_run(session, base_url, rid)
-        tests = get_tests_for_run(session, base_url, rid)
-        return rid, tests, results
+        local_session = _make_session()
+        try:
+            results = get_results_for_run(local_session, base_url, rid)
+            tests = get_tests_for_run(local_session, base_url, rid)
+            return rid, tests, results
+        finally:
+            local_session.close()
 
     run_data: list[tuple[int, list[dict], list[dict]]] = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -896,20 +929,39 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         for tid, result_id in latest_result_ids.items():
             attachments_by_test.setdefault(tid, [])
 
+        def _append_skipped_attachment(job: dict, *, size_bytes: int, limit_bytes: int, reason: str, content_type: str | None = None):
+            initial_type = content_type or job.get("initial_type")
+            attachments_by_test.setdefault(job["test_id"], []).append({
+                "name": job["filename"],
+                "path": None,
+                "content_type": initial_type,
+                "size": job.get("size") or size_bytes,
+                "is_image": bool(initial_type and str(initial_type).startswith("image/")),
+                "is_video": bool(initial_type and str(initial_type).startswith("video/")),
+                "data_url": None,
+                "inline_embedded": False,
+                "skipped": True,
+                "skip_reason": reason,
+            })
+
         def _fetch_metadata(test_id: int):
+            local_session = _make_session()
             try:
-                data = get_attachments_for_test(session, base_url, test_id)
-                if not isinstance(data, list):
-                    if isinstance(data, dict):
-                        return test_id, data.get("attachments", [])
+                try:
+                    data = get_attachments_for_test(local_session, base_url, test_id)
+                    if not isinstance(data, list):
+                        if isinstance(data, dict):
+                            return test_id, data.get("attachments", [])
+                        return test_id, []
+                    return test_id, data
+                except Exception as e:
+                    print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
                     return test_id, []
-                return test_id, data
-            except Exception as e:
-                print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
-                return test_id, []
+            finally:
+                local_session.close()
 
         metadata_map: dict[int, list] = {}
-        if latest_result_ids:
+        if attachments_enabled and latest_result_ids:
             notify("fetching_attachment_metadata", run_id=rid, count=len(latest_result_ids))
             with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
                 futures = {executor.submit(_fetch_metadata, tid): tid for tid in latest_result_ids}
@@ -922,50 +974,54 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         payload = []
                     metadata_map[tid] = payload or []
             log_memory(f"after_attachment_metadata_{rid}")
+        elif not attachments_enabled and latest_result_ids:
+            notify("attachments_disabled", run_id=rid, reason="env_flag")
 
         download_jobs = []
-        for tid, payload in metadata_map.items():
-            if not payload:
-                continue
-            result_id = latest_result_ids.get(tid)
-            if result_id is None:
-                continue
-            for att in payload:
-                rid_match = att.get("result_id")
-                if rid_match is not None and int(rid_match) != result_id:
+        if attachments_enabled:
+            for tid, payload in metadata_map.items():
+                if not payload:
                     continue
-                attachment_id = att.get("id") or att.get("attachment_id")
-                if attachment_id is None:
+                result_id = latest_result_ids.get(tid)
+                if result_id is None:
                     continue
-                try:
-                    attachment_id = int(attachment_id)
-                except (TypeError, ValueError):
-                    continue
-                filename = att.get("name") or att.get("filename") or f"attachment_{attachment_id}"
-                safe_filename = sanitize_filename(filename)
-                inferred_type = att.get("content_type") or att.get("mime_type") or mimetypes.guess_type(filename)[0]
-                ext = Path(safe_filename).suffix
-                if not ext and inferred_type:
-                    guessed_ext = mimetypes.guess_extension(inferred_type)
-                    if guessed_ext:
-                        safe_filename = f"{safe_filename}{guessed_ext}"
-                        ext = guessed_ext
-                if not ext:
-                    ext = ""
-                unique_filename = f"test_{tid}_att_{attachment_id}{ext}"
-                rel_path = Path("attachments") / f"run_{rid}" / unique_filename
-                abs_path = Path("out") / rel_path
-                abs_path.parent.mkdir(parents=True, exist_ok=True)
-                download_jobs.append({
-                    "test_id": tid,
-                    "attachment_id": attachment_id,
-                    "filename": filename,
-                    "rel_path": rel_path,
-                    "abs_path": abs_path,
-                    "initial_type": inferred_type,
-                    "size": att.get("size"),
-                })
+                for att in payload:
+                    rid_match = att.get("result_id")
+                    if rid_match is not None and int(rid_match) != result_id:
+                        continue
+                    attachment_id = att.get("id") or att.get("attachment_id")
+                    if attachment_id is None:
+                        continue
+                    try:
+                        attachment_id = int(attachment_id)
+                    except (TypeError, ValueError):
+                        continue
+                    filename = att.get("name") or att.get("filename") or f"attachment_{attachment_id}"
+                    safe_filename = sanitize_filename(filename)
+                    inferred_type = att.get("content_type") or att.get("mime_type") or mimetypes.guess_type(filename)[0]
+                    ext = Path(safe_filename).suffix
+                    if not ext and inferred_type:
+                        guessed_ext = mimetypes.guess_extension(inferred_type)
+                        if guessed_ext:
+                            safe_filename = f"{safe_filename}{guessed_ext}"
+                            ext = guessed_ext
+                    if not ext:
+                        ext = ""
+                    unique_filename = f"test_{tid}_att_{attachment_id}{ext}"
+                    rel_path = Path("attachments") / f"run_{rid}" / unique_filename
+                    abs_path = Path("out") / rel_path
+                    abs_path.parent.mkdir(parents=True, exist_ok=True)
+                    download_jobs.append({
+                        "test_id": tid,
+                        "attachment_id": attachment_id,
+                        "filename": filename,
+                        "rel_path": rel_path,
+                        "abs_path": abs_path,
+                        "initial_type": inferred_type,
+                        "size": att.get("size"),
+                    })
 
+        download_limit = attachment_size_limit if attachment_size_limit > 0 else None
         if download_jobs:
             inline_limit = inline_embed_limit
             inline_video_limit = video_inline_limit
@@ -976,7 +1032,24 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
                 if index % 5 == 0:
                     log_memory(f"download_progress_{rid}_{index}")
-                resp = download_attachment(session, base_url, attachment_id, max_retries=attachment_retry_limit)
+                try:
+                    resp = download_attachment(
+                        session,
+                        base_url,
+                        attachment_id,
+                        max_retries=attachment_retry_limit,
+                        size_limit=download_limit,
+                    )
+                except AttachmentTooLarge as exc:
+                    stripped = {
+                        "attachment_id": attachment_id,
+                        "size_bytes": exc.size_bytes,
+                        "limit_bytes": exc.limit_bytes,
+                        "skipped": True,
+                    }
+                    notify("attachment_skipped", run_id=rid, **stripped)
+                    _append_skipped_attachment(job, size_bytes=exc.size_bytes, limit_bytes=exc.limit_bytes, reason="size_limit")
+                    continue
                 tmp_path = None
                 content_type = None
                 if isinstance(resp, tuple) and len(resp) == 2 and isinstance(resp[0], (bytes, bytearray)):
@@ -995,7 +1068,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     raise RuntimeError(f"Attachment temp path missing for {attachment_id}")
 
                 data_size = Path(tmp_path).stat().st_size
-                if attachment_size_limit and data_size > attachment_size_limit:
+                if attachment_size_limit and attachment_size_limit > 0 and data_size > attachment_size_limit:
                     stripped = {
                         "attachment_id": attachment_id,
                         "size_bytes": data_size,
@@ -1003,21 +1076,17 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         "skipped": True,
                     }
                     notify("attachment_skipped", run_id=rid, **stripped)
-                    attachments_by_test.setdefault(job["test_id"], []).append({
-                        "name": job["filename"],
-                        "path": None,
-                        "content_type": content_type,
-                        "size": job.get("size") or data_size,
-                        "is_image": False,
-                        "is_video": bool(content_type and content_type.startswith("video/")),
-                        "data_url": None,
-                        "inline_embedded": False,
-                        "skipped": True,
-                    })
                     try:
                         Path(tmp_path).unlink(missing_ok=True)
                     except Exception:
                         pass
+                    _append_skipped_attachment(
+                        job,
+                        size_bytes=data_size,
+                        limit_bytes=attachment_size_limit,
+                        reason="post_download_limit",
+                        content_type=content_type,
+                    )
                     continue
 
                 is_image_type = bool(content_type and str(content_type).lower().startswith("image/"))
