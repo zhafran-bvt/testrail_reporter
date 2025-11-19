@@ -451,7 +451,7 @@ def on_startup():
     print(f"Web Workers:          {web_workers}")
     print("--------------------------")
     if web_workers > 1:
-        print("WARNING: WEB_CONCURRENCY > 1 will break async job polling; set Gunicorn workers to 1.", flush=True)
+        print("WARNING: WEB_CONCURRENCY > 1 will break async job polling; limit uvicorn workers (WEB_CONCURRENCY) to 1.", flush=True)
 
     _start_keepalive()
     _start_memlog()

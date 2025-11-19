@@ -19,12 +19,8 @@ COPY . .
 
 EXPOSE 8080
 
-CMD gunicorn app.main:app \
+CMD uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port ${PORT:-8080} \
   --workers 1 \
-  --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:${PORT:-8080} \
-  --timeout 600 \
-  --graceful-timeout 120 \
-  --keep-alive 30 \
-  --max-requests 20 \
-  --max-requests-jitter 10
+  --timeout-keep-alive 120
