@@ -781,7 +781,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         attachment_workers_env = int(os.getenv("ATTACHMENT_WORKERS", "2"))
     except ValueError:
         attachment_workers_env = 2
-    attachment_workers = max(1, min(4, attachment_workers_env))
+    attachment_workers = max(1, min(8, attachment_workers_env))
 
     try:
         run_workers_env = int(os.getenv("RUN_WORKERS", "2"))
@@ -808,7 +808,6 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         attachment_retry_limit = 4
     attachment_retry_limit = max(1, min(10, attachment_retry_limit))
     attachment_size_limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "520000000"))
-    attachments_enabled = not _env_flag("DISABLE_ATTACHMENTS", False)
 
     def _fetch_run_data(rid: int):
         local_session = _make_session()
@@ -953,7 +952,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 local_session.close()
 
         metadata_map: dict[int, list] = {}
-        if attachments_enabled and latest_result_ids:
+        if latest_result_ids:
             notify("fetching_attachment_metadata", run_id=rid, count=len(latest_result_ids))
             with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
                 futures = {executor.submit(_fetch_metadata, tid): tid for tid in latest_result_ids}
@@ -966,11 +965,9 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         payload = []
                     metadata_map[tid] = payload or []
             log_memory(f"after_attachment_metadata_{rid}")
-        elif not attachments_enabled and latest_result_ids:
-            notify("attachments_disabled", run_id=rid, reason="env_flag")
 
         download_jobs = []
-        if attachments_enabled:
+        if latest_result_ids:
             for tid, payload in metadata_map.items():
                 if not payload:
                     continue
