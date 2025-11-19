@@ -773,12 +773,18 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     else:
         max_workers = max(1, min(run_workers_ceiling, min(max(1, len(run_ids_resolved)), run_workers_env)))
 
-    inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
+    inline_embed_limit = os.getenv("ATTACHMENT_INLINE_MAX_BYTES")
+    if inline_embed_limit is None or str(inline_embed_limit).strip().lower() in {"", "none", "0"}:
+        inline_embed_limit = 0
+    else:
+        inline_embed_limit = max(0, int(inline_embed_limit))
     try:
-        video_inline_limit = int(os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES", "15000000"))
+        video_inline_limit_env = os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES")
+        if video_inline_limit_env is None or str(video_inline_limit_env).strip().lower() in {"", "none", "0"}:
+            video_inline_limit = inline_embed_limit
+        else:
+            video_inline_limit = max(0, int(video_inline_limit_env))
     except ValueError:
-        video_inline_limit = 15000000
-    if video_inline_limit < inline_embed_limit:
         video_inline_limit = inline_embed_limit
     attachment_inline_limit = inline_embed_limit
     try:
@@ -966,11 +972,10 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 })
 
         if download_jobs:
-            inline_limit = max(0, inline_embed_limit)
-            inline_video_limit = max(0, video_inline_limit)
+            inline_limit = inline_embed_limit
+            inline_video_limit = video_inline_limit
             total_downloads = len(download_jobs)
             notify("downloading_attachments", run_id=rid, total=total_downloads)
-            inline_limit = max(0, inline_embed_limit)
             for index, job in enumerate(download_jobs, start=1):
                 attachment_id = job["attachment_id"]
                 notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
