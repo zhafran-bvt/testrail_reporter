@@ -356,11 +356,6 @@ _keepalive_thread: threading.Thread | None = None
 _keepalive_stop = threading.Event()
 _memlog_thread: threading.Thread | None = None
 _memlog_stop = threading.Event()
-_idle_thread: threading.Thread | None = None
-_idle_stop = threading.Event()
-
-_last_request_ts = time.time()
-_active_requests = 0
 
 def _start_keepalive():
     url = os.getenv("KEEPALIVE_URL")
@@ -405,38 +400,6 @@ def _start_memlog():
     _memlog_thread = threading.Thread(target=_loop, name="memlog-thread", daemon=True)
     _memlog_thread.start()
 
-
-def _start_idle_monitor():
-    try:
-        idle_seconds = int(os.getenv("IDLE_RESTART_SECONDS", "0"))
-    except ValueError:
-        idle_seconds = 0
-    if idle_seconds <= 0:
-        return
-
-    # Check roughly a few times during the idle window.
-    interval = max(30, min(idle_seconds, max(30, idle_seconds // 2)))
-
-    def _loop():
-        while not _idle_stop.is_set():
-            now = time.time()
-            idle_for = now - _last_request_ts
-            # Only restart when no requests are in-flight and we've been idle long enough.
-            if _active_requests == 0 and idle_for >= idle_seconds:
-                print(
-                    f"[idle-restart] No requests for {idle_for:.0f}s "
-                    f"(threshold={idle_seconds}s); exiting for restart.",
-                    flush=True,
-                )
-                os._exit(0)
-            _idle_stop.wait(interval)
-
-    global _idle_thread
-    if _idle_thread and _idle_thread.is_alive():
-        return
-    _idle_thread = threading.Thread(target=_loop, name="idle-restart-thread", daemon=True)
-    _idle_thread.start()
-
 def _stop_keepalive():
     global _keepalive_thread
     if not _keepalive_thread:
@@ -455,30 +418,6 @@ def _stop_memlog():
     _memlog_thread = None
     _memlog_stop.clear()
 
-
-def _stop_idle_monitor():
-    global _idle_thread
-    if not _idle_thread:
-        return
-    _idle_stop.set()
-    _idle_thread.join(timeout=5)
-    _idle_thread = None
-    _idle_stop.clear()
-
-
-@app.middleware("http")
-async def _track_activity(request: Request, call_next):
-    global _last_request_ts, _active_requests
-    now = time.time()
-    _last_request_ts = now
-    _active_requests += 1
-    try:
-        response = await call_next(request)
-    finally:
-        _active_requests -= 1
-        _last_request_ts = time.time()
-    return response
-
 @app.on_event("startup")
 def on_startup():
     run_workers = os.getenv("RUN_WORKERS", "2")
@@ -494,13 +433,11 @@ def on_startup():
 
     _start_keepalive()
     _start_memlog()
-    _start_idle_monitor()
 
 @app.on_event("shutdown")
 def on_shutdown():
     _stop_keepalive()
     _stop_memlog()
-    _stop_idle_monitor()
 
 @app.get("/healthz")
 def healthz():
