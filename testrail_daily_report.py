@@ -106,11 +106,17 @@ def _memory_usage_mb() -> float | None:
 
 
 def log_memory(label: str):
-    """Log current memory usage to stderr with a consistent prefix."""
+    """Log current memory usage to stdout, or stderr for high usage."""
     mem_mb = _memory_usage_mb()
     if mem_mb is None:
         return
-    print(f"[mem-log] stage={label} rss_mb={mem_mb:.2f}", file=sys.stderr, flush=True)
+    
+    log_message = f"[mem-log] stage={label} rss_mb={mem_mb:.2f}"
+    
+    if mem_mb > 800:
+        print(f"WARNING: {log_message}", file=sys.stderr, flush=True)
+    else:
+        print(log_message, file=sys.stdout, flush=True)
 
 
 def api_get(session: requests.Session, base_url: str, endpoint: str):
