@@ -773,18 +773,12 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     else:
         max_workers = max(1, min(run_workers_ceiling, min(max(1, len(run_ids_resolved)), run_workers_env)))
 
-    inline_embed_limit = os.getenv("ATTACHMENT_INLINE_MAX_BYTES")
-    if inline_embed_limit is None or str(inline_embed_limit).strip().lower() in {"", "none", "0"}:
-        inline_embed_limit = 0
-    else:
-        inline_embed_limit = max(0, int(inline_embed_limit))
+    inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
     try:
-        video_inline_limit_env = os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES")
-        if video_inline_limit_env is None or str(video_inline_limit_env).strip().lower() in {"", "none", "0"}:
-            video_inline_limit = inline_embed_limit
-        else:
-            video_inline_limit = max(0, int(video_inline_limit_env))
+        video_inline_limit = int(os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES", "15000000"))
     except ValueError:
+        video_inline_limit = 15000000
+    if video_inline_limit < inline_embed_limit:
         video_inline_limit = inline_embed_limit
     attachment_inline_limit = inline_embed_limit
     try:
@@ -793,6 +787,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         attachment_retry_limit = 4
     attachment_retry_limit = max(1, min(10, attachment_retry_limit))
     attachment_size_limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "520000000"))
+    attachments_enabled = not _env_flag("DISABLE_ATTACHMENTS", False)
 
     def _fetch_run_data(rid: int):
         results = get_results_for_run(session, base_url, rid)
