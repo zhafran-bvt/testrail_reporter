@@ -1,6 +1,6 @@
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import pandas as pd
 from testrail_daily_report import generate_report, build_test_table
 
@@ -20,8 +20,7 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.env_or_die')
     def test_generate_report_plan(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
                                   mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
-                                  mock_download_attachment, mock_tests_for_run,
-                                  mock_plan_runs, mock_plan, mock_project):
+                                  mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
         # Mock environment variables
         mock_env_or_die.side_effect = lambda key: {
             "TESTRAIL_BASE_URL": "http://fake-testrail.com",
@@ -44,12 +43,12 @@ class TestReportGenerator(unittest.TestCase):
         def tests_side_effect(_session, _base_url, rid):
             if rid == 101:
                 return [
-                    {"id": 1, "case_id": 1001, "title": "Test Case 1", "status_id": 1, "priority_id": 1, "assignedto_id": 1},
-                    {"id": 2, "case_id": 1002, "title": "Test Case 2", "status_id": 5, "priority_id": 2, "assignedto_id": 2},
+                    {"id": 1, "title": "Test Case 1", "status_id": 1, "priority_id": 1, "assignedto_id": 1},
+                    {"id": 2, "title": "Test Case 2", "status_id": 5, "priority_id": 2, "assignedto_id": 2},
                 ]
             if rid == 202:
                 return [
-                    {"id": 10, "case_id": 2001, "title": "Spare Test", "status_id": 1, "priority_id": 3, "assignedto_id": 3},
+                    {"id": 10, "title": "Spare Test", "status_id": 1, "priority_id": 3, "assignedto_id": 3},
                 ]
             return []
         mock_tests_for_run.side_effect = tests_side_effect
@@ -127,8 +126,7 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.env_or_die')
     def test_generate_report_attachments_failure(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
                                                  mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
-                                                 mock_download_attachment, mock_tests_for_run,
-                                                 mock_plan_runs, mock_plan, mock_project):
+                                                 mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
         mock_env_or_die.side_effect = lambda key: {
             "TESTRAIL_BASE_URL": "http://fake-testrail.com",
             "TESTRAIL_USER": "user",
@@ -143,7 +141,7 @@ class TestReportGenerator(unittest.TestCase):
         }
         mock_plan_runs.return_value = [99]
         mock_tests_for_run.return_value = [
-            {"id": 7, "case_id": 7001, "title": "Sample Test", "status_id": 1, "priority_id": 3, "assignedto_id": 9},
+            {"id": 7, "title": "Sample Test", "status_id": 1, "priority_id": 3, "assignedto_id": 9},
         ]
         mock_results_for_run.return_value = [
             {"id": 701, "test_id": 7, "status_id": 1, "comment": "Commented"},

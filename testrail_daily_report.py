@@ -119,20 +119,6 @@ def log_memory(label: str):
         print(log_message, file=sys.stdout, flush=True)
 
 
-def _int_env(key: str, default: int) -> int:
-    try:
-        return int(os.getenv(key, str(default)))
-    except (TypeError, ValueError):
-        return default
-
-
-def _env_flag(key: str, default: bool = False) -> bool:
-    value = os.getenv(key)
-    if value is None:
-        return default
-    return str(value).strip().lower() in {"1", "true", "yes", "on"}
-
-
 def api_get(session: requests.Session, base_url: str, endpoint: str):
     url = f"{base_url}/index.php?/api/v2/{endpoint}"
     start = time.perf_counter()
@@ -482,7 +468,7 @@ def build_test_table(tests_df: pd.DataFrame, results_df: pd.DataFrame, status_ma
         tests_df = tests_df.rename(columns={"id": "test_id"})
     # Reduce to relevant columns
     test_keep = [c for c in ["test_id", "title", "priority_id", "refs", "assignedto_id", "status_id"] if c in tests_df.columns]
-    tests_df = tests_df[test_keep] if test_keep else pd.DataFrame(columns=["test_id", "title", "priority_id", "type_id", "refs", "assignedto_id", "status_id"])
+    tests_df = tests_df[test_keep] if test_keep else pd.DataFrame(columns=["test_id", "title", "priority_id", "refs", "assignedto_id", "status_id"])
     if "test_id" not in tests_df.columns:
         tests_df = pd.DataFrame(columns=["test_id", "title", "priority_id", "type_id", "refs"])
 
@@ -774,7 +760,6 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     priorities_map = get_priorities_map(session, base_url)
     statuses_map = get_statuses_map(session, base_url)
 
-
     if run is not None:
         run_ids_resolved = [int(run)]
     else:
@@ -792,16 +777,23 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
     report_refs: set[str] = set()
     # Allow tuning concurrency with env while keeping conservative defaults
-    attachment_workers_env = _int_env("ATTACHMENT_WORKERS", 2)
+    try:
+        attachment_workers_env = int(os.getenv("ATTACHMENT_WORKERS", "2"))
+    except ValueError:
+        attachment_workers_env = 2
     attachment_workers = max(1, min(4, attachment_workers_env))
 
-    run_workers_env = _int_env("RUN_WORKERS", 2)
-    run_workers_ceiling = _int_env("RUN_WORKERS_MAX", run_workers_env)
+    try:
+        run_workers_env = int(os.getenv("RUN_WORKERS", "2"))
+    except ValueError:
+        run_workers_env = 2
+    # Allow higher ceiling if explicitly requested
+    try:
+        run_workers_ceiling = int(os.getenv("RUN_WORKERS_MAX", "4"))
+    except ValueError:
+        run_workers_ceiling = 4
     run_workers_ceiling = max(1, min(8, run_workers_ceiling))
-    if _env_flag("RUN_WORKERS_AUTOSCALE", False):
-        max_workers = max(1, min(run_workers_ceiling, max(1, len(run_ids_resolved))))
-    else:
-        max_workers = max(1, min(run_workers_ceiling, min(max(1, len(run_ids_resolved)), run_workers_env)))
+    max_workers = max(1, min(run_workers_ceiling, min(max(1, len(run_ids_resolved)), run_workers_env)))
 
     inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
     try:
