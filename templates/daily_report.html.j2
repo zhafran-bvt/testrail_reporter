@@ -1,328 +1,369 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
   <meta charset="utf-8" />
   <title>{{ report_title }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <style>
-    :root{
-      --primary: #1A8A85;
-      --primary-600: #15736E;
-      --ok: #16a34a;
-      --fail: #ef4444;
-      --blocked: #f59e0b;
-      --retest: #3b82f6;
-      --untested: #9ca3af;
-      --bg: #F8F9FA;
-      --card-bg: #ffffff;
-      --text: #222222;
-      --muted: #666666;
-      --border: #EAEAEA;
-      --shadow: 0 10px 25px rgba(0,0,0,.06);
-      --radius: 12px;
+    body {
+        font-family: 'Merriweather', serif;
     }
-    @media (prefers-color-scheme: dark){
-      :root{
-        --bg: #111315;
-        --card-bg: #15181c;
-        --text: #EAEAEA;
-        --muted: #B3B3B3;
-        --border: #22252a;
-        --shadow: 0 10px 25px rgba(0,0,0,.4);
-      }
+    :root {
+      --bvt-dark-teal: #1A8A85;
+      --bvt-light-blue: #2C9FD3;
+      --bs-primary: var(--bvt-dark-teal);
+      --bs-primary-rgb: 26, 138, 133;
+      --bs-link-color-rgb: 21, 115, 110;
+      --bs-body-bg: #f8f9fa;
     }
-    *{ box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; color: var(--text); background: var(--bg); }
-    .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
-    h1 { margin: 0 0 8px; font-weight: 700; letter-spacing: .2px; }
-    a { color: var(--primary-600); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .toolbar { display:flex; gap:8px; align-items:center; margin: 8px 0 14px; }
-    .btn { padding: 8px 12px; border: 1px solid var(--primary); background: var(--primary); color:#fff; cursor:pointer; border-radius:10px; font-size: 13px; }
-    .btn:hover { background: var(--primary-600); }
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin: 14px 0; box-shadow: var(--shadow); }
-    .table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: auto; box-shadow: var(--shadow); position: relative; }
-    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border-bottom: 1px solid var(--border); padding: 6px 8px; font-size: 13px; vertical-align: top; word-break: break-word; background: var(--card-bg); line-height: 20px; }
-    td { position: relative; }
+
+    [data-bs-theme="dark"] {
+      --bs-body-bg: #111315;
+      --bs-body-color: #EAEAEA;
+      --bs-border-color: #333;
+      --bs-tertiary-bg: #15181c;
+      --bs-primary: var(--bvt-light-blue);
+      --bs-primary-rgb: 44, 159, 211;
+    }
+
+    .card-header {
+        background-color: var(--bvt-dark-teal);
+        color: #fff;
+    }
+    
+    [data-bs-theme="dark"] .card-header {
+        background-color: var(--bs-tertiary-bg);
+        border-bottom: 1px solid #444;
+    }
+
+    .table > thead {
+        background-color: var(--bvt-dark-teal);
+        color: #fff;
+    }
+    
+    [data-bs-theme="dark"] .table > thead {
+        background-color: #1F2937;
+    }
+
+    .donut {
+      width: 170px;
+      height: 170px;
+      border-radius: 50%;
+      position: relative;
+      box-shadow: var(--bs-box-shadow-sm);
+    }
+    .donut::after {
+      content: "";
+      position: absolute;
+      inset: 34px;
+      background: var(--bs-tertiary-bg, var(--bs-body-bg));
+      border-radius: 50%;
+    }
+    
+    .table-responsive {
+      max-height: 60vh;
+    }
+
     thead th {
-      background: var(--card-bg); /* solid background to prevent overlap */
-      text-align: left;
-      position: sticky;  /* keep header visible while body scrolls */
+      position: sticky;
       top: 0;
-      z-index: 5;
-      box-shadow: 0 1px 0 var(--border), 0 2px 6px rgba(0,0,0,0.04);
-      padding-top: 4px;
-      padding-bottom: 4px;
+      z-index: 2;
     }
-    tbody tr:nth-child(odd){ background: rgba(0,0,0,0.02); }
-    tbody tr:hover { background: rgba(0,0,0,0.04); }
-    .pill { padding: 2px 8px; border-radius: 999px; font-size: 12px; display:inline-block; font-weight: 600; }
-    .ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
-    .fail { background: color-mix(in srgb, var(--fail) 18%, transparent); color: var(--fail); }
-    .blocked { background: color-mix(in srgb, var(--blocked) 18%, transparent); color: var(--blocked); }
-    .retest { background: color-mix(in srgb, var(--retest) 18%, transparent); color: var(--retest); }
-    .untested { background: color-mix(in srgb, var(--untested) 18%, transparent); color: var(--untested); }
-    .donut { width: 170px; height: 170px; border-radius: 50%; position: relative; box-shadow: var(--shadow); }
-    .donut::after { content: ""; position: absolute; inset: 34px; background: var(--card-bg); border-radius: 50%; }
-    .table-controls { display:flex; align-items:center; gap:12px; margin:8px 0; flex-wrap:wrap; justify-content:flex-end; }
-    .table-controls label { display:inline-flex; align-items:center; gap:6px; color: var(--muted); font-size: 12px; }
-    .table-controls select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); }
-    .table-pager { display:flex; align-items:center; gap:8px; justify-content:flex-end; margin-top:6px; font-size:12px; color: var(--muted); flex-wrap:wrap; }
-    .table-pager button { padding:4px 8px; border-radius:8px; border:1px solid var(--border); background: var(--card-bg); color: var(--text); cursor:pointer; }
-    .table-pager button:disabled { opacity:0.5; cursor:not-allowed; }
-    .muted { color:var(--muted); font-size:12px; }
-    .comment-text { font-size: 12px; color: var(--muted); margin-bottom: 6px; white-space: pre-wrap; }
-    .attachment-trigger { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; border:1px solid var(--primary); background: transparent; color: var(--primary); font-size:12px; cursor:pointer; }
-    .attachment-trigger:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
-    .attachment-chip { display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:8px; border:1px solid var(--border); background: rgba(148,163,184,0.15); font-size:11px; color: var(--muted); }
-    .modal-backdrop { position: fixed; inset:0; background: rgba(15,23,42,0.55); display:none; align-items:center; justify-content:center; z-index:9999; padding:24px; }
-    .modal-backdrop.open { display:flex; }
-    .modal { background: var(--card-bg); color: var(--text); border-radius:16px; max-width: 900px; width:100%; max-height: 90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow: 0 20px 45px rgba(15,23,42,0.35); }
-    .modal-header { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid var(--border); }
-    .modal-body { padding:16px 18px; overflow:auto; }
-    .modal-footer { display:flex; justify-content:space-between; align-items:center; padding:12px 18px; border-top:1px solid var(--border); gap:12px; flex-wrap:wrap; }
-    .modal-close { background:none; border:none; font-size:20px; cursor:pointer; color: var(--muted); }
-    .modal-close:hover { color: var(--text); }
-    .slide-nav { display:flex; gap:10px; align-items:center; }
-    .slide-nav button { padding:8px 12px; border-radius:8px; border:1px solid var(--border); background: transparent; cursor:pointer; }
-    .slide-nav button:hover { background: rgba(59,130,246,0.08); }
-    .modal-image-wrap { display:flex; justify-content:center; margin-bottom:14px; }
-    .modal-image-wrap img { max-width:100%; max-height:55vh; border-radius:12px; box-shadow:0 6px 18px rgba(15,23,42,0.25); }
-    .modal-image-wrap video { width:100%; max-height:55vh; border-radius:12px; box-shadow:0 6px 18px rgba(15,23,42,0.25); display:none; background:#000; }
-    .modal-comment { font-size:13px; color:var(--muted); margin-bottom:12px; white-space:pre-wrap; }
-    .attachment-list { display:flex; flex-direction:column; gap:6px; font-size:12px; }
-    @media (max-width:640px){
-      .modal { max-height: 85vh; }
-      .modal-body { padding:12px; }
+    
+    .status-pill {
+      padding: .2em .6em;
+      border-radius: .25rem;
+      font-size: .875em;
+      font-weight: 600;
+    }
+    .status-ok { background-color: rgba(22, 163, 74, 0.18); color: #16a34a;}
+    .status-fail { background-color: rgba(239, 68, 68, 0.18); color: #ef4444;}
+    .status-blocked { background-color: rgba(245, 158, 11, 0.18); color: #f59e0b;}
+    .status-retest { background-color: rgba(59, 130, 246, 0.18); color: #3b82f6;}
+    .status-untested { background-color: rgba(108, 117, 125, 0.18); color: #6c757d;}
+
+    .modal-image-wrap img, .modal-image-wrap video {
+        max-width: 100%;
+        max-height: 60vh;
+        border-radius: var(--bs-border-radius);
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-  <h1>{{ report_title }}</h1>
-  <div class="toolbar">
-    <button class="btn" onclick="downloadHTML()">Download HTML</button>
-  </div>
-  <p class="muted"><b>Generated:</b> {{ generated_at }}</p>
-  <p>
-    <b>Project:</b>
-    {% if base_url and project_id %}
-      <a href="{{ base_url }}/index.php?/projects/overview/{{ project_id }}" target="_blank" rel="noopener">{{ project_name }}</a>
-    {% else %}
-      {{ project_name }}
-    {% endif %}
-    {% if plan_name and plan_id %}
-      | <b>Plan:</b> <a href="{{ base_url }}/index.php?/plans/view/{{ plan_id }}" target="_blank" rel="noopener">{{ plan_name }}</a>
-    {% endif %}
-  </p>
-
-  <div class="card">
-    <h3>Project Status</h3>
-    <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
-      <div class="donut" style="background: {{ donut_style }}"></div>
+  <div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="h3 mb-0">{{ report_title }}</h1>
       <div>
-        {% if donut_legend and donut_legend|length > 0 %}
-          {% for seg in donut_legend %}
-            <div style="display:flex; align-items:center; gap:8px; margin:4px 0;">
-              <span style="display:inline-block; width:12px; height:12px; background: {{ seg.color }}; border-radius:2px;"></span>
-              <span>{{ seg.label }}: {{ seg.count }} ({{ seg.percent }}%)</span>
-            </div>
-          {% endfor %}
-        {% else %}
-          <span>No data</span>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>Summary</h3>
-    <p>Total: {{ summary.total }} | Passed: {{ summary.Passed }} | Failed: {{ summary.Failed }} | Pass Rate: {{ summary.pass_rate }}%</p>
-  </div>
-
-  {# Time-based trend removed per request #}
-
-  {% for t in tables %}
-  <div class="card run-card" id="run-{{ t.run_id }}" data-run-id="{{ t.run_id }}">
-    <h3>Run #{{ t.run_id }}{% if t.run_name %} - {{ t.run_name }}{% endif %}</h3>
-    <div class="muted" style="margin:6px 0 4px;">Pass Rate: {{ t.pass_rate }}%</div>
-    {% if t.refs %}
-      <div class="muted" style="margin:4px 0 8px;">
-        <b>Refs:</b>
-        {% for ref in t.refs %}
-          <a href="{{ jira_base }}{{ ref }}" target="_blank" rel="noopener">{{ ref }}</a>{% if not loop.last %}, {% endif %}
-        {% endfor %}
-      </div>
-    {% endif %}
-    <div class="run-chips" data-run-id="{{ t.run_id }}" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
-      <button type="button" class="btn" data-status="">All</button>
-      {% for label in ['Failed','Blocked','Retest','Untested','Passed'] %}
-        {% set c = t.counts[label] | default(0) %}
-        {% if c > 0 %}
-          <button type="button" class="btn" data-status="{{ label }}">{{ label }} ({{ c }})</button>
-        {% endif %}
-      {% endfor %}
-    </div>
-    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:8px 0;">
-      <div class="donut" style="width:110px; height:110px; background: {{ t.donut_style }}"></div>
-      <div>
-        {% for seg in t.donut_legend %}
-          <div style="display:flex; align-items:center; gap:8px; font-size:12px;">
-            <span style="display:inline-block; width:10px; height:10px; background: {{ seg.color }}; border-radius:2px;"></span>
-            <span>{{ seg.label }}: {{ seg.count }}</span>
-          </div>
-        {% endfor %}
+        <button id="theme-toggle" class="btn btn-outline-secondary btn-sm">Toggle Theme</button>
+        <button class="btn btn-primary" onclick="downloadHTML()">Download HTML</button>
       </div>
     </div>
 
-    <div class="table-controls" data-run-id="{{ t.run_id }}">
-      <label>Search: <input type="search" class="table-filter" placeholder="keyword..." data-run-id="{{ t.run_id }}"></label>
-      <label>Status:
-        <select class="filter-status" data-run-id="{{ t.run_id }}">
-          <option value="">All</option>
-          <option value="Passed">Passed</option>
-          <option value="Failed">Failed</option>
-          <option value="Blocked">Blocked</option>
-          <option value="Retest">Retest</option>
-          <option value="Untested">Untested</option>
-        </select>
-      </label>
-      <label>Assignee:
-        <select class="filter-assignee" data-run-id="{{ t.run_id }}">
-          <option value="">All</option>
-        </select>
-      </label>
-      <label>Priority:
-        <select class="filter-priority" data-run-id="{{ t.run_id }}">
-          <option value="">All</option>
-        </select>
-      </label>
-      <label><input type="checkbox" class="filter-hide-untested" data-run-id="{{ t.run_id }}"> Hide Untested</label>
-      <label>Rows:
-        <select class="page-size" data-run-id="{{ t.run_id }}">
-          <option value="10" selected>10</option>
-          <option value="15">15</option>
-          <option value="20">20</option>
-          <option value="25">25</option>
-          <option value="50">50</option>
-        </select>
-      </label>
-    </div>
-    <div class="table-wrap" id="wrap-{{ t.run_id }}">
-    <table id="table-{{ t.run_id }}">
-      <colgroup>
-        <col style="width:8%" />
-        <col style="width:36%" />
-        <col style="width:12%" />
-        <col style="width:15%" />
-        <col style="width:10%" />
-        <col style="width:9%" />
-        <col style="width:20%" />
-      </colgroup>
-      <thead>
-        <tr>
-          <th data-sort-by="test_id">ID</th>
-          <th data-sort-by="title">Title</th>
-          <th data-sort-by="status_name">Status</th>
-          <th data-sort-by="assignee">Assignee</th>
-          <th data-sort-by="priority">Priority</th>
-          <th>Refs</th>
-          <th>Attachments</th>
-        </tr>
-      </thead>
-      <tbody id="rows-{{ t.run_id }}">
-        {% for r in t.rows %}
-        <tr data-status="{{ (r.status_name or '')|string|lower }}" data-assignee="{{ (r.assignee or '')|string|lower }}" data-priority="{{ (r.priority or '')|string|lower }}">
-          <td>
-            {% if base_url and r.test_id %}
-              <a href="{{ base_url }}/index.php?/tests/view/{{ r.test_id }}" target="_blank" rel="noopener">{{ r.test_id }}</a>
-            {% else %}
-              {{ r.test_id }}
-            {% endif %}
-          </td>
-          <td>{{ r.title }}</td>
-          <td>
-            {% if r.status_name == 'Passed' %}
-              <span class="pill ok">Passed</span>
-            {% elif r.status_name == 'Failed' %}
-              <span class="pill fail">Failed</span>
-            {% else %}
-              {{ r.status_name }}
-            {% endif %}
-          </td>
-          <td>{{ r.assignee or '' }}</td>
-          <td>{{ r.priority or '' }}</td>
-          <td>
-            {% if r.refs %}
-              {% for ref in r.refs %}
-                <a href="{{ jira_base }}{{ ref }}" target="_blank" rel="noopener">{{ ref }}</a>{% if not loop.last %}, {% endif %}
-              {% endfor %}
-            {% endif %}
-          </td>
-          <td>
-            {% set attachments = r.attachments or [] %}
-            {% set attachment_count = attachments|length %}
-            {% if attachment_count > 0 or (r.comment and r.comment|length > 0) %}
-              <button type="button"
-                      class="attachment-trigger"
-                      data-run="{{ t.run_id }}"
-                      data-test="{{ r.test_id }}"
-                      data-title="{{ r.title|e }}"
-                      data-comment="{{ r.comment|default('', true)|e }}"
-                      data-attachments='{{ attachments|tojson }}'>
-                Attachment{% if attachment_count != 1 %}s{% endif %}
-                {% if attachment_count > 0 %}({{ attachment_count }}){% endif %}
-              </button>
-              {% set skipped_count = attachments|selectattr('skipped')|list|length %}
-              {% if skipped_count > 0 %}
-                <div class="muted" style="font-size:11px;">
-                  {{ skipped_count }} attachment{% if skipped_count != 1 %}s{% endif %} too large to include.
+    <p class="text-muted small"><b>Generated:</b> {{ generated_at }}</p>
+    <p>
+      <b>Project:</b>
+      {% if base_url and project_id %}
+        <a href="{{ base_url }}/index.php?/projects/overview/{{ project_id }}" target="_blank" rel="noopener">{{ project_name }}</a>
+      {% else %}
+        {{ project_name }}
+      {% endif %}
+      {% if plan_name and plan_id %}
+        | <b>Plan:</b> <a href="{{ base_url }}/index.php?/plans/view/{{ plan_id }}" target="_blank" rel="noopener">{{ plan_name }}</a>
+      {% endif %}
+    </p>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Project Status</div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center flex-wrap">
+                        <div class="donut me-3" style="background: {{ donut_style }}"></div>
+                        <div>
+                        {% if donut_legend and donut_legend|length > 0 %}
+                            {% for seg in donut_legend %}
+                            <div class="d-flex align-items-center gap-2 my-1">
+                                <span style="display:inline-block; width:12px; height:12px; background: {{ seg.color }}; border-radius:2px;"></span>
+                                <span>{{ seg.label }}: {{ seg.count }} ({{ seg.percent }}%)</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <span>No data</span>
+                        {% endif %}
+                        </div>
+                    </div>
                 </div>
-              {% endif %}
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Summary</div>
+                <div class="card-body">
+                    <p class="mb-0">Total: {{ summary.total }} | Passed: {{ summary.Passed }} | Failed: {{ summary.Failed }} | Pass Rate: {{ summary.pass_rate }}%</p>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="table-pager" data-run-id="{{ t.run_id }}">
-      <button type="button" class="pager-prev" data-run-id="{{ t.run_id }}">Prev</button>
-      <button type="button" class="pager-next" data-run-id="{{ t.run_id }}">Next</button>
-      <span class="pager-info" data-run-id="{{ t.run_id }}"></span>
+
+
+    {% for t in tables %}
+    <div class="card mt-4 run-card" id="run-{{ t.run_id }}" data-run-id="{{ t.run_id }}">
+      <div class="card-header">
+        <h3 class="h5 mb-0">Run #{{ t.run_id }}{% if t.run_name %} - {{ t.run_name }}{% endif %}</h3>
+      </div>
+      <div class="card-body">
+        <div class="text-muted small mb-2">Pass Rate: {{ t.pass_rate }}%</div>
+        {% if t.refs %}
+        <div class="text-muted small mb-2">
+          <b>Refs:</b>
+          {% for ref in t.refs %}
+            <a href="{{ jira_base }}{{ ref }}" target="_blank" rel="noopener">{{ ref }}</a>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        
+        <div class="d-flex align-items-center flex-wrap gap-3 mb-3">
+            <div class="donut" style="width:110px; height:110px; background: {{ t.donut_style }}"></div>
+            <div>
+                {% for seg in t.donut_legend %}
+                <div class="d-flex align-items-center gap-2 small">
+                    <span style="display:inline-block; width:10px; height:10px; background: {{ seg.color }}; border-radius:2px;"></span>
+                    <span>{{ seg.label }}: {{ seg.count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="run-chips btn-toolbar mb-3" role="toolbar" data-run-id="{{ t.run_id }}">
+            <div class="btn-group btn-group-sm flex-wrap">
+                <button type="button" class="btn btn-outline-secondary active" data-status="">All</button>
+                {% for label in ['Failed','Blocked','Retest','Untested','Passed'] %}
+                    {% set c = t.counts[label] | default(0) %}
+                    {% if c > 0 %}
+                    <button type="button" class="btn btn-outline-secondary" data-status="{{ label }}">{{ label }} ({{ c }})</button>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="table-controls row g-2 align-items-center" data-run-id="{{ t.run_id }}">
+            <div class="col-md-3">
+                <input type="search" class="form-control form-control-sm table-filter" placeholder="Search keyword..." data-run-id="{{ t.run_id }}">
+            </div>
+            <div class="col-md-2">
+                <select class="form-select form-select-sm filter-status" data-run-id="{{ t.run_id }}">
+                    <option value="">All Statuses</option>
+                    <option value="Passed">Passed</option>
+                    <option value="Failed">Failed</option>
+                    <option value="Blocked">Blocked</option>
+                    <option value="Retest">Retest</option>
+                    <option value="Untested">Untested</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select form-select-sm filter-assignee" data-run-id="{{ t.run_id }}">
+                    <option value="">All Assignees</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select form-select-sm filter-priority" data-run-id="{{ t.run_id }}">
+                    <option value="">All Priorities</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input filter-hide-untested" id="hide-untested-{{t.run_id}}" data-run-id="{{ t.run_id }}">
+                    <label class="form-check-label small" for="hide-untested-{{t.run_id}}">Hide Untested</label>
+                </div>
+            </div>
+            <div class="col-md-1">
+                <select class="form-select form-select-sm page-size" data-run-id="{{ t.run_id }}">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-responsive mt-3" id="wrap-{{ t.run_id }}">
+          <table class="table table-sm table-hover table-bordered" id="table-{{ t.run_id }}">
+            <thead class="table-light">
+              <tr>
+                <th data-sort-by="test_id" style="width:8%">ID</th>
+                <th data-sort-by="title" style="width:36%">Title</th>
+                <th data-sort-by="status_name" style="width:12%">Status</th>
+                <th data-sort-by="assignee" style="width:15%">Assignee</th>
+                <th data-sort-by="priority" style="width:10%">Priority</th>
+                <th style="width:9%">Refs</th>
+                <th style="width:10%">Attachments</th>
+              </tr>
+            </thead>
+            <tbody id="rows-{{ t.run_id }}">
+              {% for r in t.rows %}
+              <tr data-status="{{ (r.status_name or '')|string|lower }}" data-assignee="{{ (r.assignee or '')|string|lower }}" data-priority="{{ (r.priority or '')|string|lower }}">
+                <td>
+                  {% if base_url and r.test_id %}
+                    <a href="{{ base_url }}/index.php?/tests/view/{{ r.test_id }}" target="_blank" rel="noopener">{{ r.test_id }}</a>
+                  {% else %}
+                    {{ r.test_id }}
+                  {% endif %}
+                </td>
+                <td>{{ r.title }}</td>
+                <td>
+                  {% if r.status_name == 'Passed' %}<span class="status-pill status-ok">Passed</span>
+                  {% elif r.status_name == 'Failed' %}<span class="status-pill status-fail">Failed</span>
+                  {% elif r.status_name == 'Blocked' %}<span class="status-pill status-blocked">Blocked</span>
+                  {% elif r.status_name == 'Retest' %}<span class="status-pill status-retest">Retest</span>
+                  {% elif r.status_name == 'Untested' %}<span class="status-pill status-untested">Untested</span>
+                  {% else %}{{ r.status_name }}
+                  {% endif %}
+                </td>
+                <td>{{ r.assignee or '' }}</td>
+                <td>{{ r.priority or '' }}</td>
+                <td>
+                  {% if r.refs %}
+                    {% for ref in r.refs %}
+                      <a href="{{ jira_base }}{{ ref }}" target="_blank" rel="noopener">{{ ref }}</a>{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td>
+                  {% set attachments = r.attachments or [] %}
+                  {% set attachment_count = attachments|length %}
+                  {% if attachment_count > 0 or (r.comment and r.comment|length > 0) %}
+                    <button type="button" class="btn btn-outline-primary btn-sm attachment-trigger"
+                            data-run="{{ t.run_id }}"
+                            data-test="{{ r.test_id }}"
+                            data-title="{{ r.title|e }}"
+                            data-comment="{{ r.comment|default('', true)|e }}"
+                            data-attachments='{{ attachments|tojson }}'>
+                      View ({{ attachment_count }})
+                    </button>
+                    {% set skipped_count = attachments|selectattr('skipped')|list|length %}
+                    {% if skipped_count > 0 %}
+                      <div class="text-muted small mt-1">
+                        {{ skipped_count }} attachment{% if skipped_count != 1 %}s{% endif %} too large.
+                      </div>
+                    {% endif %}
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-end align-items-center mt-2 table-pager" data-run-id="{{ t.run_id }}">
+            <span class="text-muted small me-2 pager-info" data-run-id="{{ t.run_id }}"></span>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary pager-prev" data-run-id="{{ t.run_id }}">Prev</button>
+                <button type="button" class="btn btn-outline-secondary pager-next" data-run-id="{{ t.run_id }}">Next</button>
+            </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="modal fade" id="attachmentModal" tabindex="-1" aria-labelledby="attachmentModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title" id="attachmentModalTitle">Attachments</h5>
+            <div id="attachmentModalSubtitle" class="text-muted small"></div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-comment mb-3" id="attachmentModalComment"></div>
+          <div class="modal-image-wrap text-center mb-3">
+            <img id="attachmentModalImage" alt="Attachment evidence" style="display:none;" />
+            <video id="attachmentModalVideo" controls playsinline style="display:none;"></video>
+          </div>
+          <div class="list-group" id="attachmentList"></div>
+        </div>
+        <div class="modal-footer justify-content-between">
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-secondary" id="prevAttachment">⟨ Prev</button>
+                <button type="button" class="btn btn-outline-secondary" id="nextAttachment">Next ⟩</button>
+            </div>
+            <div class="text-muted small" id="attachmentCounter"></div>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
     </div>
   </div>
-  {% endfor %}
 
-  <div class="modal-backdrop" id="attachmentModal">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="attachmentModalTitle">
-      <div class="modal-header">
-        <div>
-          <div id="attachmentModalTitle" style="font-weight:600;">Attachments</div>
-          <div id="attachmentModalSubtitle" class="muted" style="font-size:12px;"></div>
-        </div>
-        <button type="button" class="modal-close" aria-label="Close">&times;</button>
-      </div>
-      <div class="modal-body">
-        <div class="modal-comment" id="attachmentModalComment"></div>
-        <div class="modal-image-wrap">
-          <img id="attachmentModalImage" alt="Attachment evidence" style="display:none;" />
-          <video id="attachmentModalVideo" controls playsinline style="display:none;"></video>
-        </div>
-        <div class="attachment-list" id="attachmentList"></div>
-      </div>
-      <div class="modal-footer">
-        <div class="slide-nav">
-          <button type="button" id="prevAttachment">⟨ Prev</button>
-          <div class="muted" id="attachmentCounter" style="min-width:90px; text-align:center;"></div>
-          <button type="button" id="nextAttachment">Next ⟩</button>
-        </div>
-        <button type="button" class="attachment-chip modal-close" style="border-color: var(--primary); color: var(--primary); background: transparent;">Close</button>
-      </div>
-    </div>
-  </div>
-
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
   <script>
+    const themeToggle = document.getElementById('theme-toggle');
+    const htmlEl = document.documentElement;
+
+    function applyTheme(theme) {
+        htmlEl.setAttribute('data-bs-theme', theme);
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = htmlEl.getAttribute('data-bs-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('theme', newTheme);
+        applyTheme(newTheme);
+    });
+
+    // Apply saved theme on load
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        applyTheme(savedTheme);
+    } else {
+        // Apply OS preference if no theme is saved
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(prefersDark ? 'dark' : 'light');
+    }
     (function() {
       function setupInteractiveTable(runId) {
         const table = document.getElementById('table-' + runId);
@@ -337,15 +378,19 @@
         const prevBtn = pager ? pager.querySelector('.pager-prev') : null;
         const nextBtn = pager ? pager.querySelector('.pager-next') : null;
         const pagerInfo = pager ? pager.querySelector('.pager-info') : null;
-        const chips = document.querySelectorAll('.run-chips[data-run-id="' + runId + '"] [data-status]');
+        const chips = document.querySelectorAll('.run-chips[data-run-id="' + runId + '"] button');
         if (!table || !tbody || !filterInput) return;
 
         let rows = Array.from(tbody.querySelectorAll('tr'));
-        const uniq = (arr)=> Array.from(new Set(arr)).filter(Boolean).sort((a,b)=> a.localeCompare(b));
-        const assignees = uniq(rows.map(r=> (r.dataset.assignee||'').trim()).filter(Boolean));
-        const priorities = uniq(rows.map(r=> (r.dataset.priority||'').trim()).filter(Boolean));
-        if (assigneeSel && assignees.length){ assigneeSel.innerHTML = '<option value="">All</option>' + assignees.map(a=> `<option>${a}</option>`).join(''); }
-        if (prioritySel && priorities.length){ prioritySel.innerHTML = '<option value="">All</option>' + priorities.map(p=> `<option>${p}</option>`).join(''); }
+        const uniq = (arr) => Array.from(new Set(arr)).filter(Boolean).sort((a, b) => a.localeCompare(b));
+        const assignees = uniq(rows.map(r => (r.dataset.assignee || '').trim()).filter(Boolean));
+        const priorities = uniq(rows.map(r => (r.dataset.priority || '').trim()).filter(Boolean));
+        if (assigneeSel && assignees.length) {
+          assigneeSel.innerHTML = '<option value="">All Assignees</option>' + assignees.map(a => `<option>${a}</option>`).join('');
+        }
+        if (prioritySel && priorities.length) {
+          prioritySel.innerHTML = '<option value="">All Priorities</option>' + priorities.map(p => `<option>${p}</option>`).join('');
+        }
 
         const pageSizeKey = 'report_page_size_' + runId;
         let pageSize = parseInt(localStorage.getItem(pageSizeKey) || (pageSizeSel ? pageSizeSel.value : '10'), 10);
@@ -353,23 +398,23 @@
         let pageIndex = 0;
         let filteredRows = rows.slice();
 
-        function renderPage(){
+        function renderPage() {
           const start = pageIndex * pageSize;
           const end = start + pageSize;
-          rows.forEach(r => r.style.display = 'none');
-          filteredRows.slice(start, end).forEach(r => r.style.display = '');
+          tbody.innerHTML = ''; // Clear and re-append
+          filteredRows.slice(start, end).forEach(r => tbody.appendChild(r));
+          
           const total = filteredRows.length;
-          if(pagerInfo){
+          if (pagerInfo) {
             const shownStart = total ? start + 1 : 0;
             const shownEnd = Math.min(total, end);
             pagerInfo.textContent = `${shownStart}-${shownEnd} of ${total}`;
           }
-          if(prevBtn) prevBtn.disabled = pageIndex <= 0;
-          if(nextBtn) nextBtn.disabled = end >= filteredRows.length;
+          if (prevBtn) prevBtn.disabled = pageIndex <= 0;
+          if (nextBtn) nextBtn.disabled = end >= filteredRows.length;
         }
 
-        // Filtering
-        function applyFilters(){
+        function applyFilters() {
           const text = (filterInput.value || '').toLowerCase();
           const status = (statusSel && statusSel.value) || '';
           const assignee = (assigneeSel && assigneeSel.value || '').toLowerCase();
@@ -391,15 +436,15 @@
           renderPage();
         }
 
-        filterInput.addEventListener('keyup', applyFilters);
+        filterInput.addEventListener('input', applyFilters);
         if (statusSel) statusSel.addEventListener('change', applyFilters);
         if (assigneeSel) assigneeSel.addEventListener('change', applyFilters);
         if (prioritySel) prioritySel.addEventListener('change', applyFilters);
         if (hideUntested) hideUntested.addEventListener('change', applyFilters);
 
-        if(pageSizeSel){
+        if (pageSizeSel) {
           pageSizeSel.value = String(pageSize);
-          pageSizeSel.addEventListener('change', ()=>{
+          pageSizeSel.addEventListener('change', () => {
             const v = parseInt(pageSizeSel.value || '10', 10);
             pageSize = isNaN(v) || v <= 0 ? 10 : v;
             localStorage.setItem(pageSizeKey, String(pageSize));
@@ -407,46 +452,58 @@
             renderPage();
           });
         }
-        if(prevBtn){
-          prevBtn.addEventListener('click', ()=>{
-            if(pageIndex > 0){ pageIndex -= 1; renderPage(); }
+        if (prevBtn) {
+          prevBtn.addEventListener('click', () => {
+            if (pageIndex > 0) {
+              pageIndex -= 1;
+              renderPage();
+            }
           });
         }
-        if(nextBtn){
-          nextBtn.addEventListener('click', ()=>{
+        if (nextBtn) {
+          nextBtn.addEventListener('click', () => {
             const maxPage = Math.max(0, Math.ceil(filteredRows.length / pageSize) - 1);
-            if(pageIndex < maxPage){ pageIndex += 1; renderPage(); }
+            if (pageIndex < maxPage) {
+              pageIndex += 1;
+              renderPage();
+            }
           });
         }
 
-        // Status chips click → apply status filter immediately
         chips.forEach(ch => {
           ch.addEventListener('click', () => {
             const v = ch.getAttribute('data-status') || '';
             if (statusSel) statusSel.value = v;
+            chips.forEach(c => c.classList.remove('active'));
+            ch.classList.add('active');
             applyFilters();
           });
         });
 
-        // Sorting
         table.querySelectorAll('thead th[data-sort-by]').forEach(header => {
           header.style.cursor = 'pointer';
           header.addEventListener('click', () => {
             const sortBy = header.getAttribute('data-sort-by');
-            const currentRows = Array.from(tbody.querySelectorAll('tr'));
             const sortDir = header.getAttribute('data-sort-dir') === 'asc' ? 'desc' : 'asc';
+            
+            table.querySelectorAll('thead th[data-sort-by]').forEach(th => th.removeAttribute('data-sort-dir'));
             header.setAttribute('data-sort-dir', sortDir);
 
-            currentRows.sort((a, b) => {
+            rows.sort((a, b) => {
               const aText = a.querySelector(`td:nth-child(${header.cellIndex + 1})`).textContent.trim();
               const bText = b.querySelector(`td:nth-child(${header.cellIndex + 1})`).textContent.trim();
-              if (aText < bText) return sortDir === 'asc' ? -1 : 1;
-              if (aText > bText) return sortDir === 'asc' ? 1 : -1;
-              return 0;
-            });
+              const aNum = parseFloat(aText);
+              const bNum = parseFloat(bText);
 
-            currentRows.forEach(row => tbody.appendChild(row));
-            rows = Array.from(tbody.querySelectorAll('tr'));
+              let comparison = 0;
+              if (!isNaN(aNum) && !isNaN(bNum)) {
+                  comparison = aNum - bNum;
+              } else {
+                  comparison = aText.localeCompare(bText, undefined, {numeric: true});
+              }
+              return sortDir === 'asc' ? comparison : -comparison;
+            });
+            
             applyFilters();
           });
         });
@@ -454,7 +511,8 @@
         applyFilters();
       }
 
-      const modal = document.getElementById('attachmentModal');
+      const modalEl = document.getElementById('attachmentModal');
+      const attachmentModal = new bootstrap.Modal(modalEl);
       const imgEl = document.getElementById('attachmentModalImage');
       const videoEl = document.getElementById('attachmentModalVideo');
       const listEl = document.getElementById('attachmentList');
@@ -464,75 +522,58 @@
       const counterEl = document.getElementById('attachmentCounter');
       const prevBtn = document.getElementById('prevAttachment');
       const nextBtn = document.getElementById('nextAttachment');
-      const closeBtns = modal.querySelectorAll('.modal-close');
       let attachmentsState = [];
       let attachmentsIndex = 0;
 
-      function updateAttachmentView(){
-        if(!attachmentsState.length){
+      function updateAttachmentView() {
+        if (!attachmentsState.length) {
           imgEl.style.display = 'none';
-          if(videoEl){
-            videoEl.pause();
-            videoEl.removeAttribute('src');
-            videoEl.load();
-            videoEl.style.display = 'none';
-          }
-          listEl.innerHTML = '<span class="muted">No attachments available.</span>';
+          videoEl.style.display = 'none';
+          listEl.innerHTML = '<div class="list-group-item">No attachments available.</div>';
           counterEl.textContent = '';
           prevBtn.disabled = true;
           nextBtn.disabled = true;
           return;
         }
         const current = attachmentsState[attachmentsIndex];
-        if(videoEl){
-          videoEl.pause();
-          videoEl.removeAttribute('src');
-          videoEl.load();
-          videoEl.style.display = 'none';
-        }
-        if(current.is_image && current.data_url){
+        videoEl.style.display = 'none';
+        videoEl.pause();
+        
+        if (current.is_image && current.data_url) {
           imgEl.src = current.data_url;
           imgEl.alt = current.name || 'Attachment';
           imgEl.style.display = 'block';
         } else {
           imgEl.style.display = 'none';
         }
-        if(current.is_video && videoEl){
-          const videoSrc = current.data_url || current.path;
-          if(videoSrc){
-            imgEl.style.display = 'none';
-            videoEl.style.display = 'block';
-            if(current.content_type){
-              videoEl.setAttribute('type', current.content_type);
-            } else {
-              videoEl.removeAttribute('type');
-            }
-            videoEl.src = videoSrc;
-            videoEl.load();
-          } else {
-            videoEl.style.display = 'none';
-          }
+        
+        if (current.is_video && (current.data_url || current.path)) {
+          imgEl.style.display = 'none';
+          videoEl.src = current.data_url || current.path;
+          videoEl.type = current.content_type || '';
+          videoEl.style.display = 'block';
+          videoEl.load();
         }
+
         const items = attachmentsState.map((item, idx) => {
-          const isActive = idx === attachmentsIndex;
-          const wrapperClass = isActive ? 'attachment-chip' : 'muted';
-          const icon = item.is_image ? '🖼' : (item.is_video ? '🎬' : '📎');
+          const isActive = idx === attachmentsIndex ? 'active' : '';
+          const icon = item.is_image ? '🖼️' : (item.is_video ? '🎬' : '📎');
           const href = item.data_url || item.path || '#';
-          const downloadAttr = href && href.startsWith('data:') ? ` download="${item.name || 'attachment'}"` : '';
-          return `<div class="${wrapperClass}"><a href="${href}" target="_blank" rel="noopener"${downloadAttr}>${icon} ${item.name || 'Attachment'}</a></div>`;
-        });
-        listEl.innerHTML = items.join('');
+          const downloadAttr = href.startsWith('data:') ? ` download="${item.name || 'attachment'}"` : '';
+          return `<a href="${href}" target="_blank" rel="noopener" class="list-group-item list-group-item-action ${isActive}" ${downloadAttr}>${icon} ${item.name || 'Attachment'}</a>`;
+        }).join('');
+        listEl.innerHTML = items;
         counterEl.textContent = `${attachmentsIndex + 1} / ${attachmentsState.length}`;
         prevBtn.disabled = attachmentsState.length <= 1;
         nextBtn.disabled = attachmentsState.length <= 1;
       }
 
-      function openAttachmentModal(detail){
+      function openAttachmentModal(detail) {
         attachmentsState = detail.attachments || [];
         attachmentsIndex = 0;
         titleEl.textContent = `Attachments — ${detail.title || ''}`;
         subtitleEl.textContent = `Run ${detail.runId || ''} • Test ${detail.testId || ''}`;
-        if(detail.comment){
+        if (detail.comment) {
           commentEl.textContent = detail.comment;
           commentEl.style.display = 'block';
         } else {
@@ -540,29 +581,17 @@
           commentEl.style.display = 'none';
         }
         updateAttachmentView();
-        modal.classList.add('open');
+        attachmentModal.show();
       }
 
-      function closeAttachmentModal(){
-        modal.classList.remove('open');
-        attachmentsState = [];
-        attachmentsIndex = 0;
-        if(videoEl){
-          videoEl.pause();
-          videoEl.removeAttribute('src');
-          videoEl.load();
-          videoEl.style.display = 'none';
-        }
-        imgEl.style.display = 'none';
-      }
-
-      document.addEventListener('click', function(ev){
+      document.addEventListener('click', function(ev) {
         const trigger = ev.target.closest('.attachment-trigger');
-        if(trigger){
+        if (trigger) {
           let parsed = [];
           try {
             parsed = JSON.parse(trigger.dataset.attachments || '[]');
           } catch (e) {
+            console.error("Failed to parse attachments JSON", e);
             parsed = [];
           }
           openAttachmentModal({
@@ -573,41 +602,42 @@
             title: trigger.dataset.title || ''
           });
         }
-        if(ev.target === modal){
-          closeAttachmentModal();
-        }
       });
 
-      closeBtns.forEach(btn => btn.addEventListener('click', closeAttachmentModal));
-      prevBtn.addEventListener('click', function(){
-        if(attachmentsState.length <= 1) return;
+      prevBtn.addEventListener('click', function() {
+        if (attachmentsState.length <= 1) return;
         attachmentsIndex = (attachmentsIndex - 1 + attachmentsState.length) % attachmentsState.length;
         updateAttachmentView();
       });
-      nextBtn.addEventListener('click', function(){
-        if(attachmentsState.length <= 1) return;
+      nextBtn.addEventListener('click', function() {
+        if (attachmentsState.length <= 1) return;
         attachmentsIndex = (attachmentsIndex + 1) % attachmentsState.length;
         updateAttachmentView();
       });
-      document.addEventListener('keydown', function(ev){
-        if(!modal.classList.contains('open')) return;
-        if(ev.key === 'Escape'){ closeAttachmentModal(); }
-        if(ev.key === 'ArrowRight'){ nextBtn.click(); }
-        if(ev.key === 'ArrowLeft'){ prevBtn.click(); }
+      
+      modalEl.addEventListener('hidden.bs.modal', () => {
+        videoEl.pause();
       });
 
-      document.addEventListener('DOMContentLoaded', function(){
+      document.addEventListener('keydown', function(ev) {
+        if (!modalEl.classList.contains('show')) return;
+        if (ev.key === 'ArrowRight') { nextBtn.click(); }
+        if (ev.key === 'ArrowLeft') { prevBtn.click(); }
+      });
+
+      document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.run-card').forEach(card => {
           setupInteractiveTable(card.getAttribute('data-run-id'));
         });
       });
     })();
-  </script>
-  <script>
-    function downloadHTML(){
+
+    function downloadHTML() {
       try {
         const html = document.documentElement.outerHTML;
-        const blob = new Blob([html], {type: 'text/html;charset=utf-8'});
+        const blob = new Blob([html], {
+          type: 'text/html;charset=utf-8'
+        });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -621,6 +651,5 @@
       }
     }
   </script>
-</div>
 </body>
 </html>

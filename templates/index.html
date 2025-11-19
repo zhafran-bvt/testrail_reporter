@@ -22,16 +22,14 @@
       --shadow: 0 10px 25px rgba(0,0,0,.08);
       --radius: 12px;
     }
-    @media (prefers-color-scheme: dark){
-      :root{
-        --card-bg: #1C1C1C;  /* Dark Background */
+    html.dark {
+        --card-bg: #1C1C1C;
         --text: #EAEAEA;
         --muted: #B3B3B3;
         --border: #333333;
         --bg: #1C1C1C;
         --bg2: rgba(44,159,211,0.06);
         --shadow: 0 10px 25px rgba(0,0,0,.4);
-      }
     }
     html, body { height: 100%; }
     body {
@@ -43,6 +41,7 @@
       justify-content: center;
       padding: 8vh 16px 24px;
       background: linear-gradient(180deg, var(--bg2), transparent 35%), var(--bg);
+      font-family: 'Merriweather', serif;
     }
     .wrap { width: 100%; max-width: 760px; }
     .logo-wrap { position: relative; display:flex; justify-content:center; align-items:center; margin-bottom: 12px; }
@@ -93,8 +92,8 @@
     .run-card:hover { border-color: var(--primary); box-shadow:0 4px 12px rgba(15,23,42,0.08); transform: translateY(-1px); }
     .run-card input { width:18px; height:18px; margin-top:3px; }
     .run-card-content { flex:1; display:flex; flex-direction:column; gap:2px; }
-    .run-card-title { font-weight:500; color: var(--text); font-size:13px; font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
-    .run-card-id { font-size:12px; color: var(--muted); font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+    .run-card-title { font-weight:500; color: var(--text); font-size:13px; }
+    .run-card-id { font-size:12px; color: var(--muted); }
     .run-empty { padding:12px; text-align:center; font-size:13px; color: var(--muted); display:none; }
     .runs-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .runs-action-btn { padding:4px 10px; font-size:12px; border-radius:8px; border:1px solid var(--border); background: transparent; cursor:pointer; color: var(--muted); }
@@ -115,6 +114,9 @@
 </head>
 <body>
   <div class="wrap">
+    <div style="text-align: right; margin-bottom: 1rem;">
+        <button id="theme-toggle" style="padding: 4px 8px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer;">Toggle Theme</button>
+    </div>
     <div class="logo-wrap">
       <img class="logo" src="{{ logo_url }}" alt="Bhumi Varta Logo" />
     </div>
@@ -175,6 +177,33 @@
   </div>
 
   <script>
+    const themeToggle = document.getElementById('theme-toggle');
+    const htmlEl = document.documentElement;
+
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            htmlEl.classList.add('dark');
+        } else {
+            htmlEl.classList.remove('dark');
+        }
+    }
+
+    themeToggle.addEventListener('click', () => {
+        const currentTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
+        localStorage.setItem('theme', currentTheme);
+        applyTheme(currentTheme);
+    });
+
+    // Apply saved theme on load
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        applyTheme(savedTheme);
+    } else {
+        // Apply OS preference if no theme is saved
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(prefersDark ? 'dark' : 'light');
+    }
+    
     function escapeHtml(s){
       return String(s).replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
     }
@@ -560,8 +589,8 @@
       const startedAt = job?.started_at ? Date.parse(job.started_at) : null;
       if(Number.isFinite(startedAt) && startedAt > 0){
         const elapsedMs = Date.now() - startedAt;
-        if(elapsedMs > 0 && progressFraction > 0){
-          const projectedTotal = elapsedMs / Math.max(progressFraction, 0.05);
+        if(elapsedMs > 5000 && progressFraction > 0.05){ // Only show ETA after 5s and 5% progress
+          const projectedTotal = elapsedMs / progressFraction;
           etaMs = Math.max(0, projectedTotal - elapsedMs);
         }
       }

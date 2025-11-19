@@ -338,6 +338,16 @@ def _stop_memlog():
 
 @app.on_event("startup")
 def on_startup():
+    report_workers = os.getenv("REPORT_WORKERS", "1")
+    run_workers = os.getenv("RUN_WORKERS", "2")
+    attachment_workers = os.getenv("ATTACHMENT_WORKERS", "2")
+    
+    print("--- Worker Configuration ---")
+    print(f"Report Workers:     {report_workers}")
+    print(f"Run Workers:          {run_workers}")
+    print(f"Attachment Workers:   {attachment_workers}")
+    print("--------------------------")
+
     _start_keepalive()
     _start_memlog()
 
@@ -355,22 +365,12 @@ def healthz():
 def index(request: Request):
     # Brand colors can be customized via environment variables
     brand = {
-        "primary": os.getenv("BRAND_PRIMARY", "#2563eb"),
-        "primary_600": os.getenv("BRAND_PRIMARY_600", "#1d4ed8"),
-        "bg": os.getenv("BRAND_BG", "#0ea5e9"),
-        "bg2": os.getenv("BRAND_BG2", "#0ea5e91a"),
+        "primary": os.getenv("BRAND_PRIMARY", "#1A8A85"),
+        "primary_600": os.getenv("BRAND_PRIMARY_600", "#15736E"),
+        "bg": os.getenv("BRAND_BG", "#F8F9FA"),
+        "bg2": os.getenv("BRAND_BG2", "rgba(26,138,133,0.06)"),
     }
-    # Detect latest image asset for logo dynamically
-    logo_url = None
-    try:
-        candidates = []
-        for ext in ("png", "jpg", "jpeg", "svg", "webp"):
-            candidates.extend(glob.glob(str(Path("assets") / f"*.{ext}")))
-        if candidates:
-            latest = max(candidates, key=lambda p: Path(p).stat().st_mtime)
-            logo_url = "/assets/" + Path(latest).name
-    except Exception:
-        logo_url = None
+    logo_url = "/assets/Bvt.jpg"
 
     return templates.TemplateResponse(
         "index.html",
@@ -378,7 +378,7 @@ def index(request: Request):
             "request": request,
             "default_project": 1,
             "brand": brand,
-            "logo_url": logo_url or "/assets/logo-bvt.png",
+            "logo_url": logo_url,
         },
     )
 
