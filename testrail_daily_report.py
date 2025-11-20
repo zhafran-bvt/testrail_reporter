@@ -1214,8 +1214,13 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         metadata_map.clear()
         gc.collect()
 
-        for tid in attachments_by_test:
-            attachments_by_test[tid].sort(key=lambda entry: entry["path"])
+        def _attachment_sort_key(entry: dict):
+            path = entry.get("path") or ""
+            skipped = entry.get("skipped", False)
+            return (skipped, path)
+
+        for tid, items in attachments_by_test.items():
+            items.sort(key=_attachment_sort_key)
 
         rows_payload = []
         for record in table_df.itertuples(index=False, name="Row"):
