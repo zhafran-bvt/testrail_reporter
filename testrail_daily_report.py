@@ -781,7 +781,12 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         attachment_workers_env = int(os.getenv("ATTACHMENT_WORKERS", "2"))
     except ValueError:
         attachment_workers_env = 2
-    attachment_workers = max(1, min(8, attachment_workers_env))
+    try:
+        attachment_workers_ceiling = int(os.getenv("ATTACHMENT_WORKERS_MAX", "8"))
+    except ValueError:
+        attachment_workers_ceiling = 8
+    attachment_workers_ceiling = max(1, min(16, attachment_workers_ceiling))
+    attachment_workers = max(1, min(attachment_workers_ceiling, attachment_workers_env))
 
     try:
         run_workers_env = int(os.getenv("RUN_WORKERS", "2"))
@@ -920,9 +925,9 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         for tid, result_id in latest_result_ids.items():
             attachments_by_test.setdefault(tid, [])
 
-        def _append_skipped_attachment(job: dict, *, size_bytes: int, limit_bytes: int, reason: str, content_type: str | None = None):
+        def _build_skipped_attachment_entry(job: dict, *, size_bytes: int, limit_bytes: int, reason: str, content_type: str | None = None):
             initial_type = content_type or job.get("initial_type")
-            attachments_by_test.setdefault(job["test_id"], []).append({
+            return {
                 "name": job["filename"],
                 "path": None,
                 "content_type": initial_type,
@@ -933,7 +938,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 "inline_embedded": False,
                 "skipped": True,
                 "skip_reason": reason,
-            })
+                "limit_bytes": limit_bytes,
+            }
 
         def _fetch_metadata(test_id: int):
             local_session = _make_session()
@@ -1016,14 +1022,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             inline_video_limit = video_inline_limit
             total_downloads = len(download_jobs)
             notify("downloading_attachments", run_id=rid, total=total_downloads)
-            for index, job in enumerate(download_jobs, start=1):
+
+            def _process_attachment_job(index: int, job: dict):
                 attachment_id = job["attachment_id"]
+                local_session = _make_session()
                 notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
-                if index % 5 == 0:
-                    log_memory(f"download_progress_{rid}_{index}")
                 try:
                     resp = download_attachment(
-                        session,
+                        local_session,
                         base_url,
                         attachment_id,
                         max_retries=attachment_retry_limit,
@@ -1037,12 +1043,19 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         "skipped": True,
                     }
                     notify("attachment_skipped", run_id=rid, **stripped)
-                    _append_skipped_attachment(job, size_bytes=exc.size_bytes, limit_bytes=exc.limit_bytes, reason="size_limit")
-                    continue
+                    entry = _build_skipped_attachment_entry(job, size_bytes=exc.size_bytes, limit_bytes=exc.limit_bytes, reason="size_limit")
+                    return index, job["test_id"], entry
+                except Exception as exc:
+                    print(f"Warning: download failed for attachment {attachment_id}: {exc}", file=sys.stderr)
+                    entry = _build_skipped_attachment_entry(job, size_bytes=job.get("size") or 0, limit_bytes=download_limit or 0, reason="error")
+                    entry["skip_reason"] = f"error:{exc}"
+                    return index, job["test_id"], entry
+                finally:
+                    local_session.close()
+
                 tmp_path = None
                 content_type = None
                 if isinstance(resp, tuple) and len(resp) == 2 and isinstance(resp[0], (bytes, bytearray)):
-                    # Backward-compatible: caller returned bytes (e.g., tests/mocks)
                     content_type = resp[1]
                     fd, tmp = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
                     with os.fdopen(fd, "wb") as f:
@@ -1069,14 +1082,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         Path(tmp_path).unlink(missing_ok=True)
                     except Exception:
                         pass
-                    _append_skipped_attachment(
+                    entry = _build_skipped_attachment_entry(
                         job,
                         size_bytes=data_size,
                         limit_bytes=attachment_size_limit,
                         reason="post_download_limit",
                         content_type=content_type,
                     )
-                    continue
+                    return index, job["test_id"], entry
 
                 is_image_type = bool(content_type and str(content_type).lower().startswith("image/"))
                 suffix_map = {
@@ -1108,7 +1121,6 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     try:
                         shutil.copyfile(tmp_path, job["abs_path"])
                     except OSError:
-                        # Last resort: read/write the chunks
                         with open(tmp_path, "rb") as src, open(job["abs_path"], "wb") as dst:
                             shutil.copyfileobj(src, dst, length=64 * 1024)
                     size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
@@ -1149,9 +1161,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         data_url = f"data:{mime};base64,{data_b64}"
                     except Exception:
                         data_url = None
-                # Use a relative path so the saved HTML works offline and under the /reports/ mount
                 public_path = str(job["rel_path"]).replace(os.sep, "/")
-                attachments_by_test.setdefault(job["test_id"], []).append({
+                entry = {
                     "name": job["filename"],
                     "path": public_path,
                     "content_type": content_type,
@@ -1160,8 +1171,27 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     "is_video": is_video,
                     "data_url": data_url,
                     "inline_embedded": bool(data_url),
-                })
+                }
+                return index, job["test_id"], entry
+
+            completed_downloads = 0
+            with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
+                futures = {
+                    executor.submit(_process_attachment_job, idx, job): idx for idx, job in enumerate(download_jobs, start=1)
+                }
+                for future in as_completed(futures):
+                    try:
+                        index, test_id, entry = future.result()
+                    except Exception as exc:
+                        print(f"Warning: attachment future failed for run {rid}: {exc}", file=sys.stderr)
+                        continue
+                    attachments_by_test.setdefault(test_id, []).append(entry)
+                    completed_downloads += 1
+                    if completed_downloads % 5 == 0:
+                        log_memory(f"download_progress_{rid}_{completed_downloads}")
             log_memory(f"after_attachment_downloads_{rid}")
+        download_jobs.clear()
+        metadata_map.clear()
 
         for tid in attachments_by_test:
             attachments_by_test[tid].sort(key=lambda entry: entry["path"])

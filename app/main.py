@@ -262,20 +262,25 @@ class ReportJobManager:
             self._trim_history()
 
 
-def _sequential_report_worker_count() -> tuple[int, int]:
+def _report_worker_config() -> tuple[int, int, int]:
     try:
         requested = max(1, int(os.getenv("REPORT_WORKERS", "1")))
     except ValueError:
         requested = 1
-    if requested > 1:
+    try:
+        configured_max = max(1, int(os.getenv("REPORT_WORKERS_MAX", "4")))
+    except ValueError:
+        configured_max = 4
+    resolved = max(1, min(requested, configured_max))
+    if resolved != requested:
         print(
-            "INFO: REPORT_WORKERS>1 requested but sequential execution is enforced to reduce memory usage.",
+            f"INFO: REPORT_WORKERS limited to {resolved} (requested {requested}, max {configured_max}).",
             flush=True,
         )
-    return 1, requested
+    return resolved, requested, configured_max
 
 
-report_worker_count, report_worker_requested = _sequential_report_worker_count()
+report_worker_count, report_worker_requested, report_worker_max = _report_worker_config()
 job_history_limit = max(10, int(os.getenv("REPORT_JOB_HISTORY", "60")))
 _job_manager = ReportJobManager(max_workers=report_worker_count, max_history=job_history_limit)
 
@@ -381,7 +386,7 @@ def _stop_memlog():
 
 @app.on_event("startup")
 def on_startup():
-    report_workers = f"{report_worker_count} (sequential)"
+    report_workers = f"{report_worker_count} (max {report_worker_max})"
     if report_worker_requested != report_worker_count:
         report_workers = f"{report_workers} (requested {report_worker_requested})"
     run_workers = os.getenv("RUN_WORKERS", "2")
