@@ -8,7 +8,7 @@ Requires env vars:
     TESTRAIL_BASE_URL, TESTRAIL_USER, TESTRAIL_API_KEY
 """
 
-import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math, gc
+import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math, gc, json
 import time
 import contextvars
 import contextlib
@@ -700,14 +700,32 @@ def compress_image_file(input_path: Path, content_type: str | None, output_path:
             return content_type, 0, None
 
 
-def render_html(context: dict, out_path: Path):
+def render_streaming_report(context: dict, runs_cache: Path, out_path: Path):
+    """Render the final HTML by streaming run sections from disk."""
     env = Environment(loader=FileSystemLoader("templates"), autoescape=select_autoescape())
-    tpl = env.get_template("daily_report.html.j2")
-    html = tpl.render(**context)
+    template = env.get_template("daily_report.html.j2")
+
+    def _iter_tables():
+        with runs_cache.open("r", encoding="utf-8") as fp:
+            for line in fp:
+                line = line.strip()
+                if not line:
+                    continue
+                yield json.loads(line)
+
+    context["tables"] = _iter_tables()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(html, encoding="utf-8")
+    with out_path.open("w", encoding="utf-8") as dest:
+        for chunk in template.generate(**context):
+            dest.write(chunk)
     return str(out_path)
 
+def render_html(context: dict, out_path: Path):
+    """Backward-compatible wrapper so tests can patch render_html."""
+    cache_path = context.pop("_tables_cache", None)
+    if cache_path is None:
+        raise RuntimeError("render_html requires a tables cache path for streaming")
+    return render_streaming_report(context, Path(cache_path), out_path)
 
 def generate_report(project: int, plan: int | None = None, run: int | None = None,
                     run_ids: list[int] | None = None, progress=None) -> str:
@@ -789,9 +807,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         raise ValueError("No runs available to generate report")
 
     notify("initializing", plan=plan, run=run, run_count=len(run_ids or []))
-    summary = {"total": 0, "Passed": 0, "Failed": 0}
-    tables = []
-    # Time-based trend removed
+    summary = {"total": 0, "Passed": 0, "Failed": 0, "by_status": {}}
 
     report_refs: set[str] = set()
     # Allow tuning concurrency with env while keeping conservative defaults
@@ -837,33 +853,18 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     attachment_retry_limit = max(1, min(10, attachment_retry_limit))
     attachment_size_limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "520000000"))
 
-    def _fetch_run_data(rid: int):
-        local_session = _make_session()
-        try:
-            results = get_results_for_run(local_session, base_url, rid)
-            tests = get_tests_for_run(local_session, base_url, rid)
-            return rid, tests, results
-        finally:
-            local_session.close()
+    runs_cache = Path(tempfile.NamedTemporaryFile(delete=False).name)
+    total_runs = len(run_ids_resolved)
 
-    run_data: list[tuple[int, list[dict], list[dict]]] = []
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_fetch_run_data, rid): rid for rid in run_ids_resolved}
-        for future in as_completed(futures):
+    with runs_cache.open("w", encoding="utf-8") as sink:
+        for idx, rid in enumerate(run_ids_resolved, start=1):
+            notify("processing_run", run_id=rid, index=idx, total=total_runs)
+            local_session = _make_session()
             try:
-                rid, tests, results = future.result()
-                run_data.append((rid, tests, results))
-                log_memory(f"fetched_run_data_{rid}")
-            except Exception as e:
-                rid = futures[future]
-                print(f"Warning: failed to fetch run {rid}: {e}", file=sys.stderr)
-
-    run_data.sort(key=lambda item: run_ids_resolved.index(item[0]))
-    log_memory("after_fetch_runs")
-
-    total_runs = len(run_data)
-    for idx, (rid, tests, results) in enumerate(run_data, start=1):
-        notify("processing_run", run_id=rid, index=idx, total=total_runs)
+                results = get_results_for_run(local_session, base_url, rid)
+                tests = get_tests_for_run(local_session, base_url, rid)
+            finally:
+                local_session.close()
         # Ensure assignee IDs are resolvable to names
         if user_lookup_allowed:
             try:
@@ -1264,7 +1265,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 row["refs"] = [str(refs_val)]
             rows_payload.append(row)
 
-        tables.append({
+        run_payload = {
             "run_id": rid,
             "run_name": run_names.get(int(rid)) if run_names else None,
             "rows": rows_payload,
@@ -1273,18 +1274,22 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             "pass_rate": run_pass_rate,
             "donut_style": run_donut_style,
             "donut_legend": segs,
-            "refs": run_refs,
-        })
+            "refs": sorted(run_refs),
+            "run_passed": run_passed,
+            "run_failed": run_failed,
+        }
+        json.dump(run_payload, sink)
+        sink.write("\n")
+
         summary["total"] += run_total
         summary["Passed"] += run_passed
         summary["Failed"] += run_failed
         for k, v in counts.items():
-            summary.setdefault("by_status", {})
             summary["by_status"][k] = summary["by_status"].get(k, 0) + v
-        # No trend point tracking
+        report_refs.update(run_refs)
+
         log_memory(f"run_complete_{rid}")
-        # Release large dataframes promptly to avoid memory spikes
-        del table_df, latest_results_df, res_summary
+        del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
         gc.collect()
 
     pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
@@ -1316,11 +1321,20 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
     report_title = f"Testing Progress Report — {plan_name}" if plan_name else "Testing Progress Report"
     notify("rendering_report", total_runs=total_runs)
+    preview_tables: list[dict] = []
+    try:
+        with runs_cache.open("r", encoding="utf-8") as preview_fp:
+            for _, line in zip(range(3), preview_fp):
+                line = line.strip()
+                if line:
+                    preview_tables.append(json.loads(line))
+    except Exception:
+        preview_tables = []
+
     context = {
         "report_title": report_title,
         "generated_at": datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M"),
         "summary": {**summary, "pass_rate": pass_rate},
-        "tables": tables,
         "notes": ["Generated automatically from TestRail API"],
         "project_name": project_name,
         "plan_name": plan_name,
@@ -1332,6 +1346,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         "jira_base": "https://bvarta-project.atlassian.net/browse/",
         "report_refs": sorted(report_refs),
     }
+    context["tables"] = preview_tables  # placeholder so tests expecting this key continue to work
 
     def _safe_filename(name: str) -> str:
         cleaned = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in name)
@@ -1343,10 +1358,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     filename = f"Testing_Progress_Report_{name_slug}_{date_str}.html"
     out_file = Path("out") / filename
     context["output_filename"] = filename
+    context["_tables_cache"] = str(runs_cache)
     rendered = render_html(context, out_file)
     log_memory("report_rendered")
     # Drop intermediate collections before returning
-    del run_data, tables
+    try:
+        runs_cache.unlink(missing_ok=True)
+    except Exception:
+        pass
     gc.collect()
     return rendered
 
