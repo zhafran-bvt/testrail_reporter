@@ -102,16 +102,43 @@
         padding-right: 2.25rem;
         appearance: none;
     }
-    .icon-btn {
+    .theme-toggle {
+        width: 74px;
+        height: 34px;
+        border-radius: 999px;
+        border: none;
+        background: rgba(15,23,42,0.08);
+        padding: 4px;
+        display: inline-flex;
+        align-items: center;
+        cursor: pointer;
+        transition: background .3s ease;
+    }
+    [data-bs-theme="dark"] .theme-toggle {
+        background: rgba(255,255,255,0.18);
+    }
+    .theme-toggle-thumb {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: #fff;
+        color: #111;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 0;
+        transition: transform .3s ease, background .3s ease, color .3s ease, box-shadow .3s ease;
+        box-shadow: 0 4px 12px rgba(15,23,42,0.2);
     }
-    .icon-btn svg {
+    .theme-toggle-thumb svg {
         width: 16px;
         height: 16px;
         fill: currentColor;
+    }
+    .theme-toggle[data-mode="dark"] .theme-toggle-thumb {
+        transform: translateX(38px);
+        background: #0f172a;
+        color: #f8fafc;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.45);
     }
     .sr-only {
         position: absolute;
@@ -131,15 +158,15 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h1 class="h3 mb-0">{{ report_title }}</h1>
       <div>
-        <button id="theme-toggle" type="button" class="btn btn-outline-secondary btn-sm icon-btn" aria-label="Switch to dark mode" title="Switch to dark mode">
+        <button id="theme-toggle" type="button" class="theme-toggle" aria-label="Switch to dark mode" title="Switch to dark mode" data-mode="light">
           <span class="sr-only">Toggle theme</span>
-          <span id="report-theme-icon" aria-hidden="true"></span>
-        </button>
-        <button type="button" class="btn btn-primary btn-sm icon-btn" onclick="downloadHTML()" aria-label="Download HTML" title="Download HTML">
-          <span class="sr-only">Download report</span>
-          <span aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v9.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4.002 4.002a1 1 0 0 1-1.414 0l-4.002-4.002a1 1 0 0 1 1.414-1.414L11 13.586V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v2h12v-2a1 1 0 0 1 2 0v3a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/></svg>
+          <span class="theme-toggle-thumb" aria-hidden="true">
+            <span id="report-theme-icon"></span>
           </span>
+        </button>
+        <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center justify-content-center" onclick="downloadHTML()" aria-label="Download HTML" title="Download HTML">
+          <svg viewBox="0 0 24 24" width="16" height="16" class="me-1"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4.002 4.002a1 1 0 0 1-1.414 0l-4.002-4.002a1 1 0 0 1 1.414-1.414L11 13.586V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v2h12v-2a1 1 0 0 1 2 0v3a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/></svg>
+          Download
         </button>
       </div>
     </div>
@@ -384,12 +411,13 @@
     const themeIcon = document.getElementById('report-theme-icon');
     const htmlEl = document.documentElement;
     const sunIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 12 4.75Zm5.657 2.093a.75.75 0 1 1 1.06 1.06l-.354.354a.75.75 0 0 1-1.06-1.06l.354-.354ZM5.637 6.843a.75.75 0 0 1 1.06-1.06l.354.353a.75.75 0 0 1-1.06 1.061l-.354-.354ZM12 7.5A4.5 4.5 0 1 1 7.5 12 4.505 4.505 0 0 1 12 7.5Zm0 1.5A3 3 0 1 0 15 12a3 3 0 0 0-3-3Zm7.25 3.25a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5h.5Zm-13 .75a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75Zm10.657 4.657a.75.75 0 0 1 1.06 0l.354.354a.75.75 0 1 1-1.06 1.06l-.354-.353a.75.75 0 0 1 0-1.061Zm-10.657 0a.75.75 0 0 1 0 1.061l-.354.353a.75.75 0 0 1-1.06-1.06l.354-.354a.75.75 0 0 1 1.06 0Zm5.75.75a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 .75-.75Z"/></svg>';
-    const moonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.354 15.354a.75.75 0 0 1-.708.196 8 8 0 0 1-11.196-8.93.75.75 0 0 1 1.116-.515 6.5 6.5 0 0 0 9.714 8.395.75.75 0 0 1 1.074.854Z"/></svg>';
+    const moonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a.75.75 0 0 1 .808.407 6.5 6.5 0 0 0 10.285 7.186.75.75 0 0 1 .407.808z"/></svg>';
 
     function updateThemeIcon(theme) {
         const nextLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
         themeToggle.setAttribute('aria-label', nextLabel);
         themeToggle.setAttribute('title', nextLabel);
+        themeToggle.dataset.mode = theme;
         themeIcon.innerHTML = theme === 'dark' ? sunIcon : moonIcon;
     }
 
