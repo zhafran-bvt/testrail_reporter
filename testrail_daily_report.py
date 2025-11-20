@@ -82,6 +82,16 @@ def env_or_die(key: str) -> str:
     return v
 
 
+def _downcast_numeric(series: pd.Series, kind: str = "integer"):
+    """Downcast numeric series while preserving NaN values."""
+    return pd.to_numeric(series, errors="coerce", downcast=kind)
+
+
+def _minimal_frame(df: pd.DataFrame, keep: list[str]):
+    subset = [c for c in keep if c in df.columns]
+    return df[subset].copy() if subset else pd.DataFrame(columns=keep)
+
+
 def _memory_usage_mb() -> float | None:
     """Return current RSS memory usage in MB if detectable."""
     if psutil:
@@ -438,13 +448,17 @@ def summarize_results(results, status_map=DEFAULT_STATUS_MAP):
     if sort_cols:
         df = df.sort_values(sort_cols)
     df = df.drop_duplicates("test_id", keep="last")
+    df = _minimal_frame(df, ["id", "test_id", "status_id", "status_name", "comment", "created_on", "assignedto_id"])
 
     # Map status_id to names; keep original names if API provided
     if "status_name" not in df.columns:
-        sid = pd.to_numeric(df.get("status_id"), errors="coerce")
+        sid = _downcast_numeric(df.get("status_id"), "unsigned")
         df["status_name"] = sid.map(lambda x: status_map.get(int(x), str(int(x))) if pd.notna(x) else "Untested")
     else:
         df["status_name"] = df["status_name"].fillna("")
+    for col in ("id", "test_id", "status_id", "assignedto_id"):
+        if col in df.columns:
+            df[col] = _downcast_numeric(df[col], "unsigned")
 
     total = len(df)
     by_status = df["status_name"].value_counts().to_dict()
@@ -460,36 +474,40 @@ def build_test_table(tests_df: pd.DataFrame, results_df: pd.DataFrame, status_ma
     if results_df.empty:
         results_df = pd.DataFrame(columns=["test_id", "status_id", "comment"])
     if "test_id" not in results_df.columns:
-        # Ensure merge key exists even if no data
         results_df = results_df.assign(test_id=pd.Series(dtype="int64"))
+    result_keep = ["test_id", "comment", "created_on", "assignedto_id"]
+    results_df = _minimal_frame(results_df, result_keep)
 
     # Normalize tests_df
     if "id" in tests_df.columns and "test_id" not in tests_df.columns:
         tests_df = tests_df.rename(columns={"id": "test_id"})
-    # Reduce to relevant columns
-    test_keep = [c for c in ["test_id", "title", "priority_id", "refs", "assignedto_id", "status_id"] if c in tests_df.columns]
-    tests_df = tests_df[test_keep] if test_keep else pd.DataFrame(columns=["test_id", "title", "priority_id", "refs", "assignedto_id", "status_id"])
+    test_keep = ["test_id", "title", "priority_id", "refs", "assignedto_id", "status_id"]
+    tests_df = _minimal_frame(tests_df, test_keep)
     if "test_id" not in tests_df.columns:
-        tests_df = pd.DataFrame(columns=["test_id", "title", "priority_id", "type_id", "refs"])
+        tests_df = pd.DataFrame(columns=test_keep)
 
     # Deduplicate results on latest created. Exclude status fields; source of truth is tests_df status
-    res_keep = [c for c in ["test_id", "comment", "created_on", "assignedto_id"] if c in results_df.columns]
-    results_df = results_df[res_keep] if res_keep else results_df
     sort_cols = [c for c in ["test_id", "created_on"] if c in results_df.columns]
     if sort_cols:
         results_df = results_df.sort_values(sort_cols)
     if "test_id" in results_df.columns and not results_df.empty:
         results_df = results_df.drop_duplicates("test_id", keep="last")
+    for col in ("test_id", "assignedto_id"):
+        if col in results_df.columns:
+            results_df[col] = _downcast_numeric(results_df[col], "unsigned")
 
     # Map test-level status_id to friendly status (source of truth)
     if "status_id" in tests_df.columns:
         try:
-            sid = pd.to_numeric(tests_df["status_id"], errors="coerce").astype("Int64")
+            sid = _downcast_numeric(tests_df["status_id"], "unsigned").astype("Int64")
             tests_df["status_name"] = sid.map(lambda x: status_map.get(int(x), str(int(x))) if pd.notna(x) else "Untested")
         except Exception:
             tests_df["status_name"] = "Untested"
     else:
         tests_df["status_name"] = "Untested"
+    for col in ("test_id", "priority_id", "assignedto_id"):
+        if col in tests_df.columns:
+            tests_df[col] = _downcast_numeric(tests_df[col], "unsigned")
 
     merged = tests_df.merge(results_df, on="test_id", how="left")
     # Sort rows so non-Passed appear first (Failed, Blocked, Retest, Untested, then Passed)
@@ -863,7 +881,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 if isinstance(u, dict) and u.get("id") is not None:
                     users_map[int(u["id"])] = u.get("name") or u.get("email") or str(u["id"])
 
-        res_summary = summarize_results(results)
+        res_summary = summarize_results(results, status_map=statuses_map)
+        del results
         table_df = build_test_table(pd.DataFrame(tests), res_summary["df"], users_map=users_map, priorities_map=priorities_map, status_map=statuses_map)
         # Compute counts from the merged table (one row per test)
         counts = table_df["status_name"].value_counts().to_dict()
@@ -903,22 +922,22 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
         segs, run_donut_style = _build_segments(counts)
         run_refs = extract_refs(tests)
+        del tests
         report_refs.update(run_refs)
 
         latest_results_df = res_summary["df"]
         comments_by_test: dict[int, str] = {}
         latest_result_ids: dict[int, int] = {}
         if not latest_results_df.empty:
-            latest_records = latest_results_df.to_dict(orient="records")
-            for rec in latest_records:
-                tid = rec.get("test_id")
+            for rec in latest_results_df.itertuples(index=False):
+                tid = getattr(rec, "test_id", None)
                 if tid is None or pd.isna(tid):
                     continue
                 tid_int = int(tid)
-                comment = rec.get("comment")
+                comment = getattr(rec, "comment", None)
                 if comment:
                     comments_by_test[tid_int] = comment
-                result_id = rec.get("id")
+                result_id = getattr(rec, "id", None)
                 if result_id is not None and not pd.isna(result_id):
                     latest_result_ids[tid_int] = int(result_id)
         attachments_by_test: dict[int, list[dict]] = {}
@@ -1190,33 +1209,36 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     if completed_downloads % 5 == 0:
                         log_memory(f"download_progress_{rid}_{completed_downloads}")
             log_memory(f"after_attachment_downloads_{rid}")
+            gc.collect()
         download_jobs.clear()
         metadata_map.clear()
+        gc.collect()
 
         for tid in attachments_by_test:
             attachments_by_test[tid].sort(key=lambda entry: entry["path"])
 
         rows_payload = []
-        for record in table_df.to_dict(orient="records"):
-            tid = record.get("test_id")
+        for record in table_df.itertuples(index=False, name="Row"):
+            row = record._asdict()
+            tid = row.get("test_id")
             tid_int = None
             if tid is not None and not (isinstance(tid, float) and pd.isna(tid)):
                 try:
                     tid_int = int(tid)
                 except (TypeError, ValueError):
                     tid_int = None
-            record["comment"] = comments_by_test.get(tid_int, "")
-            record["attachments"] = attachments_by_test.get(tid_int, [])
-            refs_val = record.get("refs")
+            row["comment"] = comments_by_test.get(tid_int, "")
+            row["attachments"] = attachments_by_test.get(tid_int, [])
+            refs_val = row.get("refs")
             if refs_val is None:
-                record["refs"] = []
+                row["refs"] = []
             elif isinstance(refs_val, str):
-                record["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
+                row["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
             elif isinstance(refs_val, list):
-                record["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
+                row["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
             else:
-                record["refs"] = [str(refs_val)]
-            rows_payload.append(record)
+                row["refs"] = [str(refs_val)]
+            rows_payload.append(row)
 
         tables.append({
             "run_id": rid,

@@ -131,7 +131,7 @@ def _cache_meta(hit: bool, expires_at: float):
     }
 
 
-@dataclass
+@dataclass(slots=True)
 class ReportJob:
     id: str
     params: dict[str, Any]
