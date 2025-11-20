@@ -343,7 +343,7 @@
                 <td>
                   {% set attachments = r.attachments or [] %}
                   {% set attachment_count = attachments|length %}
-                  {% if attachment_count > 0 or (r.comment and r.comment|length > 0) %}
+                  {% if attachment_count > 0 %}
                     <button type="button" class="btn btn-outline-primary btn-sm attachment-trigger"
                             data-run="{{ t.run_id }}"
                             data-test="{{ r.test_id }}"
