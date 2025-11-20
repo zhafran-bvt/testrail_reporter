@@ -713,10 +713,11 @@ def render_streaming_report(context: dict, runs_cache: Path, out_path: Path):
                     continue
                 yield json.loads(line)
 
-    context["tables"] = _iter_tables()
+    render_ctx = dict(context)
+    render_ctx["tables"] = _iter_tables()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as dest:
-        for chunk in template.generate(**context):
+        for chunk in template.generate(**render_ctx):
             dest.write(chunk)
     return str(out_path)
 
