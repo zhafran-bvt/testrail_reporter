@@ -866,432 +866,433 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 tests = get_tests_for_run(local_session, base_url, rid)
             finally:
                 local_session.close()
-        # Ensure assignee IDs are resolvable to names
-        if user_lookup_allowed:
-            try:
-                test_ids = {int(x) for x in pd.Series(tests).apply(lambda r: r.get("assignedto_id") if isinstance(r, dict) else None).dropna().tolist()}
-            except Exception:
-                test_ids = set()
-            try:
-                result_ids = {int(x) for x in pd.DataFrame(results).get("assignedto_id", pd.Series([], dtype="float")).dropna().astype(int).tolist()}
-            except Exception:
-                result_ids = set()
-            for uid in (test_ids | result_ids):
-                if uid in users_map:
-                    continue
+
+            # Ensure assignee IDs are resolvable to names
+            if user_lookup_allowed:
                 try:
-                    u = get_user(session, base_url, uid)
-                except UserLookupForbidden as err:
-                    user_lookup_allowed = False
-                    print(f"Warning: disabling per-user lookups ({err})", file=sys.stderr)
-                    break
-                if isinstance(u, dict) and u.get("id") is not None:
-                    users_map[int(u["id"])] = u.get("name") or u.get("email") or str(u["id"])
-
-        res_summary = summarize_results(results, status_map=statuses_map)
-        del results
-        table_df = build_test_table(pd.DataFrame(tests), res_summary["df"], users_map=users_map, priorities_map=priorities_map, status_map=statuses_map)
-        # Compute counts from the merged table (one row per test)
-        counts = table_df["status_name"].value_counts().to_dict()
-        normalized_counts: dict[str, int] = {}
-        for k, v in counts.items():
-            key = str(k)
-            normalized_counts[key] = normalized_counts.get(key, 0) + int(v)
-        counts = normalized_counts
-        run_total = len(table_df)
-        run_passed = counts.get("Passed", 0)
-        run_failed = counts.get("Failed", 0)
-        run_pass_rate = round((run_passed / run_total) * 100, 2) if run_total else 0.0
-        # Build run-level donut segments/style
-        def _build_segments(counts: dict[str, int]):
-            status_colors = {
-                "Passed": "#16a34a",
-                "Failed": "#ef4444",
-                "Blocked": "#f59e0b",
-                "Retest": "#3b82f6",
-                "Untested": "#9ca3af",
-            }
-            total = sum(counts.values())
-            segments = []
-            donut_style = "conic-gradient(#e5e7eb 0 100%)"
-            if total > 0:
-                cumulative = 0.0
-                colors_lc = {k.lower(): v for k, v in status_colors.items()}
-                for label, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
-                    pct = (count / total) * 100.0
-                    start = cumulative
-                    end = cumulative + pct
-                    color = colors_lc.get(str(label).lower(), "#6b7280")
-                    segments.append({"label": label, "count": count, "percent": round(pct, 2), "start": start, "end": end, "color": color})
-                    cumulative = end
-                donut_style = "conic-gradient(" + ", ".join([f"{s['color']} {s['start']}% {s['end']}%" for s in segments]) + ")"
-            return segments, donut_style
-
-        segs, run_donut_style = _build_segments(counts)
-        run_refs = extract_refs(tests)
-        del tests
-        report_refs.update(run_refs)
-
-        latest_results_df = res_summary["df"]
-        comments_by_test: dict[int, str] = {}
-        latest_result_ids: dict[int, int] = {}
-        if not latest_results_df.empty:
-            for rec in latest_results_df.itertuples(index=False):
-                tid = getattr(rec, "test_id", None)
-                if tid is None or pd.isna(tid):
-                    continue
-                tid_int = int(tid)
-                comment = getattr(rec, "comment", None)
-                if comment:
-                    comments_by_test[tid_int] = comment
-                result_id = getattr(rec, "id", None)
-                if result_id is not None and not pd.isna(result_id):
-                    latest_result_ids[tid_int] = int(result_id)
-        attachments_by_test: dict[int, list[dict]] = {}
-        for tid, result_id in latest_result_ids.items():
-            attachments_by_test.setdefault(tid, [])
-
-        def _build_skipped_attachment_entry(job: dict, *, size_bytes: int, limit_bytes: int, reason: str, content_type: str | None = None):
-            initial_type = content_type or job.get("initial_type")
-            return {
-                "name": job["filename"],
-                "path": None,
-                "content_type": initial_type,
-                "size": job.get("size") or size_bytes,
-                "is_image": bool(initial_type and str(initial_type).startswith("image/")),
-                "is_video": bool(initial_type and str(initial_type).startswith("video/")),
-                "data_url": None,
-                "inline_embedded": False,
-                "skipped": True,
-                "skip_reason": reason,
-                "limit_bytes": limit_bytes,
-            }
-
-        def _fetch_metadata(test_id: int):
-            local_session = _make_session()
-            try:
+                    test_ids = {int(x) for x in pd.Series(tests).apply(lambda r: r.get("assignedto_id") if isinstance(r, dict) else None).dropna().tolist()}
+                except Exception:
+                    test_ids = set()
                 try:
-                    data = get_attachments_for_test(local_session, base_url, test_id)
-                    if not isinstance(data, list):
-                        if isinstance(data, dict):
-                            return test_id, data.get("attachments", [])
-                        return test_id, []
-                    return test_id, data
-                except Exception as e:
-                    print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
-                    return test_id, []
-            finally:
-                local_session.close()
-
-        metadata_map: dict[int, list] = {}
-        if latest_result_ids:
-            notify("fetching_attachment_metadata", run_id=rid, count=len(latest_result_ids))
-            with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
-                futures = {executor.submit(_fetch_metadata, tid): tid for tid in latest_result_ids}
-                for future in as_completed(futures):
-                    tid = futures[future]
-                    try:
-                        _, payload = future.result()
-                    except Exception as e:
-                        print(f"Warning: attachments metadata future failed for test {tid}: {e}", file=sys.stderr)
-                        payload = []
-                    metadata_map[tid] = payload or []
-            log_memory(f"after_attachment_metadata_{rid}")
-
-        download_jobs = []
-        if latest_result_ids:
-            for tid, payload in metadata_map.items():
-                if not payload:
-                    continue
-                result_id = latest_result_ids.get(tid)
-                if result_id is None:
-                    continue
-                for att in payload:
-                    rid_match = att.get("result_id")
-                    if rid_match is not None and int(rid_match) != result_id:
-                        continue
-                    attachment_id = att.get("id") or att.get("attachment_id")
-                    if attachment_id is None:
+                    result_ids = {int(x) for x in pd.DataFrame(results).get("assignedto_id", pd.Series([], dtype="float")).dropna().astype(int).tolist()}
+                except Exception:
+                    result_ids = set()
+                for uid in (test_ids | result_ids):
+                    if uid in users_map:
                         continue
                     try:
-                        attachment_id = int(attachment_id)
-                    except (TypeError, ValueError):
+                        u = get_user(session, base_url, uid)
+                    except UserLookupForbidden as err:
+                        user_lookup_allowed = False
+                        print(f"Warning: disabling per-user lookups ({err})", file=sys.stderr)
+                        break
+                    if isinstance(u, dict) and u.get("id") is not None:
+                        users_map[int(u["id"])] = u.get("name") or u.get("email") or str(u["id"])
+
+            res_summary = summarize_results(results, status_map=statuses_map)
+            del results
+            table_df = build_test_table(pd.DataFrame(tests), res_summary["df"], users_map=users_map, priorities_map=priorities_map, status_map=statuses_map)
+            # Compute counts from the merged table (one row per test)
+            counts = table_df["status_name"].value_counts().to_dict()
+            normalized_counts: dict[str, int] = {}
+            for k, v in counts.items():
+                key = str(k)
+                normalized_counts[key] = normalized_counts.get(key, 0) + int(v)
+            counts = normalized_counts
+            run_total = len(table_df)
+            run_passed = counts.get("Passed", 0)
+            run_failed = counts.get("Failed", 0)
+            run_pass_rate = round((run_passed / run_total) * 100, 2) if run_total else 0.0
+            # Build run-level donut segments/style
+            def _build_segments(counts: dict[str, int]):
+                status_colors = {
+                    "Passed": "#16a34a",
+                    "Failed": "#ef4444",
+                    "Blocked": "#f59e0b",
+                    "Retest": "#3b82f6",
+                    "Untested": "#9ca3af",
+                }
+                total = sum(counts.values())
+                segments = []
+                donut_style = "conic-gradient(#e5e7eb 0 100%)"
+                if total > 0:
+                    cumulative = 0.0
+                    colors_lc = {k.lower(): v for k, v in status_colors.items()}
+                    for label, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+                        pct = (count / total) * 100.0
+                        start = cumulative
+                        end = cumulative + pct
+                        color = colors_lc.get(str(label).lower(), "#6b7280")
+                        segments.append({"label": label, "count": count, "percent": round(pct, 2), "start": start, "end": end, "color": color})
+                        cumulative = end
+                    donut_style = "conic-gradient(" + ", ".join([f"{s['color']} {s['start']}% {s['end']}%" for s in segments]) + ")"
+                return segments, donut_style
+    
+            segs, run_donut_style = _build_segments(counts)
+            run_refs = extract_refs(tests)
+            del tests
+            report_refs.update(run_refs)
+    
+            latest_results_df = res_summary["df"]
+            comments_by_test: dict[int, str] = {}
+            latest_result_ids: dict[int, int] = {}
+            if not latest_results_df.empty:
+                for rec in latest_results_df.itertuples(index=False):
+                    tid = getattr(rec, "test_id", None)
+                    if tid is None or pd.isna(tid):
                         continue
-                    filename = att.get("name") or att.get("filename") or f"attachment_{attachment_id}"
-                    safe_filename = sanitize_filename(filename)
-                    inferred_type = att.get("content_type") or att.get("mime_type") or mimetypes.guess_type(filename)[0]
-                    ext = Path(safe_filename).suffix
-                    if not ext and inferred_type:
-                        guessed_ext = mimetypes.guess_extension(inferred_type)
-                        if guessed_ext:
-                            safe_filename = f"{safe_filename}{guessed_ext}"
-                            ext = guessed_ext
-                    if not ext:
-                        ext = ""
-                    unique_filename = f"test_{tid}_att_{attachment_id}{ext}"
-                    rel_path = Path("attachments") / f"run_{rid}" / unique_filename
-                    abs_path = Path("out") / rel_path
-                    abs_path.parent.mkdir(parents=True, exist_ok=True)
-                    download_jobs.append({
-                        "test_id": tid,
-                        "attachment_id": attachment_id,
-                        "filename": filename,
-                        "rel_path": rel_path,
-                        "abs_path": abs_path,
-                        "initial_type": inferred_type,
-                        "size": att.get("size"),
-                    })
-
-        download_limit = attachment_size_limit if attachment_size_limit > 0 else None
-        if download_jobs:
-            inline_limit = inline_embed_limit
-            inline_video_limit = video_inline_limit
-            total_downloads = len(download_jobs)
-            notify("downloading_attachments", run_id=rid, total=total_downloads)
-
-            def _process_attachment_job(index: int, job: dict):
-                attachment_id = job["attachment_id"]
+                    tid_int = int(tid)
+                    comment = getattr(rec, "comment", None)
+                    if comment:
+                        comments_by_test[tid_int] = comment
+                    result_id = getattr(rec, "id", None)
+                    if result_id is not None and not pd.isna(result_id):
+                        latest_result_ids[tid_int] = int(result_id)
+            attachments_by_test: dict[int, list[dict]] = {}
+            for tid, result_id in latest_result_ids.items():
+                attachments_by_test.setdefault(tid, [])
+    
+            def _build_skipped_attachment_entry(job: dict, *, size_bytes: int, limit_bytes: int, reason: str, content_type: str | None = None):
+                initial_type = content_type or job.get("initial_type")
+                return {
+                    "name": job["filename"],
+                    "path": None,
+                    "content_type": initial_type,
+                    "size": job.get("size") or size_bytes,
+                    "is_image": bool(initial_type and str(initial_type).startswith("image/")),
+                    "is_video": bool(initial_type and str(initial_type).startswith("video/")),
+                    "data_url": None,
+                    "inline_embedded": False,
+                    "skipped": True,
+                    "skip_reason": reason,
+                    "limit_bytes": limit_bytes,
+                }
+    
+            def _fetch_metadata(test_id: int):
                 local_session = _make_session()
-                notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
                 try:
-                    resp = download_attachment(
-                        local_session,
-                        base_url,
-                        attachment_id,
-                        max_retries=attachment_retry_limit,
-                        size_limit=download_limit,
-                    )
-                except AttachmentTooLarge as exc:
-                    stripped = {
-                        "attachment_id": attachment_id,
-                        "size_bytes": exc.size_bytes,
-                        "limit_bytes": exc.limit_bytes,
-                        "skipped": True,
-                    }
-                    notify("attachment_skipped", run_id=rid, **stripped)
-                    entry = _build_skipped_attachment_entry(job, size_bytes=exc.size_bytes, limit_bytes=exc.limit_bytes, reason="size_limit")
-                    return index, job["test_id"], entry
-                except Exception as exc:
-                    print(f"Warning: download failed for attachment {attachment_id}: {exc}", file=sys.stderr)
-                    entry = _build_skipped_attachment_entry(job, size_bytes=job.get("size") or 0, limit_bytes=download_limit or 0, reason="error")
-                    entry["skip_reason"] = f"error:{exc}"
-                    return index, job["test_id"], entry
+                    try:
+                        data = get_attachments_for_test(local_session, base_url, test_id)
+                        if not isinstance(data, list):
+                            if isinstance(data, dict):
+                                return test_id, data.get("attachments", [])
+                            return test_id, []
+                        return test_id, data
+                    except Exception as e:
+                        print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
+                        return test_id, []
                 finally:
                     local_session.close()
-
-                tmp_path = None
-                content_type = None
-                if isinstance(resp, tuple) and len(resp) == 2 and isinstance(resp[0], (bytes, bytearray)):
-                    content_type = resp[1]
-                    fd, tmp = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
-                    with os.fdopen(fd, "wb") as f:
-                        f.write(resp[0])
-                    tmp_path = Path(tmp)
-                elif isinstance(resp, tuple) and len(resp) == 2:
-                    tmp_path, content_type = resp
-                else:
-                    raise RuntimeError(f"Unexpected download_attachment response for {attachment_id}: {type(resp)}")
-
-                if tmp_path is None or not Path(tmp_path).exists():
-                    raise RuntimeError(f"Attachment temp path missing for {attachment_id}")
-
-                data_size = Path(tmp_path).stat().st_size
-                if attachment_size_limit and attachment_size_limit > 0 and data_size > attachment_size_limit:
-                    stripped = {
-                        "attachment_id": attachment_id,
-                        "size_bytes": data_size,
-                        "limit_bytes": attachment_size_limit,
-                        "skipped": True,
+    
+            metadata_map: dict[int, list] = {}
+            if latest_result_ids:
+                notify("fetching_attachment_metadata", run_id=rid, count=len(latest_result_ids))
+                with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
+                    futures = {executor.submit(_fetch_metadata, tid): tid for tid in latest_result_ids}
+                    for future in as_completed(futures):
+                        tid = futures[future]
+                        try:
+                            _, payload = future.result()
+                        except Exception as e:
+                            print(f"Warning: attachments metadata future failed for test {tid}: {e}", file=sys.stderr)
+                            payload = []
+                        metadata_map[tid] = payload or []
+                log_memory(f"after_attachment_metadata_{rid}")
+    
+            download_jobs = []
+            if latest_result_ids:
+                for tid, payload in metadata_map.items():
+                    if not payload:
+                        continue
+                    result_id = latest_result_ids.get(tid)
+                    if result_id is None:
+                        continue
+                    for att in payload:
+                        rid_match = att.get("result_id")
+                        if rid_match is not None and int(rid_match) != result_id:
+                            continue
+                        attachment_id = att.get("id") or att.get("attachment_id")
+                        if attachment_id is None:
+                            continue
+                        try:
+                            attachment_id = int(attachment_id)
+                        except (TypeError, ValueError):
+                            continue
+                        filename = att.get("name") or att.get("filename") or f"attachment_{attachment_id}"
+                        safe_filename = sanitize_filename(filename)
+                        inferred_type = att.get("content_type") or att.get("mime_type") or mimetypes.guess_type(filename)[0]
+                        ext = Path(safe_filename).suffix
+                        if not ext and inferred_type:
+                            guessed_ext = mimetypes.guess_extension(inferred_type)
+                            if guessed_ext:
+                                safe_filename = f"{safe_filename}{guessed_ext}"
+                                ext = guessed_ext
+                        if not ext:
+                            ext = ""
+                        unique_filename = f"test_{tid}_att_{attachment_id}{ext}"
+                        rel_path = Path("attachments") / f"run_{rid}" / unique_filename
+                        abs_path = Path("out") / rel_path
+                        abs_path.parent.mkdir(parents=True, exist_ok=True)
+                        download_jobs.append({
+                            "test_id": tid,
+                            "attachment_id": attachment_id,
+                            "filename": filename,
+                            "rel_path": rel_path,
+                            "abs_path": abs_path,
+                            "initial_type": inferred_type,
+                            "size": att.get("size"),
+                        })
+    
+            download_limit = attachment_size_limit if attachment_size_limit > 0 else None
+            if download_jobs:
+                inline_limit = inline_embed_limit
+                inline_video_limit = video_inline_limit
+                total_downloads = len(download_jobs)
+                notify("downloading_attachments", run_id=rid, total=total_downloads)
+    
+                def _process_attachment_job(index: int, job: dict):
+                    attachment_id = job["attachment_id"]
+                    local_session = _make_session()
+                    notify("downloading_attachment", run_id=rid, current=index, total=total_downloads, attachment_id=attachment_id)
+                    try:
+                        resp = download_attachment(
+                            local_session,
+                            base_url,
+                            attachment_id,
+                            max_retries=attachment_retry_limit,
+                            size_limit=download_limit,
+                        )
+                    except AttachmentTooLarge as exc:
+                        stripped = {
+                            "attachment_id": attachment_id,
+                            "size_bytes": exc.size_bytes,
+                            "limit_bytes": exc.limit_bytes,
+                            "skipped": True,
+                        }
+                        notify("attachment_skipped", run_id=rid, **stripped)
+                        entry = _build_skipped_attachment_entry(job, size_bytes=exc.size_bytes, limit_bytes=exc.limit_bytes, reason="size_limit")
+                        return index, job["test_id"], entry
+                    except Exception as exc:
+                        print(f"Warning: download failed for attachment {attachment_id}: {exc}", file=sys.stderr)
+                        entry = _build_skipped_attachment_entry(job, size_bytes=job.get("size") or 0, limit_bytes=download_limit or 0, reason="error")
+                        entry["skip_reason"] = f"error:{exc}"
+                        return index, job["test_id"], entry
+                    finally:
+                        local_session.close()
+    
+                    tmp_path = None
+                    content_type = None
+                    if isinstance(resp, tuple) and len(resp) == 2 and isinstance(resp[0], (bytes, bytearray)):
+                        content_type = resp[1]
+                        fd, tmp = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
+                        with os.fdopen(fd, "wb") as f:
+                            f.write(resp[0])
+                        tmp_path = Path(tmp)
+                    elif isinstance(resp, tuple) and len(resp) == 2:
+                        tmp_path, content_type = resp
+                    else:
+                        raise RuntimeError(f"Unexpected download_attachment response for {attachment_id}: {type(resp)}")
+    
+                    if tmp_path is None or not Path(tmp_path).exists():
+                        raise RuntimeError(f"Attachment temp path missing for {attachment_id}")
+    
+                    data_size = Path(tmp_path).stat().st_size
+                    if attachment_size_limit and attachment_size_limit > 0 and data_size > attachment_size_limit:
+                        stripped = {
+                            "attachment_id": attachment_id,
+                            "size_bytes": data_size,
+                            "limit_bytes": attachment_size_limit,
+                            "skipped": True,
+                        }
+                        notify("attachment_skipped", run_id=rid, **stripped)
+                        try:
+                            Path(tmp_path).unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                        entry = _build_skipped_attachment_entry(
+                            job,
+                            size_bytes=data_size,
+                            limit_bytes=attachment_size_limit,
+                            reason="post_download_limit",
+                            content_type=content_type,
+                        )
+                        return index, job["test_id"], entry
+    
+                    is_image_type = bool(content_type and str(content_type).lower().startswith("image/"))
+                    suffix_map = {
+                        "image/jpeg": ".jpg",
+                        "image/jpg": ".jpg",
+                        "image/png": ".png",
                     }
-                    notify("attachment_skipped", run_id=rid, **stripped)
+                    desired_suffix = suffix_map.get((content_type or "").lower())
+                    if desired_suffix:
+                        current_suffix = job["abs_path"].suffix.lower()
+                        if current_suffix != desired_suffix:
+                            rel_path = job["rel_path"].with_suffix(desired_suffix)
+                            job["rel_path"] = rel_path
+                            job["abs_path"] = Path("out") / rel_path
+                            job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
+                            base_name = Path(job["filename"]).stem or Path(job["filename"]).name
+                            job["filename"] = f"{base_name}{desired_suffix}"
+    
+                    inline_payload = None
+                    if is_image_type:
+                        content_type, size_bytes, inline_payload = compress_image_file(
+                            Path(tmp_path),
+                            content_type,
+                            job["abs_path"],
+                            inline_limit,
+                        )
+                    else:
+                        job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
+                        try:
+                            shutil.copyfile(tmp_path, job["abs_path"])
+                        except OSError:
+                            with open(tmp_path, "rb") as src, open(job["abs_path"], "wb") as dst:
+                                shutil.copyfileobj(src, dst, length=64 * 1024)
+                        size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
+                        if inline_video_limit and size_bytes <= inline_video_limit and size_bytes > 0:
+                            try:
+                                inline_payload = job["abs_path"].read_bytes()
+                            except Exception:
+                                inline_payload = None
+    
                     try:
                         Path(tmp_path).unlink(missing_ok=True)
                     except Exception:
                         pass
-                    entry = _build_skipped_attachment_entry(
-                        job,
-                        size_bytes=data_size,
-                        limit_bytes=attachment_size_limit,
-                        reason="post_download_limit",
-                        content_type=content_type,
+    
+                    suffix_lc = job["rel_path"].suffix.lower()
+                    content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
+                    is_image = bool(content_type and str(content_type).startswith("image/"))
+                    common_video_exts = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg"}
+                    is_video = bool(
+                        (content_type and str(content_type).startswith("video/"))
+                        or suffix_lc in common_video_exts
                     )
-                    return index, job["test_id"], entry
-
-                is_image_type = bool(content_type and str(content_type).lower().startswith("image/"))
-                suffix_map = {
-                    "image/jpeg": ".jpg",
-                    "image/jpg": ".jpg",
-                    "image/png": ".png",
-                }
-                desired_suffix = suffix_map.get((content_type or "").lower())
-                if desired_suffix:
-                    current_suffix = job["abs_path"].suffix.lower()
-                    if current_suffix != desired_suffix:
-                        rel_path = job["rel_path"].with_suffix(desired_suffix)
-                        job["rel_path"] = rel_path
-                        job["abs_path"] = Path("out") / rel_path
-                        job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
-                        base_name = Path(job["filename"]).stem or Path(job["filename"]).name
-                        job["filename"] = f"{base_name}{desired_suffix}"
-
-                inline_payload = None
-                if is_image_type:
-                    content_type, size_bytes, inline_payload = compress_image_file(
-                        Path(tmp_path),
-                        content_type,
-                        job["abs_path"],
-                        inline_limit,
-                    )
-                else:
-                    job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        shutil.copyfile(tmp_path, job["abs_path"])
-                    except OSError:
-                        with open(tmp_path, "rb") as src, open(job["abs_path"], "wb") as dst:
-                            shutil.copyfileobj(src, dst, length=64 * 1024)
-                    size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
-                    if inline_video_limit and size_bytes <= inline_video_limit and size_bytes > 0:
+                    if is_video and not content_type:
+                        content_type = {
+                            ".mp4": "video/mp4",
+                            ".mov": "video/quicktime",
+                            ".webm": "video/webm",
+                            ".mkv": "video/x-matroska",
+                            ".avi": "video/x-msvideo",
+                            ".mpg": "video/mpeg",
+                            ".mpeg": "video/mpeg",
+                        }.get(suffix_lc, content_type)
+                    data_url = None
+                    if inline_payload is not None and (is_image or is_video):
                         try:
-                            inline_payload = job["abs_path"].read_bytes()
+                            data_b64 = base64.b64encode(inline_payload).decode("ascii")
+                            mime = content_type or "application/octet-stream"
+                            data_url = f"data:{mime};base64,{data_b64}"
                         except Exception:
-                            inline_payload = None
-
-                try:
-                    Path(tmp_path).unlink(missing_ok=True)
-                except Exception:
-                    pass
-
-                suffix_lc = job["rel_path"].suffix.lower()
-                content_type = content_type or job["initial_type"] or mimetypes.guess_type(str(job["abs_path"]))[0]
-                is_image = bool(content_type and str(content_type).startswith("image/"))
-                common_video_exts = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg"}
-                is_video = bool(
-                    (content_type and str(content_type).startswith("video/"))
-                    or suffix_lc in common_video_exts
-                )
-                if is_video and not content_type:
-                    content_type = {
-                        ".mp4": "video/mp4",
-                        ".mov": "video/quicktime",
-                        ".webm": "video/webm",
-                        ".mkv": "video/x-matroska",
-                        ".avi": "video/x-msvideo",
-                        ".mpg": "video/mpeg",
-                        ".mpeg": "video/mpeg",
-                    }.get(suffix_lc, content_type)
-                data_url = None
-                if inline_payload is not None and (is_image or is_video):
-                    try:
-                        data_b64 = base64.b64encode(inline_payload).decode("ascii")
-                        mime = content_type or "application/octet-stream"
-                        data_url = f"data:{mime};base64,{data_b64}"
-                    except Exception:
-                        data_url = None
-                public_path = str(job["rel_path"]).replace(os.sep, "/")
-                entry = {
-                    "name": job["filename"],
-                    "path": public_path,
-                    "content_type": content_type,
-                    "size": job.get("size") or size_bytes,
-                    "is_image": is_image,
-                    "is_video": is_video,
-                    "data_url": data_url,
-                    "inline_embedded": bool(data_url),
-                }
-                return index, job["test_id"], entry
-
-            completed_downloads = 0
-
-            def _process_batch(batch: list[tuple[int, dict]]):
-                nonlocal completed_downloads
-                max_workers_batch = min(attachment_workers, len(batch))
-                with ThreadPoolExecutor(max_workers=max_workers_batch) as executor:
-                    futures = {executor.submit(_process_attachment_job, idx, job): idx for idx, job in batch}
-                    for future in as_completed(futures):
-                        try:
-                            index, test_id, entry = future.result()
-                        except Exception as exc:
-                            print(f"Warning: attachment future failed for run {rid}: {exc}", file=sys.stderr)
-                            continue
-                        attachments_by_test.setdefault(test_id, []).append(entry)
-                        completed_downloads += 1
-                        if completed_downloads % 5 == 0:
-                            log_memory(f"download_progress_{rid}_{completed_downloads}")
-                gc.collect()
-
-            if attachment_batch_size and attachment_batch_size > 0:
-                for start in range(0, len(download_jobs), attachment_batch_size):
-                    batch_jobs = [
-                        (index, job)
-                        for index, job in enumerate(download_jobs[start:start + attachment_batch_size], start=start + 1)
-                    ]
+                            data_url = None
+                    public_path = str(job["rel_path"]).replace(os.sep, "/")
+                    entry = {
+                        "name": job["filename"],
+                        "path": public_path,
+                        "content_type": content_type,
+                        "size": job.get("size") or size_bytes,
+                        "is_image": is_image,
+                        "is_video": is_video,
+                        "data_url": data_url,
+                        "inline_embedded": bool(data_url),
+                    }
+                    return index, job["test_id"], entry
+    
+                completed_downloads = 0
+    
+                def _process_batch(batch: list[tuple[int, dict]]):
+                    nonlocal completed_downloads
+                    max_workers_batch = min(attachment_workers, len(batch))
+                    with ThreadPoolExecutor(max_workers=max_workers_batch) as executor:
+                        futures = {executor.submit(_process_attachment_job, idx, job): idx for idx, job in batch}
+                        for future in as_completed(futures):
+                            try:
+                                index, test_id, entry = future.result()
+                            except Exception as exc:
+                                print(f"Warning: attachment future failed for run {rid}: {exc}", file=sys.stderr)
+                                continue
+                            attachments_by_test.setdefault(test_id, []).append(entry)
+                            completed_downloads += 1
+                            if completed_downloads % 5 == 0:
+                                log_memory(f"download_progress_{rid}_{completed_downloads}")
+                    gc.collect()
+    
+                if attachment_batch_size and attachment_batch_size > 0:
+                    for start in range(0, len(download_jobs), attachment_batch_size):
+                        batch_jobs = [
+                            (index, job)
+                            for index, job in enumerate(download_jobs[start:start + attachment_batch_size], start=start + 1)
+                        ]
+                        _process_batch(batch_jobs)
+                else:
+                    batch_jobs = [(index, job) for index, job in enumerate(download_jobs, start=1)]
                     _process_batch(batch_jobs)
-            else:
-                batch_jobs = [(index, job) for index, job in enumerate(download_jobs, start=1)]
-                _process_batch(batch_jobs)
-
-            log_memory(f"after_attachment_downloads_{rid}")
-        download_jobs.clear()
-        metadata_map.clear()
-        gc.collect()
-
-        def _attachment_sort_key(entry: dict):
-            path = entry.get("path") or ""
-            skipped = entry.get("skipped", False)
-            return (skipped, path)
-
-        for tid, items in attachments_by_test.items():
-            items.sort(key=_attachment_sort_key)
-
-        rows_payload = []
-        for record in table_df.itertuples(index=False, name="Row"):
-            row = record._asdict()
-            tid = row.get("test_id")
-            tid_int = None
-            if tid is not None and not (isinstance(tid, float) and pd.isna(tid)):
-                try:
-                    tid_int = int(tid)
-                except (TypeError, ValueError):
-                    tid_int = None
-            row["comment"] = comments_by_test.get(tid_int, "")
-            row["attachments"] = attachments_by_test.get(tid_int, [])
-            refs_val = row.get("refs")
-            if refs_val is None:
-                row["refs"] = []
-            elif isinstance(refs_val, str):
-                row["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
-            elif isinstance(refs_val, list):
-                row["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
-            else:
-                row["refs"] = [str(refs_val)]
-            rows_payload.append(row)
-
-        run_payload = {
-            "run_id": rid,
-            "run_name": run_names.get(int(rid)) if run_names else None,
-            "rows": rows_payload,
-            "counts": counts,
-            "total": run_total,
-            "pass_rate": run_pass_rate,
-            "donut_style": run_donut_style,
-            "donut_legend": segs,
-            "refs": sorted(run_refs),
-            "run_passed": run_passed,
-            "run_failed": run_failed,
-        }
-        json.dump(run_payload, sink)
-        sink.write("\n")
-
-        summary["total"] += run_total
-        summary["Passed"] += run_passed
-        summary["Failed"] += run_failed
-        for k, v in counts.items():
-            summary["by_status"][k] = summary["by_status"].get(k, 0) + v
-        report_refs.update(run_refs)
-
-        log_memory(f"run_complete_{rid}")
-        del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
-        gc.collect()
+    
+                log_memory(f"after_attachment_downloads_{rid}")
+            download_jobs.clear()
+            metadata_map.clear()
+            gc.collect()
+    
+            def _attachment_sort_key(entry: dict):
+                path = entry.get("path") or ""
+                skipped = entry.get("skipped", False)
+                return (skipped, path)
+    
+            for tid, items in attachments_by_test.items():
+                items.sort(key=_attachment_sort_key)
+    
+            rows_payload = []
+            for record in table_df.itertuples(index=False, name="Row"):
+                row = record._asdict()
+                tid = row.get("test_id")
+                tid_int = None
+                if tid is not None and not (isinstance(tid, float) and pd.isna(tid)):
+                    try:
+                        tid_int = int(tid)
+                    except (TypeError, ValueError):
+                        tid_int = None
+                row["comment"] = comments_by_test.get(tid_int, "")
+                row["attachments"] = attachments_by_test.get(tid_int, [])
+                refs_val = row.get("refs")
+                if refs_val is None:
+                    row["refs"] = []
+                elif isinstance(refs_val, str):
+                    row["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
+                elif isinstance(refs_val, list):
+                    row["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
+                else:
+                    row["refs"] = [str(refs_val)]
+                rows_payload.append(row)
+    
+            run_payload = {
+                "run_id": rid,
+                "run_name": run_names.get(int(rid)) if run_names else None,
+                "rows": rows_payload,
+                "counts": counts,
+                "total": run_total,
+                "pass_rate": run_pass_rate,
+                "donut_style": run_donut_style,
+                "donut_legend": segs,
+                "refs": sorted(run_refs),
+                "run_passed": run_passed,
+                "run_failed": run_failed,
+            }
+            json.dump(run_payload, sink)
+            sink.write("\n")
+    
+            summary["total"] += run_total
+            summary["Passed"] += run_passed
+            summary["Failed"] += run_failed
+            for k, v in counts.items():
+                summary["by_status"][k] = summary["by_status"].get(k, 0) + v
+            report_refs.update(run_refs)
+    
+            log_memory(f"run_complete_{rid}")
+            del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
+            gc.collect()
 
     pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
     # Donut segments
