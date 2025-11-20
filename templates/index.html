@@ -42,7 +42,7 @@
       display: flex;
       align-items: flex-start;
       justify-content: center;
-      padding: 8vh 16px 24px;
+      padding: 5vh 16px 24px;
       background: linear-gradient(180deg, var(--bg2), transparent 35%), var(--bg);
       font-family: 'Merriweather', serif;
     }
@@ -144,10 +144,22 @@
       height: 18px;
       fill: currentColor;
     }
+    html:not(.dark) .icon-btn {
+      color: #374151; /* Explicit dark color for light mode icon */
+      border-color: #D1D5DB;
+      background-color: #FFFFFF;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.09);
+    }
     html.dark .icon-btn {
       background: rgba(255,255,255,0.08);
       border-color: #444;
       color: #f3f4f6;
+    }
+    /* Fix for dark mode inputs */
+    html.dark input,
+    html.dark select {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #EAEAEA !important;
     }
     .sr-only {
       position: absolute;
@@ -182,6 +194,43 @@
     .input-group input:focus,
     .input-group select:focus {
       box-shadow: none;
+    }
+    .input-group {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: transparent;
+    }
+    .input-group input,
+    .input-group select {
+      border: none;
+      border-left: 1px solid var(--border);
+      border-radius: 0;
+      flex: 1;
+      background: transparent;
+    }
+    .input-group select {
+      border-left: 1px solid var(--border);
+    }
+    .input-group input:focus,
+    .input-group select:focus {
+      box-shadow: none;
+    }
+    .input-group-text {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      background: rgba(15,23,42,0.04);
+      border: none;
+      color: var(--muted);
+    }
+    .input-group-text svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
     }
   </style>
 </head>
@@ -267,7 +316,7 @@
     const themeIcon = document.getElementById('theme-icon');
     const htmlEl = document.documentElement;
     const sunIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 12 4.75Zm5.657 2.093a.75.75 0 1 1 1.06 1.06l-.354.354a.75.75 0 0 1-1.06-1.06l.354-.354ZM5.637 6.843a.75.75 0 0 1 1.06-1.06l.354.353a.75.75 0 0 1-1.06 1.061l-.354-.354ZM12 7.5A4.5 4.5 0 1 1 7.5 12 4.505 4.505 0 0 1 12 7.5Zm0 1.5A3 3 0 1 0 15 12a3 3 0 0 0-3-3Zm7.25 3.25a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5h.5Zm-13 .75a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75Zm10.657 4.657a.75.75 0 0 1 1.06 0l.354.354a.75.75 0 1 1-1.06 1.06l-.354-.353a.75.75 0 0 1 0-1.061Zm-10.657 0a.75.75 0 0 1 0 1.061l-.354.353a.75.75 0 0 1-1.06-1.06l.354-.354a.75.75 0 0 1 1.06 0Zm5.75.75a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 .75-.75Z"/></svg>';
-    const moonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.354 15.354a.75.75 0 0 1-.708.196 8 8 0 0 1-11.196-8.93.75.75 0 0 1 1.116-.515 6.5 6.5 0 0 0 9.714 8.395.75.75 0 0 1 1.074.854Z"/></svg>';
+    const moonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#000000" d="M20.354 15.354a.75.75 0 0 1-.708.196 8 8 0 0 1-11.196-8.93.75.75 0 0 1 1.116-.515 6.5 6.5 0 0 0 9.714 8.395.75.75 0 0 1 1.074.854Z"/></svg>';
 
     function updateThemeIcon(theme) {
         const nextLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
@@ -1021,40 +1070,4 @@
 </body>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </html>
-    .input-group {
-      display: flex;
-      align-items: stretch;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      overflow: hidden;
-      background: transparent;
-    }
-    .input-group input,
-    .input-group select {
-      border: none;
-      border-left: 1px solid var(--border);
-      border-radius: 0;
-      flex: 1;
-      background: transparent;
-    }
-    .input-group select {
-      border-left: 1px solid var(--border);
-    }
-    .input-group input:focus,
-    .input-group select:focus {
-      box-shadow: none;
-    }
-    .input-group-text {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0 12px;
-      background: rgba(15,23,42,0.04);
-      border: none;
-      color: var(--muted);
-    }
-    .input-group-text svg {
-      width: 16px;
-      height: 16px;
-      fill: currentColor;
-    }
+
