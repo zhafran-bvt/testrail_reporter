@@ -22,6 +22,7 @@
       --ring: rgba(26, 138, 133, 0.35);                 /* Focus ring from primary */
       --shadow: 0 10px 25px rgba(0,0,0,.08);
       --radius: 12px;
+      --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='%23222222' d='M6.293 9.293a1 1 0 0 1 1.414 0L12 13.586l4.293-4.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 0 1 0-1.414Z'/%3E%3C/svg%3E");
     }
     html.dark {
         --card-bg: #1C1C1C;
@@ -31,6 +32,7 @@
         --bg: #1C1C1C;
         --bg2: rgba(44,159,211,0.06);
         --shadow: 0 10px 25px rgba(0,0,0,.4);
+        --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='%23EAEAEA' d='M6.293 9.293a1 1 0 0 1 1.414 0L12 13.586l4.293-4.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 0 1 0-1.414Z'/%3E%3C/svg%3E");
     }
     html, body { height: 100%; }
     body {
@@ -60,7 +62,15 @@
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 640px){ .grid { grid-template-columns: 1fr; } }
     label { display:block; margin: 8px 0 6px; font-size: 13px; color: var(--muted); }
-    input, select { padding: 10px 12px; font-size: 14px; width: 100%; box-sizing: border-box; border:1px solid var(--border); border-radius: 10px; background: transparent; color: inherit; }
+    input, select { padding: 10px 12px; font-size: 14px; width: 100%; box-sizing: border-box; border:1px solid var(--border); border-radius: 10px; background: transparent; color: inherit; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+    select {
+      appearance: none;
+      background-image: var(--select-arrow);
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 12px;
+      padding-right: 36px;
+    }
     input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--ring); }
     .note { color: var(--muted); font-size: 13px; text-align: center; margin: 6px 0 0; }
     .actions { display:flex; justify-content: center; margin-top: 16px; gap: 10px; }
@@ -116,8 +126,8 @@
       height: 36px;
       border-radius: 50%;
       border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
+      background: rgba(15,23,42,0.05);
+      color: var(--text);
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -127,12 +137,17 @@
     .icon-btn:hover {
       border-color: var(--primary);
       color: var(--primary);
-      background: rgba(26,138,133,0.08);
+      background: rgba(26,138,133,0.12);
     }
     .icon-btn svg {
       width: 18px;
       height: 18px;
       fill: currentColor;
+    }
+    html.dark .icon-btn {
+      background: rgba(255,255,255,0.08);
+      border-color: #444;
+      color: #f3f4f6;
     }
     .sr-only {
       position: absolute;
@@ -145,6 +160,29 @@
       white-space: nowrap;
       border: 0;
     }
+    .input-group {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: transparent;
+    }
+    .input-group input,
+    .input-group select {
+      border: none;
+      border-left: 1px solid var(--border);
+      border-radius: 0;
+      flex: 1;
+      background: transparent;
+    }
+    .input-group select {
+      border-left: 1px solid var(--border);
+    }
+    .input-group input:focus,
+    .input-group select:focus {
+      box-shadow: none;
+    }
   </style>
 </head>
 <body>
@@ -152,7 +190,7 @@
     <div style="text-align: right; margin-bottom: 1rem;">
         <button id="theme-toggle" class="icon-btn" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
           <span class="sr-only">Toggle theme</span>
-          <span id="theme-icon" aria-hidden="true"></span>
+          <span id="theme-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 12 4.75Zm5.657 2.093a.75.75 0 1 1 1.06 1.06l-.354.354a.75.75 0 0 1-1.06-1.06l.354-.354ZM5.637 6.843a.75.75 0 0 1 1.06-1.06l.354.353a.75.75 0 0 1-1.06 1.061l-.354-.354ZM12 7.5A4.5 4.5 0 1 1 7.5 12 4.505 4.505 0 0 1 12 7.5Zm0 1.5A3 3 0 1 0 15 12a3 3 0 0 0-3-3Zm7.25 3.25a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5h.5Zm-13 .75a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75Zm10.657 4.657a.75.75 0 0 1 1.06 0l.354.354a.75.75 0 1 1-1.06 1.06l-.354-.353a.75.75 0 0 1 0-1.061Zm-10.657 0a.75.75 0 0 1 0 1.061l-.354.353a.75.75 0 0 1-1.06-1.06l.354-.354a.75.75 0 0 1 1.06 0Zm5.75.75a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 .75-.75Z"/></svg></span>
         </button>
     </div>
     <div class="logo-wrap">
@@ -165,14 +203,24 @@
         <div class="grid">
           <div>
             <label>Project ID</label>
-            <input type="number" id="project" name="project" value="{{ default_project }}" oninput="loadPlans()" />
+            <div class="input-group">
+              <span class="input-group-text" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 1 1v1h7a1 1 0 0 1 0 2h-1v13h1a1 1 0 0 1 0 2H5a1 1 0 1 1 0-2h1V6H5a1 1 0 1 1 0-2h7V3a1 1 0 0 1 1-1Zm5 5H7v13h10V7Z"/></svg>
+              </span>
+              <input type="number" id="project" name="project" value="{{ default_project }}" oninput="loadPlans()" aria-label="Project ID" />
+            </div>
           </div>
           <div>
             <label>Test Plan</label>
-            <select id="plan" name="plan" required class="form-select">
-              <option value="" disabled selected>Loading plans…</option>
-            </select>
-            <p class="note" id="plan-note">Showing open plans. Change project to refresh.</p>
+            <div class="input-group">
+              <span class="input-group-text" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M9 2a2 2 0 0 0-2 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2a2 2 0 0 0-2-2Zm0 2h6v2h4v12H5V6h4Z"/><path d="M8 10h8v2H8zm0 4h5v2H8z"/></svg>
+              </span>
+              <select id="plan" name="plan" required class="form-select" aria-label="Test Plan">
+                <option value="" disabled selected>Loading plans…</option>
+              </select>
+            </div>
+            <p class="note" id="plan-note" style="display:none;"></p>
           </div>
         </div>
         <div id="runs-section" class="runs-section" data-available="0" style="display:none;">
@@ -417,13 +465,17 @@
           plans = await fetchPlans(`/api/plans?project=${encodeURIComponent(project)}`);
           if (plans.length > 0) {
             note.textContent = `No open plans. Showing ${plans.length} total plan(s).`;
+            note.style.display = '';
           }
         } else {
           note.textContent = `Loaded ${plans.length} open plan(s).`;
+          note.style.display = '';
         }
 
         if(plans.length === 0){
           planSel.innerHTML = '<option value="" disabled selected>No plans found</option>';
+          note.textContent = 'No plans found for this project.';
+          note.style.display = '';
         } else {
           planSel.innerHTML = plans.map(p=> `<option value="${p.id}">${escapeHtml(p.name||('Plan '+p.id))} (ID ${p.id})</option>`).join('');
           planSel.selectedIndex = 0;
@@ -431,6 +483,7 @@
       } catch(e){
         planSel.innerHTML = '<option value="" disabled selected>Error loading plans</option>';
         note.textContent = 'Error loading plans. Check credentials or API access.';
+        note.style.display = '';
         showToast('Failed to load plans. Verify TestRail credentials and project ID.', 'error');
       } finally {
         planSel.disabled = false;
@@ -968,3 +1021,40 @@
 </body>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </html>
+    .input-group {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: transparent;
+    }
+    .input-group input,
+    .input-group select {
+      border: none;
+      border-left: 1px solid var(--border);
+      border-radius: 0;
+      flex: 1;
+      background: transparent;
+    }
+    .input-group select {
+      border-left: 1px solid var(--border);
+    }
+    .input-group input:focus,
+    .input-group select:focus {
+      box-shadow: none;
+    }
+    .input-group-text {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 12px;
+      background: rgba(15,23,42,0.04);
+      border: none;
+      color: var(--muted);
+    }
+    .input-group-text svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }

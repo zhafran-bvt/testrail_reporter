@@ -19,6 +19,7 @@
       --bs-primary-rgb: 26, 138, 133;
       --bs-link-color-rgb: 21, 115, 110;
       --bs-body-bg: #f8f9fa;
+      --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='%23212121' d='M6.293 9.293a1 1 0 0 1 1.414 0L12 13.586l4.293-4.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 0 1 0-1.414Z'/%3E%3C/svg%3E");
     }
 
     [data-bs-theme="dark"] {
@@ -28,6 +29,7 @@
       --bs-tertiary-bg: #15181c;
       --bs-primary: var(--bvt-light-blue);
       --bs-primary-rgb: 44, 159, 211;
+      --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='%23EAEAEA' d='M6.293 9.293a1 1 0 0 1 1.414 0L12 13.586l4.293-4.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 0 1 0-1.414Z'/%3E%3C/svg%3E");
     }
 
     .card-header {
@@ -90,6 +92,15 @@
         max-width: 100%;
         max-height: 60vh;
         border-radius: var(--bs-border-radius);
+    }
+    select,
+    .form-select {
+        background-image: var(--select-arrow);
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 12px;
+        padding-right: 2.25rem;
+        appearance: none;
     }
     .icon-btn {
         display: inline-flex;
