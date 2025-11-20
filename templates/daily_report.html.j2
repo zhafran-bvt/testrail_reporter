@@ -91,6 +91,28 @@
         max-height: 60vh;
         border-radius: var(--bs-border-radius);
     }
+    .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+    }
+    .icon-btn svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+    }
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
   </style>
 </head>
 <body>
@@ -98,8 +120,16 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h1 class="h3 mb-0">{{ report_title }}</h1>
       <div>
-        <button id="theme-toggle" class="btn btn-outline-secondary btn-sm">Toggle Theme</button>
-        <button class="btn btn-primary" onclick="downloadHTML()">Download HTML</button>
+        <button id="theme-toggle" type="button" class="btn btn-outline-secondary btn-sm icon-btn" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <span class="sr-only">Toggle theme</span>
+          <span id="report-theme-icon" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="btn btn-primary btn-sm icon-btn" onclick="downloadHTML()" aria-label="Download HTML" title="Download HTML">
+          <span class="sr-only">Download report</span>
+          <span aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 0 1 1 1v9.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4.002 4.002a1 1 0 0 1-1.414 0l-4.002-4.002a1 1 0 0 1 1.414-1.414L11 13.586V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v2h12v-2a1 1 0 0 1 2 0v3a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/></svg>
+          </span>
+        </button>
       </div>
     </div>
 
@@ -340,10 +370,21 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
   <script>
     const themeToggle = document.getElementById('theme-toggle');
+    const themeIcon = document.getElementById('report-theme-icon');
     const htmlEl = document.documentElement;
+    const sunIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 12 4.75Zm5.657 2.093a.75.75 0 1 1 1.06 1.06l-.354.354a.75.75 0 0 1-1.06-1.06l.354-.354ZM5.637 6.843a.75.75 0 0 1 1.06-1.06l.354.353a.75.75 0 0 1-1.06 1.061l-.354-.354ZM12 7.5A4.5 4.5 0 1 1 7.5 12 4.505 4.505 0 0 1 12 7.5Zm0 1.5A3 3 0 1 0 15 12a3 3 0 0 0-3-3Zm7.25 3.25a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5h.5Zm-13 .75a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75Zm10.657 4.657a.75.75 0 0 1 1.06 0l.354.354a.75.75 0 1 1-1.06 1.06l-.354-.353a.75.75 0 0 1 0-1.061Zm-10.657 0a.75.75 0 0 1 0 1.061l-.354.353a.75.75 0 0 1-1.06-1.06l.354-.354a.75.75 0 0 1 1.06 0Zm5.75.75a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 .75-.75Z"/></svg>';
+    const moonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.354 15.354a.75.75 0 0 1-.708.196 8 8 0 0 1-11.196-8.93.75.75 0 0 1 1.116-.515 6.5 6.5 0 0 0 9.714 8.395.75.75 0 0 1 1.074.854Z"/></svg>';
+
+    function updateThemeIcon(theme) {
+        const nextLabel = theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode';
+        themeToggle.setAttribute('aria-label', nextLabel);
+        themeToggle.setAttribute('title', nextLabel);
+        themeIcon.innerHTML = theme === 'dark' ? sunIcon : moonIcon;
+    }
 
     function applyTheme(theme) {
         htmlEl.setAttribute('data-bs-theme', theme);
+        updateThemeIcon(theme);
     }
 
     themeToggle.addEventListener('click', () => {
@@ -353,12 +394,10 @@
         applyTheme(newTheme);
     });
 
-    // Apply saved theme on load
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) {
         applyTheme(savedTheme);
     } else {
-        // Apply OS preference if no theme is saved
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         applyTheme(prefersDark ? 'dark' : 'light');
     }

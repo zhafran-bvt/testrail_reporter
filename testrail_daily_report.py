@@ -805,6 +805,11 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         attachment_workers_ceiling = 8
     attachment_workers_ceiling = max(1, min(16, attachment_workers_ceiling))
     attachment_workers = max(1, min(attachment_workers_ceiling, attachment_workers_env))
+    try:
+        attachment_batch_size = int(os.getenv("ATTACHMENT_BATCH_SIZE", "0"))
+    except ValueError:
+        attachment_batch_size = 0
+    attachment_batch_size = max(0, attachment_batch_size)
 
     try:
         run_workers_env = int(os.getenv("RUN_WORKERS", "2"))
@@ -1194,22 +1199,36 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 return index, job["test_id"], entry
 
             completed_downloads = 0
-            with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
-                futures = {
-                    executor.submit(_process_attachment_job, idx, job): idx for idx, job in enumerate(download_jobs, start=1)
-                }
-                for future in as_completed(futures):
-                    try:
-                        index, test_id, entry = future.result()
-                    except Exception as exc:
-                        print(f"Warning: attachment future failed for run {rid}: {exc}", file=sys.stderr)
-                        continue
-                    attachments_by_test.setdefault(test_id, []).append(entry)
-                    completed_downloads += 1
-                    if completed_downloads % 5 == 0:
-                        log_memory(f"download_progress_{rid}_{completed_downloads}")
+
+            def _process_batch(batch: list[tuple[int, dict]]):
+                nonlocal completed_downloads
+                max_workers_batch = min(attachment_workers, len(batch))
+                with ThreadPoolExecutor(max_workers=max_workers_batch) as executor:
+                    futures = {executor.submit(_process_attachment_job, idx, job): idx for idx, job in batch}
+                    for future in as_completed(futures):
+                        try:
+                            index, test_id, entry = future.result()
+                        except Exception as exc:
+                            print(f"Warning: attachment future failed for run {rid}: {exc}", file=sys.stderr)
+                            continue
+                        attachments_by_test.setdefault(test_id, []).append(entry)
+                        completed_downloads += 1
+                        if completed_downloads % 5 == 0:
+                            log_memory(f"download_progress_{rid}_{completed_downloads}")
+                gc.collect()
+
+            if attachment_batch_size and attachment_batch_size > 0:
+                for start in range(0, len(download_jobs), attachment_batch_size):
+                    batch_jobs = [
+                        (index, job)
+                        for index, job in enumerate(download_jobs[start:start + attachment_batch_size], start=start + 1)
+                    ]
+                    _process_batch(batch_jobs)
+            else:
+                batch_jobs = [(index, job) for index, job in enumerate(download_jobs, start=1)]
+                _process_batch(batch_jobs)
+
             log_memory(f"after_attachment_downloads_{rid}")
-            gc.collect()
         download_jobs.clear()
         metadata_map.clear()
         gc.collect()
