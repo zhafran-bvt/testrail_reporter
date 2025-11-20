@@ -56,10 +56,29 @@ templates = Jinja2Templates(directory="templates")
 
 
 class TTLCache:
-    def __init__(self, ttl_seconds: int = 120):
+    def __init__(self, ttl_seconds: int = 120, maxsize: int = 128):
         self.ttl = ttl_seconds
+        self.maxsize = max(1, maxsize)
         self._store: dict[tuple, tuple[float, Any]] = {}
+        self._order: deque[tuple] = deque()
         self._lock = threading.Lock()
+
+    def _discard(self, key: tuple):
+        self._store.pop(key, None)
+        try:
+            self._order.remove(key)
+        except ValueError:
+            pass
+
+    def _record(self, key: tuple):
+        try:
+            self._order.remove(key)
+        except ValueError:
+            pass
+        self._order.append(key)
+        while len(self._order) > self.maxsize:
+            oldest = self._order.popleft()
+            self._store.pop(oldest, None)
 
     def get(self, key: tuple):
         now = time.time()
@@ -69,7 +88,7 @@ class TTLCache:
                 return None
             expires_at, value = entry
             if expires_at <= now:
-                self._store.pop(key, None)
+                self._discard(key)
                 return None
         return value.copy() if isinstance(value, dict) else value, expires_at
 
@@ -78,17 +97,28 @@ class TTLCache:
         expires_at = time.time() + max(1, ttl)
         with self._lock:
             self._store[key] = (expires_at, value.copy() if isinstance(value, dict) else value)
+            self._record(key)
         return expires_at
 
     def clear(self):
         with self._lock:
             self._store.clear()
+            self._order.clear()
 
 
-plans_cache_ttl = int(os.getenv("PLANS_CACHE_TTL", "180"))
-runs_cache_ttl = int(os.getenv("RUNS_CACHE_TTL", "60"))
-_plans_cache = TTLCache(ttl_seconds=plans_cache_ttl)
-_runs_cache = TTLCache(ttl_seconds=runs_cache_ttl)
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+plans_cache_ttl = _int_env("PLANS_CACHE_TTL", 180)
+plans_cache_maxsize = max(1, _int_env("PLANS_CACHE_MAXSIZE", 128))
+runs_cache_ttl = _int_env("RUNS_CACHE_TTL", 60)
+runs_cache_maxsize = max(1, _int_env("RUNS_CACHE_MAXSIZE", 128))
+_plans_cache = TTLCache(ttl_seconds=plans_cache_ttl, maxsize=plans_cache_maxsize)
+_runs_cache = TTLCache(ttl_seconds=runs_cache_ttl, maxsize=runs_cache_maxsize)
 
 
 def _cache_meta(hit: bool, expires_at: float):
@@ -232,7 +262,20 @@ class ReportJobManager:
             self._trim_history()
 
 
-report_worker_count = max(1, int(os.getenv("REPORT_WORKERS", "1")))
+def _sequential_report_worker_count() -> tuple[int, int]:
+    try:
+        requested = max(1, int(os.getenv("REPORT_WORKERS", "1")))
+    except ValueError:
+        requested = 1
+    if requested > 1:
+        print(
+            "INFO: REPORT_WORKERS>1 requested but sequential execution is enforced to reduce memory usage.",
+            flush=True,
+        )
+    return 1, requested
+
+
+report_worker_count, report_worker_requested = _sequential_report_worker_count()
 job_history_limit = max(10, int(os.getenv("REPORT_JOB_HISTORY", "60")))
 _job_manager = ReportJobManager(max_workers=report_worker_count, max_history=job_history_limit)
 
@@ -338,7 +381,9 @@ def _stop_memlog():
 
 @app.on_event("startup")
 def on_startup():
-    report_workers = os.getenv("REPORT_WORKERS", "1")
+    report_workers = f"{report_worker_count} (sequential)"
+    if report_worker_requested != report_worker_count:
+        report_workers = f"{report_workers} (requested {report_worker_requested})"
     run_workers = os.getenv("RUN_WORKERS", "2")
     attachment_workers = os.getenv("ATTACHMENT_WORKERS", "2")
 

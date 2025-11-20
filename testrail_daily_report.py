@@ -8,7 +8,7 @@ Requires env vars:
     TESTRAIL_BASE_URL, TESTRAIL_USER, TESTRAIL_API_KEY
 """
 
-import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math
+import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math, gc
 import time
 import contextvars
 import contextlib
@@ -1207,6 +1207,9 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
             summary["by_status"][k] = summary["by_status"].get(k, 0) + v
         # No trend point tracking
         log_memory(f"run_complete_{rid}")
+        # Release large dataframes promptly to avoid memory spikes
+        del table_df, latest_results_df, res_summary
+        gc.collect()
 
     pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
     # Donut segments
@@ -1266,6 +1269,9 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     context["output_filename"] = filename
     rendered = render_html(context, out_file)
     log_memory("report_rendered")
+    # Drop intermediate collections before returning
+    del run_data, tables
+    gc.collect()
     return rendered
 
 
