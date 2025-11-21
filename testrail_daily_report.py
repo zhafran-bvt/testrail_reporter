@@ -1410,6 +1410,12 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
         gc.collect()
 
+    try:
+        with runs_cache.open("r", encoding="utf-8") as verify_fp:
+            cached_runs = sum(1 for line in verify_fp if line.strip())
+        notify("runs_cached", count=cached_runs, expected=total_runs)
+    except Exception:
+        cached_runs = None
     pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
     # Donut segments
     status_colors = {

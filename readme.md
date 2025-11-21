@@ -11,6 +11,8 @@ Generate and serve clean HTML summaries for TestRail plans or runs. The report i
 - Single project-level donut chart of status distribution
 - Multi-run selection UI (filterable list, select-all/clear) with loading overlay while preview builds
 - Attachments (screenshots/evidence) are compressed and embedded inline for offline viewing
+- Streaming renderer keeps memory stable by writing run data to NDJSON and only snapshotting a few preview cards for tests
+- Download button returns a `.zip` bundle (HTML + `/out/attachments/run_*`) so offline reports still include evidence
 - Robust API handling (pagination, mixed payload shapes)
 
 ## Requirements
@@ -81,6 +83,29 @@ Notes:
   - Preview button opens the generated HTML in a new tab and shows a modal spinner until the file downloads.
   - Plans list auto-loads open plans first; if none, it falls back to all plans.
   - Runs list appears after picking a plan; you can search/filter, select-all, or clear selections.
+  - The Download button fetches the `.zip` bundle next to each HTML (`Testing_Progress_Report_*.zip`) so attachments are available offline.
+
+## Report output & streaming
+
+- **Streaming renderer:** each run is serialized to a temp NDJSON file and streamed into the template. Only a small snapshot (`TABLE_SNAPSHOT_LIMIT`, default 3) is kept in memory for unit tests and preview cards.
+- **Bundles:** every successful job produces both the HTML (`out/*.html`) and a bundle (`out/*.zip`) containing that HTML plus `out/attachments/run_*`. The UI already downloads the `.zip`.
+- **Snapshots:** set `REPORT_TABLE_SNAPSHOT=0` to disable in-memory preview tables entirely (useful in production), or adjust `TABLE_SNAPSHOT_LIMIT` when running tests that need more preview rows.
+- **Attachment directories:** attachments live under `out/attachments/run_<id>/...`; the bundle logic now works with absolute paths (important when `WORKDIR=/app` in Docker).
+
+## Environment knobs (beyond credentials)
+
+| Variable | Purpose | Notes |
+| --- | --- | --- |
+| `REPORT_WORKERS`, `REPORT_WORKERS_MAX`, `REPORT_WORKERS_MIN` | concurrent jobs in the internal queue | Keep low (1–2) unless you have plenty of RAM; each job downloads attachments + renders HTML. |
+| `RUN_WORKERS`, `RUN_WORKERS_MAX` | number of TestRail runs processed simultaneously per job | Higher values speed up plans with many runs but increase peak memory. |
+| `ATTACHMENT_WORKERS`, `ATTACHMENT_WORKERS_MAX` | attachment download threads per run | Useful for hiding network latency; combine with `ATTACHMENT_BATCH_SIZE` to cap concurrent files. |
+| `ATTACHMENT_BATCH_SIZE` | split attachment downloads into batches | `0` disables batching; otherwise the size of each batch submitted to the thread pool. |
+| `ATTACHMENT_MAX_BYTES`, `ATTACHMENT_INLINE_MAX_BYTES`, `ATTACHMENT_VIDEO_INLINE_MAX_BYTES`, `ATTACHMENT_IMAGE_MAX_DIM`, `ATTACHMENT_JPEG_QUALITY`, `ATTACHMENT_MIN_JPEG_QUALITY` | governs compression + skip rules | Set `ATTACHMENT_MAX_BYTES` lower to avoid enormous blobs; inline limits control when we embed base64 payloads. |
+| `REPORT_TABLE_SNAPSHOT`, `TABLE_SNAPSHOT_LIMIT` | controls preview tables used by tests/UI | Disable snapshots in production or shrink the limit to reduce memory. |
+| `REPORT_JOB_HISTORY` | number of completed jobs retained in memory | Default 60; keep modest to avoid unbounded metadata. |
+| `MEM_LOG_INTERVAL` | seconds between `[mem-log]` heartbeat lines | Helps observe allocator behavior in production. |
+
+All env variables can live in `.env` for local work; deployments (Railway, Render, etc.) can override them per environment.
 
 ## Debugging
 
@@ -126,13 +151,9 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 - Missing names: if a user or priority is missing, the script falls back to the raw ID.
 - 404 on UI: confirm you started the server in the repo root with `uvicorn app.main:app --reload`, then open `http://127.0.0.1:8000/`.
 - Attachments not visible after download: ensure you regenerated the report after upgrading (older HTML lacked inline images). Inline rendering requires modern browsers that support data URLs.
-- Slow generation: adjust worker/attachment env vars:
-  - `RUN_WORKERS` / `RUN_WORKERS_MAX` – concurrent runs fetched (defaults 2/4, hard cap 8)
-  - `ATTACHMENT_WORKERS` – concurrent attachment downloads (default 2, max 4)
-  - `ATTACHMENT_IMAGE_MAX_DIM` and `ATTACHMENT_JPEG_QUALITY` – controls compression
-  - `ATTACHMENT_INLINE_MAX_BYTES` (default 250000) – inline small images; set 0 to disable
-  - `ATTACHMENT_VIDEO_INLINE_MAX_BYTES` (defaults to image inline limit) – inline small videos for offline playback
-  - `ATTACHMENT_MAX_BYTES` – skip attachments above this size
+- Slow generation or high memory: tune the worker env vars listed above, lower `ATTACHMENT_MAX_BYTES`, or raise `ATTACHMENT_BATCH_SIZE` to reduce concurrent files.
+- Bundle missing attachments: confirm `out/attachments/run_*` exists and that the download button grabs the `.zip` (HTML-only downloads no longer embed files).
+- Memory stuck high in Docker: the Dockerfile now ships with `libjemalloc` and `MALLOC_CONF="background_thread:true,dirty_decay_ms:200,muzzy_decay_ms:200,narenas:2,oversize_threshold:131072"` so RSS drops after jobs. If you fork the image, keep those settings or expect glibc to hold the high-water mark.
 
 ## Roadmap ideas
 - Optional per-run donut charts
