@@ -1,8 +1,13 @@
 
+import os
+import shutil
+import tempfile
 import unittest
+import zipfile
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pandas as pd
-from testrail_daily_report import generate_report, build_test_table
+from testrail_daily_report import generate_report, build_test_table, build_report_bundle
 
 class TestReportGenerator(unittest.TestCase):
 
@@ -222,6 +227,189 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.get_plan')
     @patch('testrail_daily_report.get_plan_runs')
     @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_generate_report_snapshot_disabled(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                               mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                               mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Plan", "entries": [{"runs": [{"id": 400, "name": "Single"}]}]}
+        mock_plan_runs.return_value = [400]
+        mock_tests_for_run.return_value = [
+            {"id": 1, "title": "Only", "status_id": 1, "priority_id": 1, "assignedto_id": 5},
+        ]
+        mock_results_for_run.return_value = [
+            {"id": 11, "test_id": 1, "status_id": 1},
+        ]
+        mock_users_map.return_value = {5: "User"}
+        mock_priorities_map.return_value = {1: "P1"}
+        mock_statuses_map.return_value = {1: "Passed"}
+        mock_get_attachments_for_test.return_value = []
+        mock_download_attachment.return_value = (b"", "image/png")
+        mock_render_html.return_value = "/tmp/report-no-snapshot.html"
+
+        with patch.dict(os.environ, {"REPORT_TABLE_SNAPSHOT": "0"}):
+            path = generate_report(project=1, plan=44)
+
+        self.assertEqual(path, "/tmp/report-no-snapshot.html")
+        context = mock_render_html.call_args[0][0]
+        self.assertEqual(context.get("tables"), [])
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_generate_report_snapshot_limit(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                            mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                            mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {
+            "name": "Plan",
+            "entries": [{"runs": [{"id": 500, "name": "One"}, {"id": 600, "name": "Two"}]}]
+        }
+        mock_plan_runs.return_value = [500, 600]
+
+        def _tests_for_run(_session, _base, rid):
+            return [{"id": rid, "title": f"Run {rid}", "status_id": 1, "priority_id": 1, "assignedto_id": 7}]
+
+        mock_tests_for_run.side_effect = _tests_for_run
+        mock_results_for_run.return_value = [{"id": 21, "test_id": 500, "status_id": 1}]
+        mock_users_map.return_value = {7: "User Seven"}
+        mock_priorities_map.return_value = {1: "P1"}
+        mock_statuses_map.return_value = {1: "Passed"}
+        mock_get_attachments_for_test.return_value = []
+        mock_download_attachment.return_value = (b"", "image/png")
+        mock_render_html.return_value = "/tmp/report-snapshot-limit.html"
+
+        with patch.dict(os.environ, {"REPORT_TABLE_SNAPSHOT": "1", "TABLE_SNAPSHOT_LIMIT": "1"}):
+            path = generate_report(project=1, plan=55)
+
+        self.assertEqual(path, "/tmp/report-snapshot-limit.html")
+        context = mock_render_html.call_args[0][0]
+        self.assertEqual(len(context.get("tables", [])), 1)
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.compress_image_file')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_attachment_batching_respects_env(self, mock_env_or_die, mock_render_html, mock_compress_image,
+                                              mock_statuses_map, mock_priorities_map, mock_users_map,
+                                              mock_results_for_run, mock_get_attachments_for_test,
+                                              mock_download_attachment, mock_tests_for_run, mock_plan_runs,
+                                              mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Plan", "entries": [{"runs": [{"id": 700, "name": "Batch"}]}]}
+        mock_plan_runs.return_value = [700]
+        mock_tests_for_run.return_value = [
+            {"id": 77, "title": "Has attachments", "status_id": 1, "priority_id": 1, "assignedto_id": 1},
+        ]
+        mock_results_for_run.return_value = [
+            {"id": 501, "test_id": 77, "status_id": 1, "comment": "ok"},
+        ]
+        attachments_payload = [
+            {"id": 1000 + i, "name": f"pic_{i}.png", "result_id": 501, "size": 1234}
+            for i in range(5)
+        ]
+        mock_get_attachments_for_test.return_value = attachments_payload
+        mock_download_attachment.return_value = (b"bytes", "image/png")
+        mock_users_map.return_value = {1: "User One"}
+        mock_priorities_map.return_value = {1: "P1"}
+        mock_statuses_map.return_value = {1: "Passed"}
+        mock_render_html.return_value = "/tmp/batch.html"
+
+        def fake_compress(input_path, content_type, output_path, inline_limit):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"img")
+            return "image/png", 3, None
+
+        mock_compress_image.side_effect = fake_compress
+
+        class RecordingExecutor:
+            instances = []
+
+            def __init__(self, max_workers):
+                self.max_workers = max_workers
+                self.futures = []
+                RecordingExecutor.instances.append(self)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                return False
+
+            def submit(self, fn, *args, **kwargs):
+                result = fn(*args, **kwargs)
+                future = MagicMock()
+                future.result.return_value = result
+                self.futures.append(future)
+                return future
+
+        def fake_as_completed(futures):
+            if isinstance(futures, dict):
+                iterable = list(futures.keys())
+            else:
+                iterable = list(futures)
+            for fut in iterable:
+                yield fut
+
+        with patch('testrail_daily_report.ThreadPoolExecutor', RecordingExecutor), patch('testrail_daily_report.as_completed', fake_as_completed):
+            with patch.dict(os.environ, {"ATTACHMENT_BATCH_SIZE": "2", "ATTACHMENT_WORKERS": "3", "RUN_WORKERS": "1", "RUN_WORKERS_MAX": "1"}):
+                path = generate_report(project=1, plan=700)
+
+        self.assertEqual(path, "/tmp/batch.html")
+        # First executor handles metadata, remaining executors correspond to batches.
+        self.assertGreaterEqual(len(RecordingExecutor.instances), 4)
+        batch_workers = [inst.max_workers for inst in RecordingExecutor.instances[1:]]
+        self.assertEqual(batch_workers, [2, 2, 1])
+        total_jobs = sum(len(inst.futures) for inst in RecordingExecutor.instances[1:])
+        self.assertEqual(total_jobs, 5)
+        run_dir = Path("out") / "attachments" / "run_700"
+        if run_dir.exists():
+            shutil.rmtree(run_dir)
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
     @patch('testrail_daily_report.get_results_for_run')
     @patch('testrail_daily_report.get_users_map')
     @patch('testrail_daily_report.get_priorities_map')
@@ -267,6 +455,31 @@ class TestReportGenerator(unittest.TestCase):
         self.assertEqual(table.iloc[1]['title'], 'Test A')
         self.assertEqual(table.iloc[0]['assignee'], 'User Y')
         self.assertEqual(table.iloc[1]['priority'], 'High')
+
+
+class TestBundleHelpers(unittest.TestCase):
+    def test_build_report_bundle_handles_absolute_paths(self):
+        orig_cwd = os.getcwd()
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                os.chdir(tmp)
+                out_dir = Path("out")
+                attachments_dir = out_dir / "attachments" / "run_1"
+                attachments_dir.mkdir(parents=True, exist_ok=True)
+                html_path = out_dir / "report.html"
+                html_path.parent.mkdir(parents=True, exist_ok=True)
+                html_path.write_text("<html></html>", encoding="utf-8")
+                attachment_file = attachments_dir / "test_1_att_2.png"
+                attachment_file.write_bytes(b"img-bytes")
+                bundle = build_report_bundle(html_path, {attachments_dir})
+                self.assertIsNotNone(bundle)
+                self.assertTrue(Path(bundle).exists())
+                with zipfile.ZipFile(bundle, "r") as zf:
+                    members = zf.namelist()
+                    self.assertIn("report.html", members)
+                    self.assertIn("attachments/run_1/test_1_att_2.png", members)
+            finally:
+                os.chdir(orig_cwd)
 
 if __name__ == '__main__':
     unittest.main()

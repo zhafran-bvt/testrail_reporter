@@ -734,24 +734,30 @@ def render_streaming_report(context: dict, runs_cache: Path, out_path: Path):
 def build_report_bundle(html_path: Path, attachment_dirs: set[Path]) -> Path | None:
     """Create a ZIP bundle with the HTML and referenced attachments."""
     try:
-        bundle_path = html_path.with_suffix(".zip")
+        html_path = Path(html_path)
+        html_abs = html_path.resolve()
+        bundle_path = html_abs.with_suffix(".zip")
+        attachments_root = (Path("out") / "attachments").resolve()
         with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.write(html_path, arcname=html_path.name)
-            attachments_root = Path("out").resolve()
+            zf.write(html_abs, arcname=html_abs.name)
             for directory in attachment_dirs:
-                directory = directory.resolve()
-                if not directory.exists():
+                dir_path = Path(directory)
+                if not dir_path.exists():
                     continue
+                dir_abs = dir_path.resolve()
                 try:
-                    rel_base = directory.relative_to(attachments_root)
-                    arc_base = rel_base
+                    rel_dir = dir_abs.relative_to(attachments_root)
                 except ValueError:
-                    arc_base = directory.name
-                for file_path in directory.rglob("*"):
+                    rel_dir = Path(dir_abs.name)
+                for file_path in dir_abs.rglob("*"):
                     if not file_path.is_file():
                         continue
-                    rel = Path("attachments") / file_path.relative_to(Path("out") / "attachments")
-                    zf.write(file_path, arcname=str(rel))
+                    file_abs = file_path.resolve()
+                    try:
+                        arc_rel = Path("attachments") / file_abs.relative_to(attachments_root)
+                    except ValueError:
+                        arc_rel = Path("attachments") / rel_dir / file_abs.name
+                    zf.write(file_abs, arcname=str(arc_rel))
         return bundle_path
     except Exception as exc:
         print(f"Warning: failed to create report bundle: {exc}", file=sys.stderr)
