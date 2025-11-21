@@ -242,7 +242,7 @@ class ReportJobManager:
             duration_ms = (time.perf_counter() - start) * 1000.0
             completed_at = datetime.now(timezone.utc)
             job.completed_at = completed_at
-            job.path = path
+            job.path = str(path)
             job.url = "/reports/" + Path(path).name
             api_calls = telemetry.get("api_calls", []) if isinstance(telemetry, dict) else []
             job.meta = {
@@ -251,6 +251,10 @@ class ReportJobManager:
                 "api_call_count": len(api_calls),
                 "api_calls": api_calls,
             }
+            bundle_path = getattr(path, "bundle_path", None)
+            if bundle_path:
+                job.meta["bundle_path"] = bundle_path
+                job.meta["bundle_url"] = "/reports/" + Path(bundle_path).name
             job.status = "success"
             print(f"[report-job] {job_id} completed in {duration_ms:.0f}ms -> {job.url}", flush=True)
         except Exception as exc:
