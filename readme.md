@@ -11,6 +11,7 @@ Generate and serve clean HTML summaries for TestRail plans or runs. The report i
 - Single project-level donut chart of status distribution
 - Multi-run selection UI (filterable list, select-all/clear) with loading overlay while preview builds
 - Attachments (screenshots/evidence) are compressed and embedded inline for offline viewing
+- Video attachments can be auto-transcoded via ffmpeg (resolution + bitrate caps) before embedding
 - Streaming renderer keeps memory stable by writing run data to NDJSON and only snapshotting a few preview cards for tests
 - Download button returns a `.zip` bundle (HTML + `/out/attachments/run_*`) so offline reports still include evidence
 - Robust API handling (pagination, mixed payload shapes)
@@ -101,6 +102,7 @@ Notes:
 | `ATTACHMENT_WORKERS`, `ATTACHMENT_WORKERS_MAX` | attachment download threads per run | Useful for hiding network latency; combine with `ATTACHMENT_BATCH_SIZE` to cap concurrent files. |
 | `ATTACHMENT_BATCH_SIZE` | split attachment downloads into batches | `0` disables batching; otherwise the size of each batch submitted to the thread pool. |
 | `ATTACHMENT_MAX_BYTES`, `ATTACHMENT_INLINE_MAX_BYTES`, `ATTACHMENT_VIDEO_INLINE_MAX_BYTES`, `ATTACHMENT_IMAGE_MAX_DIM`, `ATTACHMENT_JPEG_QUALITY`, `ATTACHMENT_MIN_JPEG_QUALITY` | governs compression + skip rules | Set `ATTACHMENT_MAX_BYTES` lower to avoid enormous blobs; inline limits control when we embed base64 payloads. |
+| `ATTACHMENT_VIDEO_TRANSCODE`, `ATTACHMENT_VIDEO_MAX_DIM`, `ATTACHMENT_VIDEO_TARGET_KBPS`, `ATTACHMENT_VIDEO_FFMPEG_PRESET`, `FFMPEG_BIN` | video compression controls | When enabled, ffmpeg transcodes videos to H.264/AAC using these limits before writing to `/out/attachments`. |
 | `REPORT_TABLE_SNAPSHOT`, `TABLE_SNAPSHOT_LIMIT` | controls preview tables used by tests/UI | Disable snapshots in production or shrink the limit to reduce memory. |
 | `REPORT_JOB_HISTORY` | number of completed jobs retained in memory | Default 60; keep modest to avoid unbounded metadata. |
 | `MEM_LOG_INTERVAL` | seconds between `[mem-log]` heartbeat lines | Helps observe allocator behavior in production. |

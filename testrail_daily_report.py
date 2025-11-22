@@ -8,7 +8,7 @@ Requires env vars:
     TESTRAIL_BASE_URL, TESTRAIL_USER, TESTRAIL_API_KEY
 """
 
-import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math, gc, json, zipfile
+import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math, gc, json, zipfile, subprocess
 import time
 import contextvars
 import contextlib
@@ -730,6 +730,53 @@ class ReportOutput(str):
         return obj
 
 
+class VideoTranscodeError(Exception):
+    pass
+
+
+def transcode_video_file(
+    input_path: Path,
+    output_path: Path,
+    *,
+    ffmpeg_bin: str,
+    max_dim: int,
+    target_kbps: int,
+    preset: str = "veryfast",
+) -> None:
+    """
+    Transcode video to H.264/AAC with constrained dimensions/bitrate.
+    Raises VideoTranscodeError on failure.
+    """
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    scale_expr = f"scale='min({max_dim},iw)':-2"
+    cmd = [
+        ffmpeg_bin,
+        "-y",
+        "-i",
+        str(input_path),
+        "-vf",
+        scale_expr,
+        "-c:v",
+        "libx264",
+        "-preset",
+        preset,
+        "-b:v",
+        f"{target_kbps}k",
+        "-movflags",
+        "+faststart",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        str(output_path),
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise VideoTranscodeError(proc.stderr or proc.stdout or "ffmpeg failed")
+
+
 def render_streaming_report(context: dict, runs_cache: Path, out_path: Path):
     """Render the final HTML by streaming run sections from disk."""
     env = Environment(loader=FileSystemLoader("templates"), autoescape=select_autoescape())
@@ -911,6 +958,19 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         video_inline_limit = 15000000
     if video_inline_limit < inline_embed_limit:
         video_inline_limit = inline_embed_limit
+
+    video_transcode_enabled = _env_flag("ATTACHMENT_VIDEO_TRANSCODE", True)
+    try:
+        video_max_dim = int(os.getenv("ATTACHMENT_VIDEO_MAX_DIM", "1280"))
+    except ValueError:
+        video_max_dim = 1280
+    try:
+        video_target_kbps = int(os.getenv("ATTACHMENT_VIDEO_TARGET_KBPS", "1800"))
+    except ValueError:
+        video_target_kbps = 1800
+    video_target_kbps = max(300, video_target_kbps)
+    ffmpeg_bin = os.getenv("FFMPEG_BIN", "ffmpeg")
+    video_ffmpeg_preset = os.getenv("ATTACHMENT_VIDEO_FFMPEG_PRESET", "veryfast")
     try:
         attachment_retry_limit = int(os.getenv("ATTACHMENT_RETRY_ATTEMPTS", "4"))
     except ValueError:
@@ -1277,8 +1337,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                             job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
                             base_name = Path(job["filename"]).stem or Path(job["filename"]).name
                             job["filename"] = f"{base_name}{desired_suffix}"
-    
+
                     inline_payload = None
+                    suffix_lc_initial = job["rel_path"].suffix.lower()
+                    common_video_exts = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".mpg", ".mpeg"}
+                    is_attachment_video = bool(
+                        (content_type and str(content_type).lower().startswith("video/"))
+                        or suffix_lc_initial in common_video_exts
+                    )
                     if is_image_type:
                         content_type, size_bytes, inline_payload = compress_image_file(
                             Path(tmp_path),
@@ -1286,6 +1352,35 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                             job["abs_path"],
                             inline_limit,
                         )
+                    elif is_attachment_video and video_transcode_enabled:
+                        job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
+                        transcode_ok = False
+                        try:
+                            transcode_video_file(
+                                Path(tmp_path),
+                                job["abs_path"],
+                                ffmpeg_bin=ffmpeg_bin,
+                                max_dim=video_max_dim,
+                                target_kbps=video_target_kbps,
+                                preset=video_ffmpeg_preset,
+                            )
+                            content_type = "video/mp4"
+                            transcode_ok = True
+                        except (VideoTranscodeError, FileNotFoundError) as exc:
+                            print(f"Warning: video transcode failed for attachment {attachment_id}: {exc}", file=sys.stderr)
+                        if not transcode_ok:
+                            try:
+                                shutil.copyfile(tmp_path, job["abs_path"])
+                            except OSError:
+                                with open(tmp_path, "rb") as src, open(job["abs_path"], "wb") as dst:
+                                    shutil.copyfileobj(src, dst, length=64 * 1024)
+                            content_type = content_type or job["initial_type"]
+                        size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
+                        if inline_video_limit and size_bytes <= inline_video_limit and size_bytes > 0:
+                            try:
+                                inline_payload = job["abs_path"].read_bytes()
+                            except Exception:
+                                inline_payload = None
                     else:
                         job["abs_path"].parent.mkdir(parents=True, exist_ok=True)
                         try:
@@ -1294,7 +1389,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                             with open(tmp_path, "rb") as src, open(job["abs_path"], "wb") as dst:
                                 shutil.copyfileobj(src, dst, length=64 * 1024)
                         size_bytes = job["abs_path"].stat().st_size if job["abs_path"].exists() else data_size
-                        if inline_video_limit and size_bytes <= inline_video_limit and size_bytes > 0:
+                        if inline_video_limit and size_bytes <= inline_video_limit and size_bytes > 0 and is_attachment_video:
                             try:
                                 inline_payload = job["abs_path"].read_bytes()
                             except Exception:

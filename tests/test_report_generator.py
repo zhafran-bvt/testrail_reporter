@@ -171,6 +171,7 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.get_plan')
     @patch('testrail_daily_report.get_plan_runs')
     @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.transcode_video_file')
     @patch('testrail_daily_report.download_attachment')
     @patch('testrail_daily_report.get_attachments_for_test')
     @patch('testrail_daily_report.get_results_for_run')
@@ -181,7 +182,7 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.env_or_die')
     def test_generate_report_video_attachment_paths(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
                                                     mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
-                                                    mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+                                                    mock_download_attachment, mock_transcode_video, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
         mock_env_or_die.side_effect = lambda key: {
             "TESTRAIL_BASE_URL": "http://fake-testrail.com",
             "TESTRAIL_USER": "user",
@@ -199,6 +200,10 @@ class TestReportGenerator(unittest.TestCase):
         mock_get_attachments_for_test.return_value = [
             {"id": 201, "name": "clip.mp4", "result_id": 501, "size": 1234},
         ]
+        def fake_transcode(input_path, output_path, **kwargs):
+            Path(output_path).write_bytes(b"video")
+
+        mock_transcode_video.side_effect = fake_transcode
         mock_download_attachment.return_value = (b"video-bytes", "video/mp4")
         mock_users_map.return_value = {11: "User Eleven"}
         mock_priorities_map.return_value = {2: "P2"}
@@ -222,6 +227,7 @@ class TestReportGenerator(unittest.TestCase):
         else:
             self.assertFalse(bool(video.get('data_url')))
         self.assertEqual(rows[0].get('assignee'), "User Eleven")
+        self.assertTrue(mock_transcode_video.called)
 
     @patch('testrail_daily_report.get_project')
     @patch('testrail_daily_report.get_plan')
@@ -369,6 +375,48 @@ class TestReportGenerator(unittest.TestCase):
         attachments_dir = Path("out") / "attachments"
         if attachments_dir.exists():
             shutil.rmtree(attachments_dir)
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.transcode_video_file')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_video_transcode_disabled(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                      mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                      mock_download_attachment, mock_transcode_video, mock_tests_for_run, mock_plan_runs,
+                                      mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Video Plan", "entries": [{"runs": [{"id": 401, "name": "Video"}]}]}
+        mock_plan_runs.return_value = [401]
+        mock_tests_for_run.return_value = [
+            {"id": 9, "title": "Clip", "status_id": 1, "priority_id": 1, "assignedto_id": 1},
+        ]
+        mock_results_for_run.return_value = [{"id": 900, "test_id": 9, "status_id": 1}]
+        mock_get_attachments_for_test.return_value = [{"id": 700, "name": "clip.mov", "result_id": 900, "size": 1000}]
+        mock_download_attachment.return_value = (b"video", "video/quicktime")
+        mock_users_map.return_value = {1: "User"}
+        mock_priorities_map.return_value = {1: "P1"}
+        mock_statuses_map.return_value = {1: "Passed"}
+        mock_render_html.return_value = "/tmp/video-disabled.html"
+
+        with patch.dict(os.environ, {"ATTACHMENT_VIDEO_TRANSCODE": "0"}):
+            path = generate_report(project=1, plan=900, run_ids=[401])
+
+        self.assertEqual(path, "/tmp/video-disabled.html")
+        self.assertFalse(mock_transcode_video.called)
 
     @patch('testrail_daily_report.get_project')
     @patch('testrail_daily_report.get_plan')
