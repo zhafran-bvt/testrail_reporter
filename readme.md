@@ -107,6 +107,24 @@ Notes:
 
 All env variables can live in `.env` for local work; deployments (Railway, Render, etc.) can override them per environment.
 
+## Suggested environment profiles
+
+**Memory-conscious (≤4 GB)**
+- `REPORT_WORKERS=1`, `RUN_WORKERS=2`, `ATTACHMENT_WORKERS=3`
+- `ATTACHMENT_BATCH_SIZE=10`, `ATTACHMENT_MAX_BYTES=75000000`
+- `REPORT_TABLE_SNAPSHOT=0` (skip preview tables) and `TABLE_SNAPSHOT_LIMIT=1`
+- Favor `ATTACHMENT_INLINE_MAX_BYTES=200000` to keep embedded blobs small
+- Set `REPORT_WORKER_IDLE_SECS=60` so idle threads release memory sooner
+
+**Throughput-focused (≥8 GB)**
+- `REPORT_WORKERS=3`, `RUN_WORKERS=4`, `ATTACHMENT_WORKERS=8`
+- `ATTACHMENT_BATCH_SIZE=0` (no batching) for maximum parallel downloads
+- Keep `REPORT_TABLE_SNAPSHOT=1` with `TABLE_SNAPSHOT_LIMIT=3` for UI previews
+- Increase `ATTACHMENT_MAX_BYTES` if your plans require large media
+- Ensure `MEM_LOG_INTERVAL=30` so you can monitor peaks during load tests
+
+Use these as starting points—mix and match depending on your SLA (e.g., bump `ATTACHMENT_WORKERS` only when TestRail rate limits allow it).
+
 ## Debugging
 
 - Health: `GET /healthz` returns `{ "ok": true }` when the app is up.
@@ -153,7 +171,7 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 - Attachments not visible after download: ensure you regenerated the report after upgrading (older HTML lacked inline images). Inline rendering requires modern browsers that support data URLs.
 - Slow generation or high memory: tune the worker env vars listed above, lower `ATTACHMENT_MAX_BYTES`, or raise `ATTACHMENT_BATCH_SIZE` to reduce concurrent files.
 - Bundle missing attachments: confirm `out/attachments/run_*` exists and that the download button grabs the `.zip` (HTML-only downloads no longer embed files).
-- Memory stuck high in Docker: the Dockerfile now ships with `libjemalloc` and `MALLOC_CONF="background_thread:true,dirty_decay_ms:200,muzzy_decay_ms:200,narenas:2,oversize_threshold:131072"` so RSS drops after jobs. If you fork the image, keep those settings or expect glibc to hold the high-water mark.
+- Memory stuck high in Docker: the Dockerfile now ships with `libjemalloc` and `MALLOC_CONF="background_thread:true,dirty_decay_ms:600,muzzy_decay_ms:600"` so RSS drops after jobs. If you fork the image, keep those settings or expect glibc to hold the high-water mark.
 
 ## Roadmap ideas
 - Optional per-run donut charts

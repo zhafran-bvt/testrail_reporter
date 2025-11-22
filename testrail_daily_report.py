@@ -36,6 +36,27 @@ except ImportError:  # pragma: no cover - psutil optional
 load_dotenv(override=True)
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+
+VERBOSE_STAGE_LOGS = _env_flag("REPORT_VERBOSE_LOGS", False)
+NOISY_STAGES = {
+    "run_data_loaded",
+    "run_users_ready",
+    "run_summary_ready",
+    "run_table_built",
+    "run_latest_results",
+    "run_download_queue",
+    "run_payload_written",
+    "run_summary_updated",
+    "run_stop",
+}
+
+
 # --- Telemetry helpers ---
 _telemetry_ctx: contextvars.ContextVar[dict | None] = contextvars.ContextVar("testrail_reporter_telemetry", default=None)
 
@@ -775,7 +796,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     """Generate a report for a plan or run and return the output HTML path."""
     def notify(stage: str, **payload):
         log_payload = {k: payload.get(k) for k in sorted(payload)}
-        print(f"[report-log] stage={stage} payload={log_payload}", flush=True)
+        if VERBOSE_STAGE_LOGS or stage not in NOISY_STAGES:
+            print(f"[report-log] stage={stage} payload={log_payload}", flush=True)
         if progress:
             try:
                 progress(stage, payload)

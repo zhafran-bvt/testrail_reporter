@@ -198,6 +198,34 @@ class ReportJobManager:
                     position += 1
         return None
 
+    def stats(self) -> dict[str, Any]:
+        with self.lock:
+            total = len(self.order)
+            running = 0
+            queued = 0
+            recent_status = None
+            recent_id = None
+            for jid in self.order:
+                job = self.jobs.get(jid)
+                if not job:
+                    continue
+                if job.status == "running":
+                    running += 1
+                elif job.status == "queued":
+                    queued += 1
+            if self.order:
+                latest = self.jobs.get(self.order[-1])
+                if latest:
+                    recent_status = latest.status
+                    recent_id = latest.id
+        return {
+            "size": total,
+            "running": running,
+            "queued": queued,
+            "history_limit": self.max_history,
+            "latest_job": {"id": recent_id, "status": recent_status} if recent_id else None,
+        }
+
     def _trim_history(self):
         with self.lock:
             while len(self.order) > self.max_history:
@@ -434,7 +462,7 @@ def on_shutdown():
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True}
+    return {"ok": True, "queue": _job_manager.stats()}
 
 
 @app.get("/", response_class=HTMLResponse)

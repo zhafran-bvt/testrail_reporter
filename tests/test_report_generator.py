@@ -332,6 +332,54 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.get_users_map')
     @patch('testrail_daily_report.get_priorities_map')
     @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.env_or_die')
+    def test_generate_report_html_contains_runs(self, mock_env_or_die, mock_statuses_map, mock_priorities_map,
+                                                mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                                mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Plan", "entries": [{"runs": [{"id": 50, "name": "First"}, {"id": 60, "name": "Second"}]}]}
+        mock_plan_runs.return_value = [50, 60]
+
+        def tests_side_effect(_session, _base, rid):
+            return [{"id": rid, "title": f"Test {rid}", "status_id": 1, "priority_id": 1, "assignedto_id": 1}]
+
+        mock_tests_for_run.side_effect = tests_side_effect
+        mock_results_for_run.return_value = [{"id": 300, "test_id": 50, "status_id": 1}]
+        mock_get_attachments_for_test.return_value = []
+        mock_download_attachment.return_value = (b"bytes", "image/png")
+        mock_users_map.return_value = {1: "Solo"}
+        mock_priorities_map.return_value = {1: "P1"}
+        mock_statuses_map.return_value = {1: "Passed"}
+
+        path = generate_report(project=1, plan=200, run_ids=[50, 60])
+        html_path = Path(path)
+        self.assertTrue(html_path.exists())
+        html = html_path.read_text(encoding="utf-8")
+        self.assertIn("Run #50", html)
+        self.assertIn("Run #60", html)
+        html_path.unlink(missing_ok=True)
+        bundle = html_path.with_suffix(".zip")
+        if bundle.exists():
+            bundle.unlink()
+        attachments_dir = Path("out") / "attachments"
+        if attachments_dir.exists():
+            shutil.rmtree(attachments_dir)
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
     @patch('testrail_daily_report.render_html')
     @patch('testrail_daily_report.env_or_die')
     def test_generate_report_snapshot_disabled(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
