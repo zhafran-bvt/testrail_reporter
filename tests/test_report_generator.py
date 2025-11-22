@@ -235,6 +235,105 @@ class TestReportGenerator(unittest.TestCase):
     @patch('testrail_daily_report.get_statuses_map')
     @patch('testrail_daily_report.render_html')
     @patch('testrail_daily_report.env_or_die')
+    def test_generate_report_multiple_runs_snapshot(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                                    mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                                    mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Plan", "entries": [{"runs": [{"id": 10, "name": "Alpha"}, {"id": 20, "name": "Beta"}]}]}
+        mock_plan_runs.return_value = [10, 20]
+
+        def tests_side_effect(_session, _base, rid):
+            if rid == 10:
+                return [{"id": 1, "title": "A", "status_id": 1, "priority_id": 1, "assignedto_id": 1}]
+            return [{"id": 2, "title": "B", "status_id": 5, "priority_id": 2, "assignedto_id": 2}]
+
+        mock_tests_for_run.side_effect = tests_side_effect
+        mock_results_for_run.side_effect = lambda *_: [{"id": 100, "test_id": 1, "status_id": 1}]
+        mock_get_attachments_for_test.return_value = []
+        mock_download_attachment.return_value = (b"", "image/png")
+        mock_users_map.return_value = {1: "U1", 2: "U2"}
+        mock_priorities_map.return_value = {1: "P1", 2: "P2"}
+        mock_statuses_map.return_value = {1: "Passed", 5: "Failed"}
+        mock_render_html.return_value = "/tmp/multi.html"
+
+        path = generate_report(project=1, plan=77, run_ids=[10, 20])
+        self.assertEqual(path, "/tmp/multi.html")
+        context = mock_render_html.call_args[0][0]
+        self.assertEqual(len(context["tables"]), 2)
+        run_ids = [card["run_id"] for card in context["tables"]]
+        self.assertEqual(run_ids, [10, 20])
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_generate_report_mixed_attachment_runs(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                                   mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                                   mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Plan", "entries": [{"runs": [{"id": 30, "name": "NoFiles"}, {"id": 40, "name": "WithFiles"}]}]}
+        mock_plan_runs.return_value = [30, 40]
+
+        def tests_side_effect(_session, _base, rid):
+            return [{"id": rid, "title": f"Run {rid}", "status_id": 1, "priority_id": 1, "assignedto_id": 1}]
+
+        mock_tests_for_run.side_effect = tests_side_effect
+        def results_side_effect(_session, _base, rid):
+            return [{"id": 200 + rid, "test_id": rid, "status_id": 1}]
+
+        mock_results_for_run.side_effect = results_side_effect
+
+        def attachments_side_effect(_session, _base, test_id):
+            if test_id == 30:
+                return []
+            return [{"id": 400, "name": "pic.png", "result_id": 200 + test_id, "size": 10}]
+
+        mock_get_attachments_for_test.side_effect = attachments_side_effect
+        mock_download_attachment.return_value = (b"bytes", "image/png")
+        mock_users_map.return_value = {1: "Solo"}
+        mock_priorities_map.return_value = {1: "P1"}
+        mock_statuses_map.return_value = {1: "Passed"}
+        mock_render_html.return_value = "/tmp/mixed.html"
+
+        path = generate_report(project=1, plan=88, run_ids=[30, 40])
+        self.assertEqual(path, "/tmp/mixed.html")
+        context = mock_render_html.call_args[0][0]
+        self.assertEqual(len(context["tables"]), 2)
+        no_files = context["tables"][0]["rows"][0]["attachments"]
+        with_files = context["tables"][1]["rows"][0]["attachments"]
+        self.assertEqual(no_files, [])
+        self.assertEqual(len(with_files), 1)
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
     def test_generate_report_snapshot_disabled(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
                                                mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
                                                mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
