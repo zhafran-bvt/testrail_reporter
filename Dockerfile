@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libjemalloc2 && rm -rf /var/lib/apt/lists/*
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 \
-    MALLOC_CONF="background_thread:true,dirty_decay_ms:200,muzzy_decay_ms:200,narenas:2,oversize_threshold:131072"
+    MALLOC_CONF="background_thread:true,dirty_decay_ms:600,muzzy_decay_ms:600"
 
 COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt

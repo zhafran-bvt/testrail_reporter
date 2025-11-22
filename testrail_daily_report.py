@@ -966,13 +966,22 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
 
     with runs_cache.open("w", encoding="utf-8") as sink:
         for idx, rid in enumerate(run_ids_resolved, start=1):
-            notify("processing_run", run_id=rid, index=idx, total=total_runs)
+            notify("processing_run", run_id=rid, index=idx, total=total_runs, remaining=len(run_ids_resolved) - idx)
             local_session = _make_session()
             try:
                 results = get_results_for_run(local_session, base_url, rid)
                 tests = get_tests_for_run(local_session, base_url, rid)
             finally:
                 local_session.close()
+            try:
+                tests_count = len(tests)
+            except Exception:
+                tests_count = 0
+            try:
+                results_count = len(results)
+            except Exception:
+                results_count = 0
+            notify("run_data_loaded", run_id=rid, tests=tests_count, results=results_count)
 
             # Ensure assignee IDs are resolvable to names
             if user_lookup_allowed:
@@ -984,7 +993,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     result_ids = {int(x) for x in pd.DataFrame(results).get("assignedto_id", pd.Series([], dtype="float")).dropna().astype(int).tolist()}
                 except Exception:
                     result_ids = set()
-                for uid in (test_ids | result_ids):
+                missing_users = (test_ids | result_ids) - set(users_map)
+                for uid in missing_users:
                     if uid in users_map:
                         continue
                     try:
@@ -995,10 +1005,12 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                         break
                     if isinstance(u, dict) and u.get("id") is not None:
                         users_map[int(u["id"])] = u.get("name") or u.get("email") or str(u["id"])
+            notify("run_users_ready", run_id=rid, known_users=len(users_map))
 
             res_summary = summarize_results(results, status_map=statuses_map)
-            del results
+            notify("run_summary_ready", run_id=rid, rows=len(res_summary["df"]))
             table_df = build_test_table(pd.DataFrame(tests), res_summary["df"], users_map=users_map, priorities_map=priorities_map, status_map=statuses_map)
+            notify("run_table_built", run_id=rid, rows=len(table_df))
             # Compute counts from the merged table (one row per test)
             counts = table_df["status_name"].value_counts().to_dict()
             normalized_counts: dict[str, int] = {}
@@ -1055,6 +1067,7 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     result_id = getattr(rec, "id", None)
                     if result_id is not None and not pd.isna(result_id):
                         latest_result_ids[tid_int] = int(result_id)
+            notify("run_latest_results", run_id=rid, latest=len(latest_result_ids))
             attachments_by_test: dict[int, list[dict]] = {}
             for tid, result_id in latest_result_ids.items():
                 attachments_by_test.setdefault(tid, [])
@@ -1149,9 +1162,10 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                             "initial_type": inferred_type,
                             "size": att.get("size"),
                         })
-    
+
             download_limit = attachment_size_limit if attachment_size_limit > 0 else None
             if download_jobs:
+                notify("run_download_queue", run_id=rid, jobs=len(download_jobs))
                 inline_limit = inline_embed_limit
                 inline_video_limit = video_inline_limit
                 total_downloads = len(download_jobs)
@@ -1339,6 +1353,8 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                     _process_batch(batch_jobs)
     
                 log_memory(f"after_attachment_downloads_{rid}")
+            else:
+                notify("run_download_queue", run_id=rid, jobs=0)
             download_jobs.clear()
             metadata_map.clear()
             gc.collect()
@@ -1348,67 +1364,70 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 skipped = entry.get("skipped", False)
                 return (skipped, path)
     
-        for tid, items in attachments_by_test.items():
-            items.sort(key=_attachment_sort_key)
-
-        run_has_files = any(
-            entry.get("path")
-            for entries in attachments_by_test.values()
-            for entry in entries
-        )
-        run_attachment_dir = Path("out") / "attachments" / f"run_{rid}"
-        if run_has_files and run_attachment_dir.exists():
-            bundle_dirs.add(run_attachment_dir)
-
-        rows_payload = []
-        for record in table_df.itertuples(index=False, name="Row"):
-            row = record._asdict()
-            tid = row.get("test_id")
-            tid_int = None
-            if tid is not None and not (isinstance(tid, float) and pd.isna(tid)):
-                try:
-                    tid_int = int(tid)
-                except (TypeError, ValueError):
-                    tid_int = None
-            row["comment"] = comments_by_test.get(tid_int, "")
-            row["attachments"] = attachments_by_test.get(tid_int, [])
-            refs_val = row.get("refs")
-            if refs_val is None:
-                row["refs"] = []
-            elif isinstance(refs_val, str):
-                row["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
-            elif isinstance(refs_val, list):
-                row["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
-            else:
-                row["refs"] = [str(refs_val)]
-            rows_payload.append(row)
+            for tid, items in attachments_by_test.items():
+                items.sort(key=_attachment_sort_key)
     
-        run_payload = {
-            "run_id": rid,
-            "run_name": run_names.get(int(rid)) if run_names else None,
-            "rows": rows_payload,
-            "counts": counts,
-            "total": run_total,
-            "pass_rate": run_pass_rate,
-            "donut_style": run_donut_style,
-            "donut_legend": segs,
-            "refs": sorted(run_refs),
-            "run_passed": run_passed,
-            "run_failed": run_failed,
-        }
-        json.dump(run_payload, sink)
-        sink.write("\n")
-        if snapshot_enabled and len(tables_snapshot) < snapshot_limit:
-            tables_snapshot.append(_snapshot_run(run_payload))
-        summary["total"] += run_total
-        summary["Passed"] += run_passed
-        summary["Failed"] += run_failed
-        for k, v in counts.items():
-            summary["by_status"][k] = summary["by_status"].get(k, 0) + v
-        report_refs.update(run_refs)
-        log_memory(f"run_complete_{rid}")
-        del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
-        gc.collect()
+            run_has_files = any(
+                entry.get("path")
+                for entries in attachments_by_test.values()
+                for entry in entries
+            )
+            run_attachment_dir = Path("out") / "attachments" / f"run_{rid}"
+            if run_has_files and run_attachment_dir.exists():
+                bundle_dirs.add(run_attachment_dir)
+    
+            rows_payload = []
+            for record in table_df.itertuples(index=False, name="Row"):
+                row = record._asdict()
+                tid = row.get("test_id")
+                tid_int = None
+                if tid is not None and not (isinstance(tid, float) and pd.isna(tid)):
+                    try:
+                        tid_int = int(tid)
+                    except (TypeError, ValueError):
+                        tid_int = None
+                row["comment"] = comments_by_test.get(tid_int, "")
+                row["attachments"] = attachments_by_test.get(tid_int, [])
+                refs_val = row.get("refs")
+                if refs_val is None:
+                    row["refs"] = []
+                elif isinstance(refs_val, str):
+                    row["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
+                elif isinstance(refs_val, list):
+                    row["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
+                else:
+                    row["refs"] = [str(refs_val)]
+                rows_payload.append(row)
+    
+            run_payload = {
+                "run_id": rid,
+                "run_name": run_names.get(int(rid)) if run_names else None,
+                "rows": rows_payload,
+                "counts": counts,
+                "total": run_total,
+                "pass_rate": run_pass_rate,
+                "donut_style": run_donut_style,
+                "donut_legend": segs,
+                "refs": sorted(run_refs),
+                "run_passed": run_passed,
+                "run_failed": run_failed,
+            }
+            json.dump(run_payload, sink)
+            sink.write("\n")
+            notify("run_payload_written", run_id=rid, rows=run_total, attachments=sum(len(v) for v in attachments_by_test.values()))
+            if snapshot_enabled and len(tables_snapshot) < snapshot_limit:
+                tables_snapshot.append(_snapshot_run(run_payload))
+            summary["total"] += run_total
+            summary["Passed"] += run_passed
+            summary["Failed"] += run_failed
+            for k, v in counts.items():
+                summary["by_status"][k] = summary["by_status"].get(k, 0) + v
+            report_refs.update(run_refs)
+            notify("run_summary_updated", run_id=rid, total=summary["total"])
+            notify("run_stop", run_id=rid, index=idx)
+            log_memory(f"run_complete_{rid}")
+            del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
+            gc.collect()
 
     try:
         with runs_cache.open("r", encoding="utf-8") as verify_fp:
