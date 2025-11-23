@@ -166,7 +166,6 @@
         </button>
         <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center justify-content-center" onclick="downloadHTML()" aria-label="Download HTML" title="Download HTML">
           <svg viewBox="0 0 24 24" width="16" height="16" class="me-1"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4.002 4.002a1 1 0 0 1-1.414 0l-4.002-4.002a1 1 0 0 1 1.414-1.414L11 13.586V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v2h12v-2a1 1 0 0 1 2 0v3a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z"/></svg>
-          Download
         </button>
       </div>
     </div>
@@ -342,22 +341,23 @@
                 </td>
                 <td>
                   {% set attachments = r.attachments or [] %}
-                  {% set attachment_count = attachments|length %}
-                  {% if attachment_count > 0 %}
+                  {% set viewable = attachments|rejectattr('skipped')|list %}
+                  {% set viewable_count = viewable|length %}
+                  {% if viewable_count > 0 %}
                     <button type="button" class="btn btn-outline-primary btn-sm attachment-trigger"
                             data-run="{{ t.run_id }}"
                             data-test="{{ r.test_id }}"
                             data-title="{{ r.title|e }}"
                             data-comment="{{ r.comment|default('', true)|e }}"
-                            data-attachments='{{ attachments|tojson }}'>
-                      View ({{ attachment_count }})
+                            data-attachments='{{ viewable|tojson }}'>
+                      View ({{ viewable_count }})
                     </button>
-                    {% set skipped_count = attachments|selectattr('skipped')|list|length %}
-                    {% if skipped_count > 0 %}
-                      <div class="text-muted small mt-1">
-                        {{ skipped_count }} attachment{% if skipped_count != 1 %}s{% endif %} too large.
-                      </div>
-                    {% endif %}
+                  {% endif %}
+                  {% set skipped_count = attachments|selectattr('skipped')|list|length %}
+                  {% if skipped_count > 0 %}
+                    <div class="text-muted small mt-1">
+                      {{ skipped_count }} attachment{% if skipped_count != 1 %}s{% endif %} too large.
+                    </div>
                   {% endif %}
                 </td>
               </tr>
@@ -692,19 +692,18 @@
 
     function downloadHTML() {
       try {
-        const current = window.location.pathname;
-        let zipPath = current.replace(/\.html(\?.*)?$/, '.zip$1');
-        if (zipPath === current) {
-          zipPath = current + '.zip';
-        }
+        const href = window.location.href;
+        const segments = window.location.pathname.split('/');
+        const rawName = segments[segments.length - 1] || 'report.html';
+        const filename = rawName.split('?')[0] || 'report.html';
         const link = document.createElement('a');
-        link.href = zipPath;
-        link.download = zipPath.split('/').pop();
+        link.href = href;
+        link.download = filename;
         document.body.appendChild(link);
         link.click();
         link.remove();
       } catch (e) {
-        alert('Failed to download bundle: ' + e);
+        alert('Failed to download report: ' + e);
       }
     }
   </script>

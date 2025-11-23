@@ -279,10 +279,6 @@ class ReportJobManager:
                 "api_call_count": len(api_calls),
                 "api_calls": api_calls,
             }
-            bundle_path = getattr(path, "bundle_path", None)
-            if bundle_path:
-                job.meta["bundle_path"] = bundle_path
-                job.meta["bundle_url"] = "/reports/" + Path(bundle_path).name
             job.status = "success"
             print(f"[report-job] {job_id} completed in {duration_ms:.0f}ms -> {job.url}", flush=True)
         except Exception as exc:

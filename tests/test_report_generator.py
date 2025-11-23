@@ -1,13 +1,11 @@
 
 import os
 import shutil
-import tempfile
 import unittest
-import zipfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pandas as pd
-from testrail_daily_report import generate_report, build_test_table, build_report_bundle
+from testrail_daily_report import generate_report, build_test_table
 
 class TestReportGenerator(unittest.TestCase):
 
@@ -111,11 +109,7 @@ class TestReportGenerator(unittest.TestCase):
         self.assertEqual(first_row.get('comment'), "Needs fix")
         attachments = first_row.get('attachments', [])
         self.assertEqual(len(attachments), 2)
-        paths = {att['path'] for att in attachments}
-        self.assertEqual(paths, {
-            "attachments/run_101/test_2_att_102.png",
-            "attachments/run_101/test_2_att_103.png",
-        })
+        self.assertTrue(all(att.get('data_url', '').startswith('data:') for att in attachments))
 
     @patch('testrail_daily_report.get_project')
     @patch('testrail_daily_report.get_plan')
@@ -219,13 +213,9 @@ class TestReportGenerator(unittest.TestCase):
         attachments = rows[0].get('attachments', [])
         self.assertEqual(len(attachments), 1)
         video = attachments[0]
-        self.assertEqual(video['path'], "attachments/run_301/test_5_att_201.mp4")
         self.assertTrue(video['is_video'])
-        # Small video may be inlined as data_url; allow either
-        if video.get('data_url'):
-            self.assertTrue(video['data_url'].startswith('data:'))
-        else:
-            self.assertFalse(bool(video.get('data_url')))
+        self.assertTrue(video.get('data_url', '').startswith('data:'))
+        self.assertFalse(video.get('skipped'))
         self.assertEqual(rows[0].get('assignee'), "User Eleven")
         self.assertTrue(mock_transcode_video.called)
 
@@ -369,9 +359,6 @@ class TestReportGenerator(unittest.TestCase):
         self.assertIn("Run #50", html)
         self.assertIn("Run #60", html)
         html_path.unlink(missing_ok=True)
-        bundle = html_path.with_suffix(".zip")
-        if bundle.exists():
-            bundle.unlink()
         attachments_dir = Path("out") / "attachments"
         if attachments_dir.exists():
             shutil.rmtree(attachments_dir)
@@ -417,6 +404,46 @@ class TestReportGenerator(unittest.TestCase):
 
         self.assertEqual(path, "/tmp/video-disabled.html")
         self.assertFalse(mock_transcode_video.called)
+
+    @patch('testrail_daily_report.get_project')
+    @patch('testrail_daily_report.get_plan')
+    @patch('testrail_daily_report.get_plan_runs')
+    @patch('testrail_daily_report.get_tests_for_run')
+    @patch('testrail_daily_report.download_attachment')
+    @patch('testrail_daily_report.get_attachments_for_test')
+    @patch('testrail_daily_report.get_results_for_run')
+    @patch('testrail_daily_report.get_users_map')
+    @patch('testrail_daily_report.get_priorities_map')
+    @patch('testrail_daily_report.get_statuses_map')
+    @patch('testrail_daily_report.render_html')
+    @patch('testrail_daily_report.env_or_die')
+    def test_keep_attachment_files_flag(self, mock_env_or_die, mock_render_html, mock_statuses_map, mock_priorities_map,
+                                        mock_users_map, mock_results_for_run, mock_get_attachments_for_test,
+                                        mock_download_attachment, mock_tests_for_run, mock_plan_runs, mock_plan, mock_project):
+        mock_env_or_die.side_effect = lambda key: {
+            "TESTRAIL_BASE_URL": "http://fake-testrail.com",
+            "TESTRAIL_USER": "user",
+            "TESTRAIL_API_KEY": "key"
+        }[key]
+        mock_project.return_value = {"name": "Project"}
+        mock_plan.return_value = {"name": "Plan", "entries": [{"runs": [{"id": 501, "name": "Inline"}]}]}
+        mock_plan_runs.return_value = [501]
+        mock_tests_for_run.return_value = [{"id": 42, "title": "Attachment", "status_id": 1, "priority_id": 1, "assignedto_id": 1}]
+        mock_results_for_run.return_value = [{"id": 42, "test_id": 42, "status_id": 1}]
+        mock_get_attachments_for_test.return_value = [{"id": 600, "name": "pic.png", "result_id": 42, "size": 512}]
+        mock_download_attachment.return_value = (b"\x89PNG\r\n\x1a\n", "image/png")
+        mock_users_map.return_value = {1: "User"}
+        mock_priorities_map.return_value = {1: "P1"}
+        mock_statuses_map.return_value = {1: "Passed"}
+        mock_render_html.return_value = "/tmp/no-files.html"
+
+        path = generate_report(project=1, plan=777, run_ids=[501])
+
+        self.assertEqual(path, "/tmp/no-files.html")
+        self.assertFalse((Path("out") / "attachments").exists())
+        html = Path(path)
+        if html.exists():
+            html.unlink()
 
     @patch('testrail_daily_report.get_project')
     @patch('testrail_daily_report.get_plan')
@@ -651,30 +678,6 @@ class TestReportGenerator(unittest.TestCase):
         self.assertEqual(table.iloc[0]['assignee'], 'User Y')
         self.assertEqual(table.iloc[1]['priority'], 'High')
 
-
-class TestBundleHelpers(unittest.TestCase):
-    def test_build_report_bundle_handles_absolute_paths(self):
-        orig_cwd = os.getcwd()
-        with tempfile.TemporaryDirectory() as tmp:
-            try:
-                os.chdir(tmp)
-                out_dir = Path("out")
-                attachments_dir = out_dir / "attachments" / "run_1"
-                attachments_dir.mkdir(parents=True, exist_ok=True)
-                html_path = out_dir / "report.html"
-                html_path.parent.mkdir(parents=True, exist_ok=True)
-                html_path.write_text("<html></html>", encoding="utf-8")
-                attachment_file = attachments_dir / "test_1_att_2.png"
-                attachment_file.write_bytes(b"img-bytes")
-                bundle = build_report_bundle(html_path, {attachments_dir})
-                self.assertIsNotNone(bundle)
-                self.assertTrue(Path(bundle).exists())
-                with zipfile.ZipFile(bundle, "r") as zf:
-                    members = zf.namelist()
-                    self.assertIn("report.html", members)
-                    self.assertIn("attachments/run_1/test_1_att_2.png", members)
-            finally:
-                os.chdir(orig_cwd)
 
 if __name__ == '__main__':
     unittest.main()

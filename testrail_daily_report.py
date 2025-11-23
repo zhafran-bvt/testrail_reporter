@@ -8,7 +8,7 @@ Requires env vars:
     TESTRAIL_BASE_URL, TESTRAIL_USER, TESTRAIL_API_KEY
 """
 
-import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math, gc, json, zipfile, subprocess
+import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math, gc, json, subprocess
 import time
 import contextvars
 import contextlib
@@ -721,15 +721,6 @@ def compress_image_file(input_path: Path, content_type: str | None, output_path:
             return content_type, 0, None
 
 
-class ReportOutput(str):
-    """String subclass that carries bundle metadata."""
-
-    def __new__(cls, path: str, bundle_path: str | None):
-        obj = str.__new__(cls, path)
-        obj.bundle_path = bundle_path
-        return obj
-
-
 class VideoTranscodeError(Exception):
     pass
 
@@ -798,38 +789,6 @@ def render_streaming_report(context: dict, runs_cache: Path, out_path: Path):
             dest.write(chunk)
     return str(out_path)
 
-
-def build_report_bundle(html_path: Path, attachment_dirs: set[Path]) -> Path | None:
-    """Create a ZIP bundle with the HTML and referenced attachments."""
-    try:
-        html_path = Path(html_path)
-        html_abs = html_path.resolve()
-        bundle_path = html_abs.with_suffix(".zip")
-        attachments_root = (Path("out") / "attachments").resolve()
-        with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.write(html_abs, arcname=html_abs.name)
-            for directory in attachment_dirs:
-                dir_path = Path(directory)
-                if not dir_path.exists():
-                    continue
-                dir_abs = dir_path.resolve()
-                try:
-                    rel_dir = dir_abs.relative_to(attachments_root)
-                except ValueError:
-                    rel_dir = Path(dir_abs.name)
-                for file_path in dir_abs.rglob("*"):
-                    if not file_path.is_file():
-                        continue
-                    file_abs = file_path.resolve()
-                    try:
-                        arc_rel = Path("attachments") / file_abs.relative_to(attachments_root)
-                    except ValueError:
-                        arc_rel = Path("attachments") / rel_dir / file_abs.name
-                    zf.write(file_abs, arcname=str(arc_rel))
-        return bundle_path
-    except Exception as exc:
-        print(f"Warning: failed to create report bundle: {exc}", file=sys.stderr)
-        return None
 
 def render_html(context: dict, out_path: Path):
     """Backward-compatible wrapper so tests can patch render_html."""
@@ -990,8 +949,10 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     snapshot_limit = max(1, snapshot_limit)
     tables_snapshot: list[dict] = []
     runs_cache = Path(tempfile.NamedTemporaryFile(delete=False).name)
+    runs_cache.parent.mkdir(parents=True, exist_ok=True)
+    with runs_cache.open("w", encoding="utf-8") as sink_init:
+        sink_init.write("")
     total_runs = len(run_ids_resolved)
-    bundle_dirs: set[Path] = set()
     snapshot_env = os.getenv("REPORT_TABLE_SNAPSHOT")
     if snapshot_env is not None:
         snapshot_enabled = _flag_enabled(snapshot_env)
@@ -1046,15 +1007,14 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
         base["rows"] = rows_preview
         return base
 
-    with runs_cache.open("w", encoding="utf-8") as sink:
-        for idx, rid in enumerate(run_ids_resolved, start=1):
-            notify("processing_run", run_id=rid, index=idx, total=total_runs, remaining=len(run_ids_resolved) - idx)
-            local_session = _make_session()
-            try:
-                results = get_results_for_run(local_session, base_url, rid)
-                tests = get_tests_for_run(local_session, base_url, rid)
-            finally:
-                local_session.close()
+    for idx, rid in enumerate(run_ids_resolved, start=1):
+        notify("processing_run", run_id=rid, index=idx, total=total_runs, remaining=len(run_ids_resolved) - idx)
+        local_session = _make_session()
+        try:
+            results = get_results_for_run(local_session, base_url, rid)
+            tests = get_tests_for_run(local_session, base_url, rid)
+        finally:
+            local_session.close()
             try:
                 tests_count = len(tests)
             except Exception:
@@ -1426,17 +1386,23 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                             data_url = f"data:{mime};base64,{data_b64}"
                         except Exception:
                             data_url = None
-                    public_path = str(job["rel_path"]).replace(os.sep, "/")
                     entry = {
                         "name": job["filename"],
-                        "path": public_path,
+                        "path": None,
                         "content_type": content_type,
                         "size": job.get("size") or size_bytes,
                         "is_image": is_image,
                         "is_video": is_video,
                         "data_url": data_url,
                         "inline_embedded": bool(data_url),
+                        "skipped": False,
+                        "skip_reason": None,
+                        "limit_bytes": None,
                     }
+                    if data_url is None:
+                        entry["skipped"] = True
+                        entry["skip_reason"] = "inline_limit"
+                        entry["limit_bytes"] = inline_embed_limit
                     return index, job["test_id"], entry
     
                 completed_downloads = 0
@@ -1481,70 +1447,66 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
                 skipped = entry.get("skipped", False)
                 return (skipped, path)
     
-            for tid, items in attachments_by_test.items():
-                items.sort(key=_attachment_sort_key)
-    
-            run_has_files = any(
-                entry.get("path")
-                for entries in attachments_by_test.values()
-                for entry in entries
-            )
-            run_attachment_dir = Path("out") / "attachments" / f"run_{rid}"
-            if run_has_files and run_attachment_dir.exists():
-                bundle_dirs.add(run_attachment_dir)
-    
-            rows_payload = []
-            for record in table_df.itertuples(index=False, name="Row"):
-                row = record._asdict()
-                tid = row.get("test_id")
-                tid_int = None
-                if tid is not None and not (isinstance(tid, float) and pd.isna(tid)):
-                    try:
-                        tid_int = int(tid)
-                    except (TypeError, ValueError):
-                        tid_int = None
-                row["comment"] = comments_by_test.get(tid_int, "")
-                row["attachments"] = attachments_by_test.get(tid_int, [])
-                refs_val = row.get("refs")
-                if refs_val is None:
-                    row["refs"] = []
-                elif isinstance(refs_val, str):
-                    row["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
-                elif isinstance(refs_val, list):
-                    row["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
-                else:
-                    row["refs"] = [str(refs_val)]
-                rows_payload.append(row)
-    
-            run_payload = {
-                "run_id": rid,
-                "run_name": run_names.get(int(rid)) if run_names else None,
-                "rows": rows_payload,
-                "counts": counts,
-                "total": run_total,
-                "pass_rate": run_pass_rate,
-                "donut_style": run_donut_style,
-                "donut_legend": segs,
-                "refs": sorted(run_refs),
-                "run_passed": run_passed,
-                "run_failed": run_failed,
-            }
+        for tid, items in attachments_by_test.items():
+            items.sort(key=_attachment_sort_key)
+
+        run_attachment_dir = Path("out") / "attachments" / f"run_{rid}"
+        if run_attachment_dir.exists():
+            shutil.rmtree(run_attachment_dir, ignore_errors=True)
+
+        rows_payload: list[dict] = []
+        for record in table_df.itertuples(index=False, name="Row"):
+            row = record._asdict()
+            tid = row.get("test_id")
+            tid_int = None
+            if tid is not None and not (isinstance(tid, float) and pd.isna(tid)):
+                try:
+                    tid_int = int(tid)
+                except (TypeError, ValueError):
+                    tid_int = None
+            row["comment"] = comments_by_test.get(tid_int, "")
+            row["attachments"] = attachments_by_test.get(tid_int, [])
+            refs_val = row.get("refs")
+            if refs_val is None:
+                row["refs"] = []
+            elif isinstance(refs_val, str):
+                row["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
+            elif isinstance(refs_val, list):
+                row["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
+            else:
+                row["refs"] = [str(refs_val)]
+            rows_payload.append(row)
+
+        run_payload = {
+            "run_id": rid,
+            "run_name": run_names.get(int(rid)) if run_names else None,
+            "rows": rows_payload,
+            "counts": counts,
+            "total": run_total,
+            "pass_rate": run_pass_rate,
+            "donut_style": run_donut_style,
+            "donut_legend": segs,
+            "refs": sorted(run_refs),
+            "run_passed": run_passed,
+            "run_failed": run_failed,
+        }
+        with runs_cache.open("a", encoding="utf-8") as sink:
             json.dump(run_payload, sink)
             sink.write("\n")
-            notify("run_payload_written", run_id=rid, rows=run_total, attachments=sum(len(v) for v in attachments_by_test.values()))
-            if snapshot_enabled and len(tables_snapshot) < snapshot_limit:
-                tables_snapshot.append(_snapshot_run(run_payload))
-            summary["total"] += run_total
-            summary["Passed"] += run_passed
-            summary["Failed"] += run_failed
-            for k, v in counts.items():
-                summary["by_status"][k] = summary["by_status"].get(k, 0) + v
-            report_refs.update(run_refs)
-            notify("run_summary_updated", run_id=rid, total=summary["total"])
-            notify("run_stop", run_id=rid, index=idx)
-            log_memory(f"run_complete_{rid}")
-            del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
-            gc.collect()
+        notify("run_payload_written", run_id=rid, rows=run_total, attachments=sum(len(v) for v in attachments_by_test.values()))
+        if snapshot_enabled and len(tables_snapshot) < snapshot_limit:
+            tables_snapshot.append(_snapshot_run(run_payload))
+        summary["total"] += run_total
+        summary["Passed"] += run_passed
+        summary["Failed"] += run_failed
+        for k, v in counts.items():
+            summary["by_status"][k] = summary["by_status"].get(k, 0) + v
+        report_refs.update(run_refs)
+        notify("run_summary_updated", run_id=rid, total=summary["total"])
+        notify("run_stop", run_id=rid, index=idx)
+        log_memory(f"run_complete_{rid}")
+        del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
+        gc.collect()
 
     try:
         with runs_cache.open("r", encoding="utf-8") as verify_fp:
@@ -1630,11 +1592,13 @@ def generate_report(project: int, plan: int | None = None, run: int | None = Non
     except Exception:
         pass
     gc.collect()
-    bundle_path = build_report_bundle(rendered, bundle_dirs) if rendered.exists() else None
     tables_snapshot.clear()
-    bundle_dirs.clear()
+    try:
+        shutil.rmtree(Path("out") / "attachments", ignore_errors=True)
+    except Exception:
+        pass
     gc.collect()
-    return ReportOutput(str(rendered), str(bundle_path) if bundle_path else None)
+    return str(rendered)
 
 
 def main():
@@ -1656,9 +1620,6 @@ def main():
             raise ValueError("--runs can only be used together with --plan")
         result = generate_report(project=args.project, plan=args.plan, run=args.run, run_ids=args.runs)
         print(f"✅ Report saved to: {result}")
-        bundle_path = getattr(result, "bundle_path", None)
-        if bundle_path:
-            print(f"📦 Bundle saved to: {bundle_path}")
     except (ValueError, requests.exceptions.RequestException) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

@@ -13,7 +13,7 @@ Generate and serve clean HTML summaries for TestRail plans or runs. The report i
 - Attachments (screenshots/evidence) are compressed and embedded inline for offline viewing
 - Video attachments can be auto-transcoded via ffmpeg (resolution + bitrate caps) before embedding
 - Streaming renderer keeps memory stable by writing run data to NDJSON and only snapshotting a few preview cards for tests
-- Download button returns a `.zip` bundle (HTML + `/out/attachments/run_*`) so offline reports still include evidence
+- Download button saves the rendered HTML directly (attachments are already inlined for offline use)
 - Robust API handling (pagination, mixed payload shapes)
 
 ## Requirements
@@ -84,14 +84,14 @@ Notes:
   - Preview button opens the generated HTML in a new tab and shows a modal spinner until the file downloads.
   - Plans list auto-loads open plans first; if none, it falls back to all plans.
   - Runs list appears after picking a plan; you can search/filter, select-all, or clear selections.
-  - The Download button fetches the `.zip` bundle next to each HTML (`Testing_Progress_Report_*.zip`) so attachments are available offline.
+  - The Download button saves the HTML that is already loaded (all attachments are embedded as data URLs).
 
 ## Report output & streaming
 
 - **Streaming renderer:** each run is serialized to a temp NDJSON file and streamed into the template. Only a small snapshot (`TABLE_SNAPSHOT_LIMIT`, default 3) is kept in memory for unit tests and preview cards.
-- **Bundles:** every successful job produces both the HTML (`out/*.html`) and a bundle (`out/*.zip`) containing that HTML plus `out/attachments/run_*`. The UI already downloads the `.zip`.
+- **Self-contained HTML:** attachments are compressed/encoded as data URLs, so the HTML alone contains every inline asset. The temporary `/out/attachments/run_*` directories are cleaned up after each job.
 - **Snapshots:** set `REPORT_TABLE_SNAPSHOT=0` to disable in-memory preview tables entirely (useful in production), or adjust `TABLE_SNAPSHOT_LIMIT` when running tests that need more preview rows.
-- **Attachment directories:** attachments live under `out/attachments/run_<id>/...`; the bundle logic now works with absolute paths (important when `WORKDIR=/app` in Docker).
+- **Attachment directories:** attachments live under `out/attachments/run_<id>/...` only while the report is rendering; they are deleted once the HTML has been written.
 
 ## Environment knobs (beyond credentials)
 
@@ -172,7 +172,7 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 - 404 on UI: confirm you started the server in the repo root with `uvicorn app.main:app --reload`, then open `http://127.0.0.1:8000/`.
 - Attachments not visible after download: ensure you regenerated the report after upgrading (older HTML lacked inline images). Inline rendering requires modern browsers that support data URLs.
 - Slow generation or high memory: tune the worker env vars listed above, lower `ATTACHMENT_MAX_BYTES`, or raise `ATTACHMENT_BATCH_SIZE` to reduce concurrent files.
-- Bundle missing attachments: confirm `out/attachments/run_*` exists and that the download button grabs the `.zip` (HTML-only downloads no longer embed files).
+- Missing attachments: confirm `ATTACHMENT_INLINE_MAX_BYTES` and video/image limits are high enough for your evidence. Oversized files are marked as skipped instead of being written next to the HTML.
 - Memory stuck high in Docker: the Dockerfile now ships with `libjemalloc` and `MALLOC_CONF="background_thread:true,dirty_decay_ms:600,muzzy_decay_ms:600"` so RSS drops after jobs. If you fork the image, keep those settings or expect glibc to hold the high-water mark.
 
 ## Roadmap ideas
