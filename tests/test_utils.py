@@ -52,7 +52,7 @@ class TestBuildTestTable(unittest.TestCase):
 
 
 class TestPlansAPIShapes(unittest.TestCase):
-    @patch("testrail_daily_report.api_get")
+    @patch("testrail_client.api_get")
     def test_get_plans_list_and_dict(self, mock_api_get):
         # first page returns dict shape
         mock_api_get.side_effect = [

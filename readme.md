@@ -34,6 +34,9 @@ Set the following environment variables (e.g., in `.env`):
 - `TESTRAIL_BASE_URL`: Base URL to your TestRail, e.g. `https://<subdomain>.testrail.io`
 - `TESTRAIL_USER`: TestRail username or email
 - `TESTRAIL_API_KEY`: TestRail API key
+- `TESTRAIL_HTTP_TIMEOUT`: Per-request timeout in seconds for TestRail API calls (default: `20`)
+- `TESTRAIL_HTTP_RETRIES`: Retry attempts for API/attachment calls on 429/5xx/timeouts (default: `3`)
+- `TESTRAIL_HTTP_BACKOFF`: Initial backoff in seconds between retries; grows exponentially (default: `1.6`)
 
 Load from `.env` is handled automatically via `python-dotenv`.
 
@@ -89,9 +92,9 @@ Notes:
 ## Report output & streaming
 
 - **Streaming renderer:** each run is serialized to a temp NDJSON file and streamed into the template. Only a small snapshot (`TABLE_SNAPSHOT_LIMIT`, default 3) is kept in memory for unit tests and preview cards.
-- **Self-contained HTML:** attachments are compressed/encoded as data URLs, so the HTML alone contains every inline asset. The temporary `/out/attachments/run_*` directories are cleaned up after each job.
+- **Self-contained HTML:** attachments are compressed/encoded as data URLs, so the HTML alone contains every inline asset without leaving disk artifacts behind.
 - **Snapshots:** set `REPORT_TABLE_SNAPSHOT=0` to disable in-memory preview tables entirely (useful in production), or adjust `TABLE_SNAPSHOT_LIMIT` when running tests that need more preview rows.
-- **Attachment directories:** attachments live under `out/attachments/run_<id>/...` only while the report is rendering; they are deleted once the HTML has been written.
+- **Attachment directories:** attachment downloads stay in temp files only while the report is rendering; nothing persists under `out/attachments` once the HTML is written.
 
 ## Environment knobs (beyond credentials)
 
@@ -102,10 +105,11 @@ Notes:
 | `ATTACHMENT_WORKERS`, `ATTACHMENT_WORKERS_MAX` | attachment download threads per run | Useful for hiding network latency; combine with `ATTACHMENT_BATCH_SIZE` to cap concurrent files. |
 | `ATTACHMENT_BATCH_SIZE` | split attachment downloads into batches | `0` disables batching; otherwise the size of each batch submitted to the thread pool. |
 | `ATTACHMENT_MAX_BYTES`, `ATTACHMENT_INLINE_MAX_BYTES`, `ATTACHMENT_VIDEO_INLINE_MAX_BYTES`, `ATTACHMENT_IMAGE_MAX_DIM`, `ATTACHMENT_JPEG_QUALITY`, `ATTACHMENT_MIN_JPEG_QUALITY` | governs compression + skip rules | Set `ATTACHMENT_MAX_BYTES` lower to avoid enormous blobs; inline limits control when we embed base64 payloads. |
-| `ATTACHMENT_VIDEO_TRANSCODE`, `ATTACHMENT_VIDEO_MAX_DIM`, `ATTACHMENT_VIDEO_TARGET_KBPS`, `ATTACHMENT_VIDEO_FFMPEG_PRESET`, `FFMPEG_BIN` | video compression controls | When enabled, ffmpeg transcodes videos to H.264/AAC using these limits before writing to `/out/attachments`. |
+| `ATTACHMENT_VIDEO_TRANSCODE`, `ATTACHMENT_VIDEO_MAX_DIM`, `ATTACHMENT_VIDEO_TARGET_KBPS`, `ATTACHMENT_VIDEO_FFMPEG_PRESET`, `FFMPEG_BIN` | video compression controls | When enabled, ffmpeg transcodes videos to H.264/AAC using these limits before embedding inline. |
 | `REPORT_TABLE_SNAPSHOT`, `TABLE_SNAPSHOT_LIMIT` | controls preview tables used by tests/UI | Disable snapshots in production or shrink the limit to reduce memory. |
 | `REPORT_JOB_HISTORY` | number of completed jobs retained in memory | Default 60; keep modest to avoid unbounded metadata. |
 | `MEM_LOG_INTERVAL` | seconds between `[mem-log]` heartbeat lines | Helps observe allocator behavior in production. |
+| `TESTRAIL_HTTP_TIMEOUT`, `TESTRAIL_HTTP_RETRIES`, `TESTRAIL_HTTP_BACKOFF` | request timeout/retry/backoff for all TestRail calls (including attachments) | Retries on 429, 5xx, timeouts, and connection errors; backoff grows each attempt. |
 
 All env variables can live in `.env` for local work; deployments (Railway, Render, etc.) can override them per environment.
 
@@ -129,7 +133,7 @@ Use these as starting points—mix and match depending on your SLA (e.g., bump `
 
 ## Debugging
 
-- Health: `GET /healthz` returns `{ "ok": true }` when the app is up.
+- Health: `GET /healthz` returns `{ "ok": true }` plus queue stats and the active HTTP timeout/retry settings.
 - Warm ping: set `KEEPALIVE_URL` (and optional `KEEPALIVE_INTERVAL`) so the server self-pings even when idle (useful on Render free tier).
 - Plans fetching:
   - The UI first calls `/api/plans?project=ID&is_completed=0` (open plans).

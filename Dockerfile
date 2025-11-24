@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates libjemalloc2 ffmpeg && rm -rf /var/lib/apt/lists/*
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 \
-    MALLOC_CONF="background_thread:true,dirty_decay_ms:0,muzzy_decay_ms:0"
+    MALLOC_CONF="background_thread:true,dirty_decay_ms:400,muzzy_decay_ms:400"
 
 COPY requirements.txt ./
 RUN pip install --upgrade pip && pip install -r requirements.txt

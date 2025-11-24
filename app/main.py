@@ -24,6 +24,7 @@ from testrail_daily_report import (
     capture_telemetry,
     log_memory,
 )
+from testrail_client import DEFAULT_HTTP_TIMEOUT, DEFAULT_HTTP_RETRIES, DEFAULT_HTTP_BACKOFF
 import requests
 import glob
 
@@ -458,7 +459,15 @@ def on_shutdown():
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "queue": _job_manager.stats()}
+    return {
+        "ok": True,
+        "queue": _job_manager.stats(),
+        "http": {
+            "timeout_seconds": DEFAULT_HTTP_TIMEOUT,
+            "retries": DEFAULT_HTTP_RETRIES,
+            "backoff_seconds": DEFAULT_HTTP_BACKOFF,
+        },
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
