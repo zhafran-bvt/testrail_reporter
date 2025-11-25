@@ -1,0 +1,12 @@
+{
+  "name": "testrail-daily-report-ui",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "build:ui": "esbuild src/app.ts --bundle --outfile=assets/app.js --target=es2017"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0",
+    "typescript": "^5.4.0"
+  }
+}

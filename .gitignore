@@ -23,3 +23,15 @@ venv/
 # Output
 out/
 server.log
+
+# Frontend build artifacts
+assets/app.js
+package-lock.json
+tsconfig.tsbuildinfo
+*.diag.json
+*.tsbuildinfo
+*.map
+*.log
+*.cache/
+tmp/
+node_modules/
