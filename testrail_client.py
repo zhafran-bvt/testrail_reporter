@@ -183,6 +183,43 @@ def get_plan(session, base_url, plan_id: int, *, timeout: float | None = None, m
     return api_get(session, base_url, f"get_plan/{plan_id}", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
 
 
+def get_cases(
+    session,
+    base_url,
+    project_id: int,
+    *,
+    suite_id: int | None = None,
+    section_id: int | None = None,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
+    """Return list of cases for a project (optionally filtered by suite/section)."""
+    cases: list = []
+    offset, limit = 0, 250
+    while True:
+        qs = [f"limit={limit}", f"offset={offset}"]
+        if suite_id is not None:
+            qs.append(f"suite_id={suite_id}")
+        if section_id is not None:
+            qs.append(f"section_id={section_id}")
+        endpoint = f"get_cases/{project_id}&" + "&".join(qs)
+        data = api_get(session, base_url, endpoint, timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+        if not data:
+            break
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            items = data.get("cases") or data.get("items") or []
+        else:
+            items = []
+        cases.extend(items)
+        if len(items) < limit:
+            break
+        offset += limit
+    return cases
+
+
 def get_users_map(session, base_url, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
     try:
         users = api_get(session, base_url, "get_users", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
@@ -533,6 +570,19 @@ class TestRailClient:
     def get_attachments_for_test(self, test_id: int):
         with self.make_session() as session:
             return get_attachments_for_test(session, self.base_url, test_id, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+
+    def get_cases(self, project_id: int, suite_id: int | None = None, section_id: int | None = None):
+        with self.make_session() as session:
+            return get_cases(
+                session,
+                self.base_url,
+                project_id,
+                suite_id=suite_id,
+                section_id=section_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
     def download_attachment(self, attachment_id: int, *, size_limit: int | None = None, max_retries: int = 4):
         with self.make_session() as session:

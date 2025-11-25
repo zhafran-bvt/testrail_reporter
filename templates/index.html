@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap" rel="stylesheet">
   <style>
     :root{
       /* Brandable tokens (defaults use your suggested palette) */
@@ -27,7 +27,8 @@
       --radius: 12px;
       --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='%23222222' d='M6.293 9.293a1 1 0 0 1 1.414 0L12 13.586l4.293-4.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 0 1 0-1.414Z'/%3E%3C/svg%3E");
     }
-    html.dark {
+    [data-theme="dark"],
+    [data-bs-theme="dark"] {
         --card-bg: #1C1C1C;
         --text: #EAEAEA;
         --muted: #B3B3B3;
@@ -158,6 +159,83 @@
     .run-card-title { font-weight:500; color: var(--text); font-size:13px; }
     .run-card-id { font-size:12px; color: var(--muted); }
     .run-empty { padding:12px; text-align:center; font-size:13px; color: var(--muted); display:none; }
+    .case-picker {
+      margin-top: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: var(--card-bg);
+      box-shadow: var(--shadow);
+    }
+    .case-picker-header {
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:8px;
+    }
+    .case-picker-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .case-search { width:260px; max-width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:8px; background: var(--card-bg); color: var(--text); font-size:13px; }
+    .case-search:focus { outline:none; border-color: var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,0.18); }
+    .case-list-wrap { max-height: 280px; overflow:auto; border:1px solid var(--border); border-radius:10px; padding:8px; background: var(--card-bg); }
+    .case-list { display:flex; flex-direction:column; gap:8px; }
+    .case-card { display:flex; gap:10px; padding:10px; border:1px solid var(--border); border-radius:10px; background: var(--card-bg); transition:border-color .12s ease, box-shadow .12s ease; }
+    .case-card:hover { border-color: var(--primary); box-shadow:0 4px 12px rgba(15,23,42,0.08); }
+    .case-card input { width:18px; height:18px; margin-top:3px; flex-shrink:0; }
+    .case-card-title { font-weight:600; font-size:13px; color: var(--text); }
+    .case-card-meta { font-size:12px; color: var(--muted); }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 11000;
+      padding: 20px;
+    }
+    .modal-card {
+      width: min(960px, 96vw);
+      max-height: 90vh;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 18px 48px rgba(0,0,0,0.28);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-head {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-body {
+      padding: 12px 16px 16px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal-actions {
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      padding: 12px 16px;
+      border-top:1px solid var(--border);
+      background: rgba(0,0,0,0.02);
+    }
+    .modal-close {
+      border:none;
+      background: transparent;
+      font-size: 18px;
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .modal-close:hover { color: var(--primary); }
     .runs-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .runs-action-btn { padding:4px 10px; font-size:12px; border-radius:8px; border:1px solid var(--border); background: transparent; cursor:pointer; color: var(--muted); }
     .runs-action-btn:hover { border-color: var(--primary); color: var(--primary); }
@@ -185,10 +263,8 @@
       cursor: pointer;
       transition: background .3s ease;
     }
-    .theme-toggle:hover {
-      background: rgba(26,138,133,0.18);
-    }
-    html.dark .theme-toggle {
+    [data-theme="dark"] .theme-toggle,
+    [data-bs-theme="dark"] .theme-toggle {
       background: rgba(255,255,255,0.18);
     }
     .theme-toggle-thumb {
@@ -210,13 +286,14 @@
     }
     .theme-toggle[data-mode="dark"] .theme-toggle-thumb {
       transform: translateX(38px);
-      background: #111315;
-      color: #f5f5f5;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+      background: #0f172a;
+      color: #f8fafc;
     }
     /* Fix for dark mode inputs */
-    html.dark input,
-    html.dark select {
+    [data-theme="dark"] input,
+    [data-theme="dark"] select,
+    [data-bs-theme="dark"] input,
+    [data-bs-theme="dark"] select {
         background: rgba(255, 255, 255, 0.05) !important;
         color: #EAEAEA !important;
     }
@@ -321,7 +398,7 @@
         <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode" data-mode="light">
           <span class="sr-only">Toggle theme</span>
           <span class="theme-toggle-thumb" aria-hidden="true">
-            <span id="theme-icon"></span>
+            <span id="report-theme-icon"></span>
           </span>
         </button>
       </div>
@@ -453,6 +530,10 @@
               <label><input type="checkbox" id="runIncludeAll" checked> Include all cases</label>
             </div>
             <input type="text" id="runCaseIds" placeholder="Case IDs (comma separated, optional)" style="margin-top:8px;">
+            <div class="actions" style="justify-content:flex-start; gap:8px; margin-top:8px;">
+              <button type="button" class="refresh-btn" id="casePickerToggle">Select cases</button>
+              <span id="casePickerStatus" class="note" style="margin:0; text-align:left;">No cases selected.</span>
+            </div>
             <div class="actions" style="justify-content:flex-start; margin-top:12px;">
               <button type="submit">Create Test Run</button>
               <button type="button" class="refresh-btn" id="refreshManagePlansBtn" style="margin-left:8px;">Refresh plans</button>
@@ -500,11 +581,42 @@
       <div class="loading-progress-text" id="loadingProgressValue"></div>
     </div>
   </div>
+  <div id="casePickerModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="casePickerTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <h3 id="casePickerTitle" style="margin:0; font-size:16px;">Select Test Cases</h3>
+          <span id="caseCountLabel" class="note" style="margin:0; font-size:12px;">Loading…</span>
+        </div>
+        <button type="button" id="casePickerClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="case-picker-header" style="margin-bottom:4px;">
+          <input type="search" id="caseSearch" class="case-search" placeholder="Search cases by ID, title, refs…" />
+          <div class="case-picker-actions">
+            <button type="button" class="refresh-btn" id="caseRefreshBtn">Refresh</button>
+            <button type="button" class="refresh-btn" id="caseSelectVisibleBtn">Select visible</button>
+            <button type="button" class="refresh-btn" id="caseClearSelectionBtn">Clear</button>
+          </div>
+        </div>
+        <div class="case-list-wrap">
+          <div id="caseList" class="case-list"></div>
+          <div id="caseEmpty" class="run-empty" style="display:none;">No cases found.</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="refresh-btn" id="casePickerDone">Done</button>
+      </div>
+    </div>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-vd3p4DPZJbqU5bQL1Nr1o5mwxoRCwfrbzEuYqG2NCc0PcMk7v1rQpTQnXFdV7iGd" crossorigin="anonymous"></script>
   <script>
     const themeToggle = document.getElementById('theme-toggle');
-    const themeIcon = document.getElementById('theme-icon');
+    const themeIcon = document.getElementById('report-theme-icon');
     const htmlEl = document.documentElement;
+    const defaultSuiteId = {{ default_suite_id | tojson }};
+    const defaultSectionId = {{ default_section_id | tojson }};
+    const caseFilterParam = defaultSectionId ? JSON.stringify({ mode: "1", filters: { "cases:section_id": { values: [String(defaultSectionId)] }}}) : null;
     const sunIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.75a.75.75 0 0 1 .75-.75h.5a.75.75 0 0 1 0 1.5h-.5A.75.75 0 0 1 12 4.75Zm5.657 2.093a.75.75 0 1 1 1.06 1.06l-.354.354a.75.75 0 0 1-1.06-1.06l.354-.354ZM5.637 6.843a.75.75 0 0 1 1.06-1.06l.354.353a.75.75 0 0 1-1.06 1.061l-.354-.354ZM12 7.5A4.5 4.5 0 1 1 7.5 12 4.505 4.505 0 0 1 12 7.5Zm0 1.5A3 3 0 1 0 15 12a3 3 0 0 0-3-3Zm7.25 3.25a.75.75 0 0 1 0 1.5h-.5a.75.75 0 0 1 0-1.5h.5Zm-13 .75a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5a.75.75 0 0 1 .75.75Zm10.657 4.657a.75.75 0 0 1 1.06 0l.354.354a.75.75 0 1 1-1.06 1.06l-.354-.353a.75.75 0 0 1 0-1.061Zm-10.657 0a.75.75 0 0 1 0 1.061l-.354.353a.75.75 0 0 1-1.06-1.06l.354-.354a.75.75 0 0 1 1.06 0Zm5.75.75a.75.75 0 0 1 .75.75v.5a.75.75 0 0 1-1.5 0v-.5a.75.75 0 0 1 .75-.75Z"/></svg>';
     const moonIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3a.75.75 0 0 1 .808.407 6.5 6.5 0 0 0 10.285 7.186.75.75 0 0 1 .407.808z"/></svg>';
 
@@ -517,17 +629,15 @@
     }
 
     function applyTheme(theme) {
-        if (theme === 'dark') {
-            htmlEl.classList.add('dark');
-        } else {
-            htmlEl.classList.remove('dark');
-            theme = 'light';
-        }
-        updateThemeIcon(theme);
+        const normalized = theme === 'dark' ? 'dark' : 'light';
+        htmlEl.setAttribute('data-theme', normalized);
+        htmlEl.setAttribute('data-bs-theme', normalized);
+        updateThemeIcon(normalized);
     }
 
     themeToggle.addEventListener('click', () => {
-        const nextTheme = htmlEl.classList.contains('dark') ? 'light' : 'dark';
+        const current = htmlEl.getAttribute('data-theme');
+        const nextTheme = current === 'dark' ? 'light' : 'dark';
         localStorage.setItem('theme', nextTheme);
         applyTheme(nextTheme);
     });
@@ -872,6 +982,197 @@
       return text.split(',').map(x => parseInt(x.trim(), 10)).filter(x => Number.isFinite(x));
     }
 
+    // --- Case picker state ---
+    let selectedCases = new Set();
+    let cachedCases = [];
+
+    function updateCasePickerStatus(){
+      const status = document.getElementById('casePickerStatus');
+      if(!status) return;
+      const count = selectedCases.size;
+      status.textContent = count ? `${count} case${count === 1 ? '' : 's'} selected` : 'No cases selected.';
+    }
+
+    function updateCaseCount(count){
+      const label = document.getElementById('caseCountLabel');
+      if(!label) return;
+      if(typeof count === 'number' && count >= 0){
+        label.textContent = `${count} case${count === 1 ? '' : 's'} loaded`;
+      } else {
+        label.textContent = 'Cases';
+      }
+    }
+
+    function syncCaseIdsInput(){
+      const input = document.getElementById('runCaseIds');
+      if(!input) return;
+      const sorted = Array.from(selectedCases).sort((a,b)=>a-b);
+      input.value = sorted.join(', ');
+      updateCasePickerStatus();
+    }
+
+    function applySelectionToList(){
+      document.querySelectorAll('#caseList input[type="checkbox"]').forEach(cb => {
+        const id = parseInt(cb.value, 10);
+        cb.checked = selectedCases.has(id);
+      });
+    }
+
+    function renderCases(cases){
+      const list = document.getElementById('caseList');
+      const empty = document.getElementById('caseEmpty');
+      if(!list || !empty) return;
+      if(!cases || cases.length === 0){
+        list.innerHTML = '';
+        empty.textContent = 'No cases found.';
+        empty.style.display = 'block';
+        return;
+      }
+      list.innerHTML = cases.map(c => {
+        const id = c.id;
+        const title = escapeHtml(c.title || `Case ${id}`);
+        const refs = c.refs ? escapeHtml(String(c.refs)) : '';
+        const searchTokens = `${id} ${c.title || ''} ${c.refs || ''}`.toLowerCase();
+        const refsLabel = refs ? `<span class="case-card-meta">Refs: ${refs}</span>` : '';
+        return `<label class="case-card" data-text="${escapeHtml(searchTokens)}">
+          <input type="checkbox" value="${id}">
+          <div>
+            <div class="case-card-title">${title}</div>
+            <div class="case-card-meta">Case ${id}${refs ? ' • ' + refsLabel : ''}</div>
+          </div>
+        </label>`;
+      }).join('');
+      empty.style.display = 'none';
+      applySelectionToList();
+    }
+
+    function filterCases(){
+      const search = document.getElementById('caseSearch');
+      const list = document.getElementById('caseList');
+      const empty = document.getElementById('caseEmpty');
+      if(!search || !list || !empty) return;
+      const query = (search.value || '').trim().toLowerCase();
+      let visible = 0;
+      list.querySelectorAll('.case-card').forEach(card => {
+        const matches = !query || card.dataset.text.includes(query);
+        card.style.display = matches ? '' : 'none';
+        if(matches) visible += 1;
+      });
+      if(visible === 0){
+        empty.textContent = query ? 'No cases match your search.' : 'No cases found.';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+      }
+    }
+
+    function loadCases(force = false){
+      const projectVal = document.getElementById('runProject')?.value || document.getElementById('project')?.value || '1';
+      const refreshBtn = document.getElementById('caseRefreshBtn');
+      const empty = document.getElementById('caseEmpty');
+      if(refreshBtn){
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = 'Refreshing…';
+      }
+      if(empty){
+        empty.textContent = 'Loading cases…';
+        empty.style.display = 'block';
+      }
+      const qs = new URLSearchParams({ project: projectVal });
+      if(defaultSuiteId !== null && defaultSuiteId !== undefined){
+        qs.append('suite_id', defaultSuiteId);
+      }
+      if(defaultSectionId !== null && defaultSectionId !== undefined){
+        qs.append('section_id', defaultSectionId);
+      }
+      if(caseFilterParam){
+        qs.append('filters', caseFilterParam);
+      }
+      return requestJson(`/api/cases?${qs.toString()}`)
+        .then(data => {
+          cachedCases = Array.isArray(data.cases) ? data.cases : [];
+          cachedCases.sort((a,b)=>{
+            const ua = Number(a.updated_on) || 0;
+            const ub = Number(b.updated_on) || 0;
+            if(ub !== ua) return ub - ua;
+            return (b.id || 0) - (a.id || 0);
+          });
+          updateCaseCount(cachedCases.length);
+          renderCases(cachedCases);
+          filterCases();
+        })
+        .catch(err => {
+          showToast(err?.message || 'Failed to load cases.', 'error');
+          if(empty){
+            empty.textContent = 'Failed to load cases.';
+            empty.style.display = 'block';
+          }
+          updateCaseCount(null);
+        })
+        .finally(() => {
+          if(refreshBtn){
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = 'Refresh';
+          }
+        });
+    }
+
+    function openCasePicker(){
+      const modal = document.getElementById('casePickerModal');
+      if(!modal) return;
+      modal.classList.remove('hidden');
+      const manual = parseIdList(document.getElementById('runCaseIds').value);
+      manual.forEach(id => selectedCases.add(id));
+      updateCasePickerStatus();
+      updateCaseCount(cachedCases.length || 0);
+      loadCases().then(applySelectionToList);
+    }
+
+    function closeCasePicker(){
+      const modal = document.getElementById('casePickerModal');
+      if(!modal) return;
+      modal.classList.add('hidden');
+    }
+
+    function handleCaseCheckboxChange(event){
+      const target = event.target;
+      if(!target || target.type !== 'checkbox') return;
+      const id = parseInt(target.value, 10);
+      if(!Number.isFinite(id)) return;
+      if(target.checked){
+        selectedCases.add(id);
+        const includeAll = document.getElementById('runIncludeAll');
+        if(includeAll){
+          includeAll.checked = false;
+        }
+      } else {
+        selectedCases.delete(id);
+      }
+      syncCaseIdsInput();
+    }
+
+    function selectVisibleCases(state){
+      document.querySelectorAll('#caseList .case-card').forEach(card => {
+        if(card.style.display === 'none') return;
+        const cb = card.querySelector('input[type="checkbox"]');
+        if(!cb) return;
+        cb.checked = state;
+        const id = parseInt(cb.value, 10);
+        if(state && Number.isFinite(id)){
+          selectedCases.add(id);
+        } else if(Number.isFinite(id)) {
+          selectedCases.delete(id);
+        }
+      });
+      syncCaseIdsInput();
+    }
+
+    function clearCaseSelection(){
+      selectedCases.clear();
+      document.querySelectorAll('#caseList input[type="checkbox"]').forEach(cb => cb.checked = false);
+      syncCaseIdsInput();
+    }
+
 
     function formatStage(job){
       const meta = job?.meta || {};
@@ -1114,6 +1415,10 @@
         });
         const planId = data?.plan?.id;
         showToast(planId ? `Plan created: #${planId}` : 'Plan created', 'success');
+        // Clear inputs after successful submit
+        document.getElementById('planName').value = '';
+        document.getElementById('planDesc').value = '';
+        document.getElementById('planMilestone').value = '';
       } catch (err){
         showToast(err?.message || 'Failed to create plan', 'error');
       }
@@ -1130,17 +1435,20 @@
         refs: document.getElementById('runRefs').value.trim() || null,
         include_all: includeAll,
       };
-      const caseIds = parseIdList(document.getElementById('runCaseIds').value);
+      const manualCaseIds = parseIdList(document.getElementById('runCaseIds').value);
+      // Merge picker selections + manual entries, de-dup
+      const combinedCaseIds = Array.from(new Set([...selectedCases, ...manualCaseIds])).filter(id => Number.isFinite(id));
       if(!payload.name){
         showToast('Run name is required.', 'error');
         return;
       }
-      if(!includeAll && caseIds.length === 0){
+      if(combinedCaseIds.length){
+        payload.include_all = false;
+        payload.case_ids = combinedCaseIds;
+      }
+      if(!payload.include_all && (!payload.case_ids || payload.case_ids.length === 0)){
         showToast('Provide case IDs or select include all.', 'error');
         return;
-      }
-      if(caseIds.length){
-        payload.case_ids = caseIds;
       }
       try {
         const data = await requestJson('/api/manage/run', {
@@ -1150,6 +1458,13 @@
         });
         const runId = data?.run?.id;
         showToast(runId ? `Run created: #${runId}` : 'Run created', 'success');
+        document.getElementById('runName').value = '';
+        document.getElementById('runDesc').value = '';
+        document.getElementById('runRefs').value = '';
+        document.getElementById('runCaseIds').value = '';
+        selectedCases.clear();
+        updateCasePickerStatus();
+        applySelectionToList();
       } catch (err){
         showToast(err?.message || 'Failed to create run', 'error');
       }
@@ -1177,6 +1492,9 @@
         const msg = caseId ? `Case created: #${caseId}` : 'Case created';
         showToast(msg, 'success');
         togglePanel('casePanel', true);
+        document.getElementById('caseTitle').value = '';
+        document.getElementById('caseRefs').value = '';
+        document.getElementById('caseBdd').value = '';
       } catch (err){
         showToast(err?.message || 'Failed to create case', 'error');
       }
@@ -1206,6 +1524,24 @@
       refreshPlansBtn?.addEventListener('click', ()=> loadPlans(true));
       const refreshManagePlansBtn = document.getElementById('refreshManagePlansBtn');
       refreshManagePlansBtn?.addEventListener('click', ()=> loadManagePlans(true));
+      document.getElementById('casePickerToggle')?.addEventListener('click', openCasePicker);
+      document.getElementById('caseSearch')?.addEventListener('input', filterCases);
+      document.getElementById('caseRefreshBtn')?.addEventListener('click', ()=> loadCases(true));
+      document.getElementById('caseSelectVisibleBtn')?.addEventListener('click', ()=> selectVisibleCases(true));
+      document.getElementById('caseClearSelectionBtn')?.addEventListener('click', clearCaseSelection);
+      document.getElementById('caseList')?.addEventListener('change', handleCaseCheckboxChange);
+      document.getElementById('casePickerDone')?.addEventListener('click', closeCasePicker);
+      document.getElementById('casePickerClose')?.addEventListener('click', closeCasePicker);
+      document.getElementById('casePickerModal')?.addEventListener('click', (e)=> {
+        if(e.target && e.target.id === 'casePickerModal'){
+          closeCasePicker();
+        }
+      });
+      document.getElementById('runCaseIds')?.addEventListener('input', ()=> {
+        selectedCases = new Set(parseIdList(document.getElementById('runCaseIds').value));
+        updateCasePickerStatus();
+        applySelectionToList();
+      });
       document.getElementById('planCreateForm')?.addEventListener('submit', submitPlanForm);
       document.getElementById('runCreateForm')?.addEventListener('submit', submitRunForm);
     document.getElementById('caseCreateForm')?.addEventListener('submit', submitCaseForm);
@@ -1488,5 +1824,4 @@
     });
   </script>
 </body>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </html>

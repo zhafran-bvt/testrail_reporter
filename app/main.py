@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator, model_validator
+import json
 
 from testrail_daily_report import (
     generate_report,
@@ -583,6 +584,8 @@ def index(request: Request):
         {
             "request": request,
             "default_project": 1,
+            "default_suite_id": _default_suite_id(),
+            "default_section_id": _default_section_id(),
             "brand": brand,
             "logo_url": logo_url,
         },
@@ -817,6 +820,48 @@ def api_runs(plan: int, project: int = 1):
     data = base_payload.copy()
     data["meta"] = _cache_meta(False, expires_at)
     return data
+
+
+@app.get("/api/cases")
+def api_cases(project: int = 1, suite_id: int | None = None, section_id: int | None = None, filters: str | None = None):
+    try:
+        client = _make_client()
+        filter_section_id = None
+        if not section_id and filters:
+            try:
+                parsed = json.loads(filters)
+                section_vals = parsed.get("filters", {}).get("cases:section_id", {}).get("values")
+                if isinstance(section_vals, list) and section_vals:
+                    try:
+                        filter_section_id = int(str(section_vals[0]).strip())
+                    except (TypeError, ValueError):
+                        filter_section_id = None
+            except Exception:
+                filter_section_id = None
+        effective_section = section_id or filter_section_id
+        cases = client.get_cases(project, suite_id=suite_id, section_id=effective_section)
+    except HTTPException:
+        raise
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Error fetching cases: {e}")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load cases: {exc}")
+    slim = []
+    for c in cases:
+        cid = c.get("id")
+        if cid is None:
+            continue
+        slim.append(
+            {
+                "id": cid,
+                "title": c.get("title") or f"Case {cid}",
+                "refs": c.get("refs"),
+                "updated_on": c.get("updated_on"),
+                "priority_id": c.get("priority_id"),
+                "section_id": c.get("section_id"),
+            }
+        )
+    return {"count": len(slim), "cases": slim}
 
 
 @app.get("/api/users")
