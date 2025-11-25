@@ -425,6 +425,7 @@ class ManageRun(BaseModel):
     plan_id: int | None = None
     name: str
     description: str | None = None
+    refs: str | None = None
     include_all: bool = True
     case_ids: list[int] | None = None
     dry_run: bool = False
@@ -690,6 +691,8 @@ def api_manage_run(payload: ManageRun):
         "description": payload.description,
         "include_all": payload.include_all,
     }
+    if payload.refs:
+        body["refs"] = payload.refs
     if payload.case_ids:
         body["case_ids"] = payload.case_ids
     if payload.dry_run:
