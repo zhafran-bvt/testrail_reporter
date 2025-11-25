@@ -414,6 +414,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2h-2V6H7v4h10v2H7v6H5V6Z" fill="currentColor" fill-opacity=".15"/><path d="M9 13h10v-2H9v2Zm8-7H7v4h10V6Zm-10 8h10v2H7v-2Zm0 4h5v2H7v-2Z" fill="currentColor"/></svg>
           Management
         </a>
+        <a href="#" id="linkHowTo" class="nav-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 1-10 10A10.011 10.011 0 0 1 12 2Zm0 2a8 8 0 1 0 8 8a8.009 8.009 0 0 0-8-8Zm-.012 3c.92 0 1.68.26 2.29.79S15.2 9.1 15.2 9.88a2.49 2.49 0 0 1-.33 1.25a3.61 3.61 0 0 1-.93 1l-.44.34a2.3 2.3 0 0 0-.68.77a2.63 2.63 0 0 0-.24 1l-1.74-.12a3.68 3.68 0 0 1 .28-1.53a3 3 0 0 1 1.03-1.2l.47-.34c.22-.17.39-.34.51-.52a1.35 1.35 0 0 0 .18-.7a1 1 0 0 0-.39-.82a1.64 1.64 0 0 0-1-.27a1.5 1.5 0 0 0-1.02.36a1.24 1.24 0 0 0-.43 1L8.4 9a2.82 2.82 0 0 1 .36-1.44a2.87 2.87 0 0 1 1-.99A3.39 3.39 0 0 1 11.988 7Zm0 8a1.2 1.2 0 0 1 .87.33a1.16 1.16 0 0 1 .35.85a1.13 1.13 0 0 1-.35.85a1.2 1.2 0 0 1-.87.33a1.18 1.18 0 0 1-.86-.33a1.13 1.13 0 0 1-.35-.85a1.16 1.16 0 0 1 .35-.85a1.18 1.18 0 0 1 .86-.33Z" fill="currentColor"/></svg>
+          How to Use
+        </a>
       </nav>
 
       <div class="content">
@@ -565,6 +569,19 @@
               </form>
             </div>
           </div>
+      </div>
+      <div id="howToView" class="hidden" style="max-width: 900px; margin: 0 auto; padding: 12px 0;">
+        <div class="card" style="margin-bottom:12px;">
+          <h2 style="margin:0 0 8px;">How to Use</h2>
+          <p class="subtitle" style="margin:0 0 12px;">Quick steps to generate reports and manage TestRail content.</p>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0; font-size:14px;">
+            <li><b>Reporter</b>: pilih Project & Plan (klik Refresh bila daftar kosong), cari nama run di kolom search, centang run yang mau dilaporkan, lalu klik <b>Preview Report</b>. Report HTML terbuka di tab baru dan bisa langsung diunduh.</li>
+            <li><b>Management → Plan</b>: isi nama plan dan (opsional) milestone, lalu submit. Form otomatis bersih setelah sukses.</li>
+            <li><b>Management → Run</b>: pilih plan yang aktif, isi nama/desc/refs. Untuk scope: centang “Include all cases” atau klik <b>Select cases</b> untuk buka modal, cari/seleksi case (bisa “Select visible” atau “Clear”), lalu submit.</li>
+            <li><b>Management → Case</b>: buat case baru dengan title + refs opsional. Jika ada BDD, tempelkan skenario di kolom BDD (satu baris per langkah).</li>
+            <li><b>Tips</b>: tombol Refresh tersedia di plan/run/case picker. Lampiran akan dikompresi dan di-inline di report; video bisa ditranscode bila fitur video aktif.</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
@@ -1500,10 +1517,10 @@
       }
     }
 
-    document.addEventListener('DOMContentLoaded', async function(){
+    document.addEventListener('DOMContentLoaded', function(){
       updateReportMeta(null);
-      await loadPlans();
-      await loadManagePlans();
+      loadPlans();
+      loadManagePlans();
       const runSearch = document.getElementById('runSearch');
       if(runSearch){
         runSearch.addEventListener('input', filterRuns);
@@ -1545,8 +1562,9 @@
       document.getElementById('planCreateForm')?.addEventListener('submit', submitPlanForm);
       document.getElementById('runCreateForm')?.addEventListener('submit', submitRunForm);
     document.getElementById('caseCreateForm')?.addEventListener('submit', submitCaseForm);
-    document.getElementById('linkReporter')?.addEventListener('click', function(e){ e.preventDefault(); switchView('reporter'); });
+      document.getElementById('linkReporter')?.addEventListener('click', function(e){ e.preventDefault(); switchView('reporter'); });
     document.getElementById('linkManage')?.addEventListener('click', function(e){ e.preventDefault(); switchView('manage'); loadManagePlans(); });
+    document.getElementById('linkHowTo')?.addEventListener('click', function(e){ e.preventDefault(); switchView('howto'); });
     document.getElementById('runProject')?.addEventListener('change', function(){ cachedPlanOptionsHtml = ""; loadManagePlans(); });
     document.getElementById('caseProject')?.addEventListener('change', function(){ cachedPlanOptionsHtml = ""; loadManagePlans(); });
     // Initialize collapse state for management panels
@@ -1560,18 +1578,25 @@
         function switchView(target){
           const reporter = document.getElementById('reporterView');
           const manage = document.getElementById('manageView');
+          const howto = document.getElementById('howToView');
           const linkReporter = document.getElementById('linkReporter');
           const linkManage = document.getElementById('linkManage');
+          const linkHowto = document.getElementById('linkHowTo');
+          reporter?.classList.add('hidden');
+          manage?.classList.add('hidden');
+          howto?.classList.add('hidden');
+          linkReporter?.classList.remove('active');
+          linkManage?.classList.remove('active');
+          linkHowto?.classList.remove('active');
           if(target === 'manage'){
-            reporter?.classList.add('hidden');
             manage?.classList.remove('hidden');
             linkManage?.classList.add('active');
-            linkReporter?.classList.remove('active');
+          } else if(target === 'howto'){
+            howto?.classList.remove('hidden');
+            linkHowto?.classList.add('active');
           } else {
-            manage?.classList.add('hidden');
             reporter?.classList.remove('hidden');
             linkReporter?.classList.add('active');
-            linkManage?.classList.remove('active');
           }
         }
     
