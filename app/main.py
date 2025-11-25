@@ -21,10 +21,15 @@ from testrail_daily_report import (
     get_plans_for_project,
     get_plan,
     env_or_die,
-    capture_telemetry,
     log_memory,
 )
-from testrail_client import DEFAULT_HTTP_TIMEOUT, DEFAULT_HTTP_RETRIES, DEFAULT_HTTP_BACKOFF
+from testrail_client import (
+    DEFAULT_HTTP_TIMEOUT,
+    DEFAULT_HTTP_RETRIES,
+    DEFAULT_HTTP_BACKOFF,
+    TestRailClient,
+    capture_telemetry,
+)
 import requests
 import glob
 
@@ -54,6 +59,65 @@ if Path("assets").exists():
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
 templates = Jinja2Templates(directory="templates")
+
+
+def _write_enabled() -> bool:
+    return True
+
+
+def _make_client() -> TestRailClient:
+    base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
+    user = env_or_die("TESTRAIL_USER")
+    api_key = env_or_die("TESTRAIL_API_KEY")
+    return TestRailClient(
+        base_url=base_url,
+        auth=(user, api_key),
+        timeout=DEFAULT_HTTP_TIMEOUT,
+        max_attempts=DEFAULT_HTTP_RETRIES,
+        backoff=DEFAULT_HTTP_BACKOFF,
+    )
+
+
+def _default_suite_id() -> int | None:
+    val = os.getenv("DEFAULT_SUITE_ID", "1")
+    try:
+        parsed = int(str(val).strip())
+        return parsed
+    except ValueError:
+        return None
+
+
+def _default_section_id() -> int | None:
+    val = os.getenv("DEFAULT_SECTION_ID", "69")
+    try:
+        parsed = int(str(val).strip())
+        return parsed
+    except ValueError:
+        return None
+
+
+def _default_template_id() -> int | None:
+    val = os.getenv("DEFAULT_TEMPLATE_ID", "4")
+    try:
+        return int(str(val).strip())
+    except ValueError:
+        return None
+
+
+def _default_type_id() -> int | None:
+    val = os.getenv("DEFAULT_TYPE_ID", "7")
+    try:
+        return int(str(val).strip())
+    except ValueError:
+        return None
+
+
+def _default_priority_id() -> int | None:
+    val = os.getenv("DEFAULT_PRIORITY_ID", "2")
+    try:
+        return int(str(val).strip())
+    except ValueError:
+        return None
 
 
 class TTLCache:
@@ -347,6 +411,38 @@ class ReportRequest(BaseModel):
             raise ValueError("Run selection requires a plan")
         return self
 
+
+class ManagePlan(BaseModel):
+    project: int = 1
+    name: str
+    description: str | None = None
+    milestone_id: int | None = None
+    dry_run: bool = False
+
+
+class ManageRun(BaseModel):
+    project: int = 1
+    plan_id: int | None = None
+    name: str
+    description: str | None = None
+    include_all: bool = True
+    case_ids: list[int] | None = None
+    dry_run: bool = False
+
+    @model_validator(mode="after")
+    def _validate_cases(self):
+        if not self.include_all and not self.case_ids:
+            raise ValueError("Provide case_ids when include_all is false")
+        return self
+
+
+class ManageCase(BaseModel):
+    project: int = 1
+    title: str
+    refs: str | None = None
+    bdd_scenarios: str | None = None
+    dry_run: bool = False
+
 _keepalive_thread: threading.Thread | None = None
 _keepalive_stop = threading.Event()
 _memlog_thread: threading.Thread | None = None
@@ -561,6 +657,85 @@ def api_report_status(job_id: str):
     return _job_manager.serialize(job)
 
 
+def _require_write_enabled():
+    return
+
+
+@app.post("/api/manage/plan")
+def api_manage_plan(payload: ManagePlan):
+    _require_write_enabled()
+    client = _make_client()
+    body = {
+        "name": payload.name,
+        "description": payload.description,
+    }
+    if payload.milestone_id is not None:
+        body["milestone_id"] = payload.milestone_id
+    if payload.dry_run:
+        return {"dry_run": True, "payload": body, "project": payload.project}
+    created = client.add_plan(payload.project, body)
+    return {"plan": created}
+
+
+@app.post("/api/manage/run")
+def api_manage_run(payload: ManageRun):
+    _require_write_enabled()
+    client = _make_client()
+    suite_id = _default_suite_id()
+    if suite_id is None:
+        raise HTTPException(status_code=400, detail="DEFAULT_SUITE_ID is required to create runs when suite_id is omitted")
+    body = {
+        "suite_id": suite_id,
+        "name": payload.name,
+        "description": payload.description,
+        "include_all": payload.include_all,
+    }
+    if payload.case_ids:
+        body["case_ids"] = payload.case_ids
+    if payload.dry_run:
+        target = "plan_entry" if payload.plan_id else "run"
+        return {"dry_run": True, "target": target, "payload": body, "project": payload.project, "plan_id": payload.plan_id}
+    if payload.plan_id:
+        created = client.add_plan_entry(payload.plan_id, body)
+    else:
+        created = client.add_run(payload.project, body)
+    return {"run": created}
+
+
+@app.post("/api/manage/case")
+def api_manage_case(payload: ManageCase):
+    _require_write_enabled()
+    client = _make_client()
+    section_id = _default_section_id()
+    if section_id is None:
+        raise HTTPException(status_code=400, detail="DEFAULT_SECTION_ID is required to create cases")
+    body = {
+        "title": payload.title,
+        "refs": payload.refs,
+    }
+    tmpl = _default_template_id()
+    if tmpl is not None:
+        body["template_id"] = tmpl
+    typ = _default_type_id()
+    if typ is not None:
+        body["type_id"] = typ
+    prio = _default_priority_id()
+    if prio is not None:
+        body["priority_id"] = prio
+    # Convert BDD text into array of {content: ...}
+    bdd_text = payload.bdd_scenarios or ""
+    steps = [line.strip() for line in bdd_text.splitlines() if line.strip()]
+    if steps:
+        combined = "\n".join(steps)
+        body["custom_testrail_bdd_scenario"] = [{"content": combined}]
+    # Remove None fields
+    body = {k: v for k, v in body.items() if v is not None}
+    if payload.dry_run:
+        return {"dry_run": True, "payload": body, "section_id": section_id}
+    created = client.add_case(section_id, body)
+    return {"case": created}
+
+
 @app.get("/api/plans")
 def api_plans(project: int = 1, is_completed: int | None = None):
     """List plans for a project, optionally filter by completion (0 or 1)."""
@@ -639,6 +814,20 @@ def api_runs(plan: int, project: int = 1):
     data = base_payload.copy()
     data["meta"] = _cache_meta(False, expires_at)
     return data
+
+
+@app.get("/api/users")
+def api_users(project: int = 1):
+    """Return list of users for dropdowns."""
+    try:
+        client = _make_client()
+        users = client.get_users_map()
+        items = [{"id": uid, "name": name} for uid, name in sorted(users.items(), key=lambda kv: kv[1])]
+        return {"count": len(items), "users": items}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load users: {exc}")
 
 @app.get("/ui", response_class=HTMLResponse)
 def ui_alias(request: Request):

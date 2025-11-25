@@ -122,6 +122,59 @@ def api_get(
         raise last_exc
 
 
+def api_post(
+    session: requests.Session,
+    base_url: str,
+    endpoint: str,
+    payload: dict[str, Any],
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
+    """POST with retry/backoff for transient errors."""
+    url = f"{base_url}/index.php?/api/v2/{endpoint}"
+    attempts = max(1, max_attempts or DEFAULT_HTTP_RETRIES)
+    delay = backoff or DEFAULT_HTTP_BACKOFF
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        start = time.perf_counter()
+        try:
+            r = session.post(url, json=payload, timeout=timeout or DEFAULT_HTTP_TIMEOUT)
+            r.raise_for_status()
+            data = r.json()
+            if isinstance(data, dict) and any(k in data for k in ("error", "message")):
+                msg = data.get("error") or data.get("message") or str(data)
+                raise RuntimeError(f"API error for '{endpoint}': {msg}")
+            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "ok")
+            return data
+        except requests.exceptions.HTTPError as exc:
+            last_exc = exc
+            status_code = exc.response.status_code if exc.response is not None else None
+            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            retryable = status_code == 429 or (status_code is not None and 500 <= status_code < 600)
+            if not retryable or attempt == attempts:
+                raise
+            time.sleep(delay)
+            delay *= 1.6
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+            last_exc = exc
+            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            if attempt == attempts:
+                raise
+            time.sleep(delay)
+            delay *= 1.6
+        except Exception as exc:
+            last_exc = exc
+            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            if attempt == attempts:
+                raise
+            time.sleep(delay)
+            delay *= 1.6
+    if last_exc:
+        raise last_exc
+
+
 def get_project(session, base_url, project_id: int, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
     return api_get(session, base_url, f"get_project/{project_id}", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
 
@@ -490,5 +543,54 @@ class TestRailClient:
                 max_retries=max_retries,
                 size_limit=size_limit,
                 timeout=self.timeout,
+                backoff=self.backoff,
+            )
+
+    # Write operations
+    def add_plan(self, project_id: int, payload: dict[str, Any]):
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"add_plan/{project_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def add_run(self, project_id: int, payload: dict[str, Any]):
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"add_run/{project_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def add_plan_entry(self, plan_id: int, payload: dict[str, Any]):
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"add_plan_entry/{plan_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def add_case(self, section_id: int, payload: dict[str, Any]):
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"add_case/{section_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
                 backoff=self.backoff,
             )
