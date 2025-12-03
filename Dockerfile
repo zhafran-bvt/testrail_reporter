@@ -60,4 +60,4 @@ COPY --from=builder /app/Procfile ./Procfile
 EXPOSE 8080
 
 # Start the Uvicorn application (pytest removed)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${PORT:-8080}", "--workers", "1", "--timeout-keep-alive", "120"]
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1 --timeout-keep-alive 120
