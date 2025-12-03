@@ -3,13 +3,13 @@ from unittest.mock import patch
 
 import pandas as pd
 
+from testrail_client import (
+    get_plans_for_project,
+)
 from testrail_daily_report import (
     build_test_table,
     extract_refs,
     summarize_results,
-)
-from testrail_client import (
-    get_plans_for_project,
 )
 
 

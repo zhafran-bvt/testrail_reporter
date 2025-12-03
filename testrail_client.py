@@ -507,9 +507,10 @@ def get_results_for_run(
         elif isinstance(batch, dict) and "results" in batch:
             items = batch.get("results", [])
         else:
+            keys = list(batch.keys()) if isinstance(batch, dict) else "n/a"
             print(
-                f"Warning: Unexpected payload for results (run {run_id}): {type(batch)} "
-                f"keys={list(batch.keys()) if isinstance(batch, dict) else 'n/a'}",
+                f"Warning: Unexpected payload for results (run {run_id}): "
+                f"{type(batch)} keys={keys}",
                 file=sys.stderr,
             )
             break

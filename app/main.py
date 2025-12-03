@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import requests
 from dotenv import load_dotenv
@@ -339,6 +339,7 @@ class ReportJobManager:
         start = time.perf_counter()
         print(f"[report-job] {job_id} started with params={job.params}", flush=True)
         try:
+
             def reporter(stage, payload=None):
                 self.report_progress(job_id, stage, payload or {})
 
@@ -743,7 +744,7 @@ def api_manage_run(payload: ManageRun):
         )
     assert suite_id is not None
     body: dict[str, Any] = {}
-    body["suite_id"] = str(suite_id) # type: ignore[assignment]
+    body["suite_id"] = str(suite_id)  # type: ignore[assignment]
     body["name"] = payload.name
     body["description"] = payload.description
     body["include_all"] = payload.include_all
@@ -783,19 +784,19 @@ def api_manage_case(payload: ManageCase):
     }
     tmpl = _default_template_id()
     if tmpl is not None:
-        body["template_id"] = tmpl # type: ignore
+        body["template_id"] = tmpl  # type: ignore
     typ = _default_type_id()
     if typ is not None:
-        body["type_id"] = typ # type: ignore
+        body["type_id"] = typ  # type: ignore
     prio = _default_priority_id()
     if prio is not None:
-        body["priority_id"] = prio # type: ignore
+        body["priority_id"] = prio  # type: ignore
     # Convert BDD text into array of {content: ...}
     bdd_text = payload.bdd_scenarios or ""
     steps = [line.strip() for line in bdd_text.splitlines() if line.strip()]
     if steps:
         combined = "\n".join(steps)
-        body["custom_testrail_bdd_scenario"] = [{"content": combined}] # type: ignore
+        body["custom_testrail_bdd_scenario"] = [{"content": combined}]  # type: ignore
     # Remove None fields
     body = {k: v for k, v in body.items() if v is not None}
     if payload.dry_run:

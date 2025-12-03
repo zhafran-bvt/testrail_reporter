@@ -23,8 +23,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Literal
-
 from typing import Literal, TypedDict, cast
 
 import pandas as pd
@@ -32,12 +30,6 @@ import requests
 from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from PIL import Image
-
-class Summary(TypedDict):
-    total: int
-    Passed: int
-    Failed: int
-    by_status: dict[str, int]
 
 from testrail_client import (
     DEFAULT_HTTP_BACKOFF,
@@ -48,6 +40,14 @@ from testrail_client import (
     UserLookupForbidden,
     download_attachment,
 )
+
+
+class Summary(TypedDict):
+    total: int
+    Passed: int
+    Failed: int
+    by_status: dict[str, int]
+
 
 try:
     import resource  # type: ignore
@@ -103,7 +103,8 @@ def env_or_die(key: str) -> str:
 
 
 def _downcast_numeric(
-    series: pd.Series, kind: Literal["integer", "signed", "unsigned", "float"] = "integer"
+    series: pd.Series,
+    kind: Literal["integer", "signed", "unsigned", "float"] = "integer",
 ):
     """Downcast numeric series while preserving NaN values."""
     return pd.to_numeric(series, errors="coerce", downcast=kind)
@@ -641,8 +642,8 @@ def process_run_attachments(
                         final_type = "video/mp4"
                     except (VideoTranscodeError, FileNotFoundError) as exc:
                         print(
-                            f"Warning: video transcode failed for attachment {attachment_id}: "
-                            f"{exc}",
+                            f"Warning: video transcode failed for "
+                            f"attachment {attachment_id}: {exc}",
                             file=sys.stderr,
                         )
                 size_bytes = _tmp_size(final_path)
@@ -943,17 +944,12 @@ def generate_report(
         attachment_batch_size = 0
     attachment_batch_size = max(0, attachment_batch_size)
 
-    try:
-        run_workers_env = int(os.getenv("RUN_WORKERS", "2"))
-    except ValueError:
-        run_workers_env = 2
     # Allow higher ceiling if explicitly requested
     try:
         run_workers_ceiling = int(os.getenv("RUN_WORKERS_MAX", "4"))
     except ValueError:
         run_workers_ceiling = 4
     run_workers_ceiling = max(1, min(8, run_workers_ceiling))
-
 
     inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
     try:
@@ -1236,8 +1232,8 @@ def generate_report(
                         _, payload = future.result()
                     except Exception as e:
                         print(
-                            f"Warning: attachments metadata future failed for test {tid}: "
-                            f"{e}",
+                            f"Warning: attachments metadata future failed "
+                            f"for test {tid}: {e}",
                             file=sys.stderr,
                         )
                         payload = []
@@ -1341,7 +1337,7 @@ def generate_report(
         round((cast(int, summary["Passed"]) / cast(int, summary["total"])) * 100, 2)
         if summary["total"]
         else 0
-    ) # type: ignore # type: ignore # type: ignore
+    )  # type: ignore # type: ignore # type: ignore
     # Donut segments
     status_colors = {
         "Passed": "#16a34a",
@@ -1351,7 +1347,7 @@ def generate_report(
         "Untested": "#9ca3af",
     }
     status_counts = summary.get("by_status", {})
-    total_for_chart = sum(status_counts.values()) # type: ignore
+    total_for_chart = sum(status_counts.values())  # type: ignore
     segments = []
     if total_for_chart > 0:
         cumulative = 0.0

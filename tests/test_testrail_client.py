@@ -1,4 +1,3 @@
-
 import requests
 
 from testrail_client import (
