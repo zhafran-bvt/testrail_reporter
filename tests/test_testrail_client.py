@@ -1,6 +1,12 @@
+
 import requests
-from pathlib import Path
-from testrail_client import api_get, download_attachment, AttachmentTooLarge, capture_telemetry
+
+from testrail_client import (
+    AttachmentTooLarge,
+    api_get,
+    capture_telemetry,
+    download_attachment,
+)
 
 
 def test_api_get_retries_on_429(monkeypatch):
@@ -33,7 +39,9 @@ def test_api_get_retries_on_429(monkeypatch):
     session = FakeSession([resp_429, resp_ok])
 
     with capture_telemetry() as telemetry:
-        data = api_get(session, "http://x", "get_stuff", timeout=1, max_attempts=2, backoff=0)
+        data = api_get(
+            session, "http://x", "get_stuff", timeout=1, max_attempts=2, backoff=0
+        )
 
     assert data == {"ok": True}
     assert calls == [1, 1]
@@ -74,7 +82,15 @@ def test_download_attachment_enforces_size_limit(monkeypatch, tmp_path):
 
     with capture_telemetry() as telemetry:
         try:
-            download_attachment(session, base_url, attachment_id, size_limit=5, max_retries=1, timeout=1, backoff=0)
+            download_attachment(
+                session,
+                base_url,
+                attachment_id,
+                size_limit=5,
+                max_retries=1,
+                timeout=1,
+                backoff=0,
+            )
         except AttachmentTooLarge as exc:
             assert exc.limit_bytes == 5
         else:

@@ -1,3 +1,4 @@
+# mypy: disable-error-code=assignment
 #!/usr/bin/env python3
 """
 TestRail Daily Report → HTML
@@ -8,16 +9,36 @@ Requires env vars:
     TESTRAIL_BASE_URL, TESTRAIL_USER, TESTRAIL_API_KEY
 """
 
-import os, sys, argparse, requests, pandas as pd, mimetypes, base64, math, gc, json, subprocess
-import time
-from datetime import datetime, timezone
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-from pathlib import Path
-from io import BytesIO
+import argparse
+import base64
+import gc
+import json
+import math
+import mimetypes
+import os
+import subprocess
+import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from io import BytesIO
+from pathlib import Path
+from typing import Literal
+
+from typing import Literal, TypedDict, cast
+
+import pandas as pd
+import requests
 from dotenv import load_dotenv
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from PIL import Image
+
+class Summary(TypedDict):
+    total: int
+    Passed: int
+    Failed: int
+    by_status: dict[str, int]
+
 from testrail_client import (
     DEFAULT_HTTP_BACKOFF,
     DEFAULT_HTTP_RETRIES,
@@ -25,21 +46,7 @@ from testrail_client import (
     AttachmentTooLarge,
     TestRailClient,
     UserLookupForbidden,
-    api_get,
-    capture_telemetry,
     download_attachment,
-    get_attachments_for_test,
-    get_plan,
-    get_plan_runs,
-    get_plans_for_project,
-    get_priorities_map,
-    get_project,
-    get_results_for_run,
-    get_statuses_map,
-    get_tests_for_run,
-    get_user,
-    get_users_map,
-    record_api_call,
 )
 
 try:
@@ -95,7 +102,9 @@ def env_or_die(key: str) -> str:
     return v
 
 
-def _downcast_numeric(series: pd.Series, kind: str = "integer"):
+def _downcast_numeric(
+    series: pd.Series, kind: Literal["integer", "signed", "unsigned", "float"] = "integer"
+):
     """Downcast numeric series while preserving NaN values."""
     return pd.to_numeric(series, errors="coerce", downcast=kind)
 
@@ -107,22 +116,33 @@ def _minimal_frame(df: pd.DataFrame, keep: list[str]):
 
 def _memory_usage_mb() -> float | None:
     """Return current RSS memory usage in MB if detectable."""
-    if psutil:
+    _psutil = None
+    _resource = None
+    try:
+        import psutil as _psutil  # type: ignore
+    except ImportError:
+        pass
+    try:
+        import resource as _resource  # type: ignore
+    except ImportError:
+        pass
+
+    if _psutil:
         try:
-            proc = psutil.Process(os.getpid())
-            return proc.memory_info().rss / (1024 * 1024)
+            proc = _psutil.Process(os.getpid())
+            mem_info = proc.memory_info()
+            return mem_info.rss / (1024 * 1024)
         except Exception:
             pass
-    if resource:
+    if _resource:
         try:
-            usage = resource.getrusage(resource.RUSAGE_SELF)
-            # ru_maxrss is KB on Linux, bytes on macOS. Detect large values to adjust.
-            rss = float(getattr(usage, "ru_maxrss", 0.0))
+            usage = _resource.getrusage(_resource.RUSAGE_SELF)
+            rss: float = float(getattr(usage, "ru_maxrss", 0.0))
             if rss <= 0:
                 return None
-            if rss > 10 * (1024 ** 2):  # looks like bytes
+            if rss > 10 * (1024**2):
                 return rss / (1024 * 1024)
-            return rss / 1024.0  # assume KB
+            return rss / 1024.0
         except Exception:
             return None
     return None
@@ -133,34 +153,52 @@ def log_memory(label: str):
     mem_mb = _memory_usage_mb()
     if mem_mb is None:
         return
-    
+
     log_message = f"[mem-log] stage={label} rss_mb={mem_mb:.2f}"
-    
+
     if mem_mb > 800:
         print(f"WARNING: {log_message}", file=sys.stderr, flush=True)
     else:
         print(log_message, file=sys.stdout, flush=True)
 
 
-
 def summarize_results(results, status_map=DEFAULT_STATUS_MAP):
     df = pd.DataFrame(results)
-    # If no results or unexpected payload (e.g., missing test_id), return empty frame with expected columns
+    # If no results or unexpected payload (e.g., missing test_id),
+    # return empty frame with expected columns
     if df.empty or "test_id" not in df.columns:
         empty_cols = ["test_id", "status_id", "comment", "created_on"]
-        return {"total": 0, "by_status": {}, "pass_rate": 0.0, "df": pd.DataFrame(columns=empty_cols)}
+        return {
+            "total": 0,
+            "by_status": {},
+            "pass_rate": 0.0,
+            "df": pd.DataFrame(columns=empty_cols),
+        }
 
     # Deduplicate to the latest result per test_id
     sort_cols = [c for c in ["test_id", "created_on", "id"] if c in df.columns]
     if sort_cols:
         df = df.sort_values(sort_cols)
     df = df.drop_duplicates("test_id", keep="last")
-    df = _minimal_frame(df, ["id", "test_id", "status_id", "status_name", "comment", "created_on", "assignedto_id"])
+    df = _minimal_frame(
+        df,
+        [
+            "id",
+            "test_id",
+            "status_id",
+            "status_name",
+            "comment",
+            "created_on",
+            "assignedto_id",
+        ],
+    )
 
     # Map status_id to names; keep original names if API provided
     if "status_name" not in df.columns:
         sid = _downcast_numeric(df.get("status_id"), "unsigned")
-        df["status_name"] = sid.map(lambda x: status_map.get(int(x), str(int(x))) if pd.notna(x) else "Untested")
+        df["status_name"] = sid.map(
+            lambda x: status_map.get(int(x), str(int(x))) if pd.notna(x) else "Untested"
+        )
     else:
         df["status_name"] = df["status_name"].fillna("")
     for col in ("id", "test_id", "status_id", "assignedto_id"):
@@ -174,15 +212,29 @@ def summarize_results(results, status_map=DEFAULT_STATUS_MAP):
     return {"total": total, "by_status": by_status, "pass_rate": pass_rate, "df": df}
 
 
-def build_test_table(tests_df: pd.DataFrame, results_df: pd.DataFrame, status_map=DEFAULT_STATUS_MAP, users_map=None, priorities_map=None):
+def build_test_table(
+    tests_df: pd.DataFrame,
+    results_df: pd.DataFrame,
+    status_map=DEFAULT_STATUS_MAP,
+    users_map=None,
+    priorities_map=None,
+):
     users_map = users_map or {}
     priorities_map = priorities_map or {}
     tests_df = _prepare_tests_frame(pd.DataFrame(tests_df), status_map)
     results_df = _prepare_results_frame(results_df)
 
     merged = tests_df.merge(results_df, on="test_id", how="left")
-    status_order_map = {"Failed": 0, "Blocked": 1, "Retest": 2, "Untested": 3, "Passed": 4}
-    merged["_status_order"] = merged["status_name"].map(lambda s: status_order_map.get(str(s), 2))
+    status_order_map = {
+        "Failed": 0,
+        "Blocked": 1,
+        "Retest": 2,
+        "Untested": 3,
+        "Passed": 4,
+    }
+    merged["_status_order"] = merged["status_name"].map(
+        lambda s: status_order_map.get(str(s), 2)
+    )
     if "test_id" in merged.columns:
         merged = merged.sort_values(["_status_order", "test_id"])
     else:
@@ -194,7 +246,9 @@ def build_test_table(tests_df: pd.DataFrame, results_df: pd.DataFrame, status_ma
     if "priority_id" in merged.columns:
         try:
             pid = pd.to_numeric(merged["priority_id"], errors="coerce").astype("Int64")
-            merged["priority"] = pid.map(lambda x: priorities_map.get(int(x), str(int(x))) if pd.notna(x) else "")
+            merged["priority"] = pid.map(
+                lambda x: priorities_map.get(int(x), str(int(x))) if pd.notna(x) else ""
+            )
         except Exception:
             merged["priority"] = merged["priority_id"].astype(str)
     else:
@@ -228,7 +282,9 @@ def extract_refs(items) -> list[str]:
 
 def _prepare_results_frame(results_df: pd.DataFrame) -> pd.DataFrame:
     if results_df.empty:
-        return pd.DataFrame(columns=["test_id", "comment", "created_on", "assignedto_id"])
+        return pd.DataFrame(
+            columns=["test_id", "comment", "created_on", "assignedto_id"]
+        )
     if "test_id" not in results_df.columns:
         results_df = results_df.assign(test_id=pd.Series(dtype="int64"))
     result_keep = ["test_id", "comment", "created_on", "assignedto_id"]
@@ -244,17 +300,30 @@ def _prepare_results_frame(results_df: pd.DataFrame) -> pd.DataFrame:
     return results_df
 
 
-def _prepare_tests_frame(tests_df: pd.DataFrame, status_map=DEFAULT_STATUS_MAP) -> pd.DataFrame:
+def _prepare_tests_frame(
+    tests_df: pd.DataFrame, status_map=DEFAULT_STATUS_MAP
+) -> pd.DataFrame:
     if "id" in tests_df.columns and "test_id" not in tests_df.columns:
         tests_df = tests_df.rename(columns={"id": "test_id"})
-    test_keep = ["test_id", "title", "priority_id", "refs", "assignedto_id", "status_id"]
+    test_keep = [
+        "test_id",
+        "title",
+        "priority_id",
+        "refs",
+        "assignedto_id",
+        "status_id",
+    ]
     tests_df = _minimal_frame(tests_df, test_keep)
     if "test_id" not in tests_df.columns:
         tests_df = pd.DataFrame(columns=test_keep)
     if "status_id" in tests_df.columns:
         try:
             sid = _downcast_numeric(tests_df["status_id"], "unsigned").astype("Int64")
-            tests_df["status_name"] = sid.map(lambda x: status_map.get(int(x), str(int(x))) if pd.notna(x) else "Untested")
+            tests_df["status_name"] = sid.map(
+                lambda x: status_map.get(int(x), str(int(x)))
+                if pd.notna(x)
+                else "Untested"
+            )
         except Exception:
             tests_df["status_name"] = "Untested"
     else:
@@ -292,7 +361,7 @@ def compress_image_data(data: bytes, content_type: str | None):
         with Image.open(BytesIO(data)) as img:
             work = img.copy()
             if max(work.size) > max_dim:
-                work.thumbnail((max_dim, max_dim), Image.LANCZOS)
+                work.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
             def save_png(image_obj):
                 buffer = BytesIO()
@@ -301,7 +370,9 @@ def compress_image_data(data: bytes, content_type: str | None):
 
             def save_jpeg(image_obj, quality):
                 buffer = BytesIO()
-                image_obj.convert("RGB").save(buffer, format="JPEG", optimize=True, quality=quality)
+                image_obj.convert("RGB").save(
+                    buffer, format="JPEG", optimize=True, quality=quality
+                )
                 return buffer.getvalue(), "image/jpeg"
 
             img_format = (img.format or "").upper()
@@ -325,7 +396,7 @@ def compress_image_data(data: bytes, content_type: str | None):
                 if shrink_ratio < 0.98:
                     new_dim = max(320, int(max(image_obj.size) * shrink_ratio))
                     shrunk = image_obj.copy()
-                    shrunk.thumbnail((new_dim, new_dim), Image.LANCZOS)
+                    shrunk.thumbnail((new_dim, new_dim), Image.Resampling.LANCZOS)
                     return save_jpeg(shrunk, min_quality)
                 return bytes_payload, current_type
 
@@ -390,8 +461,16 @@ def process_run_attachments(
                     attachment_id = int(attachment_id)
                 except (TypeError, ValueError):
                     continue
-                filename = att.get("name") or att.get("filename") or f"attachment_{attachment_id}"
-                inferred_type = att.get("content_type") or att.get("mime_type") or mimetypes.guess_type(filename)[0]
+                filename = (
+                    att.get("name")
+                    or att.get("filename")
+                    or f"attachment_{attachment_id}"
+                )
+                inferred_type = (
+                    att.get("content_type")
+                    or att.get("mime_type")
+                    or mimetypes.guess_type(filename)[0]
+                )
                 size_hint = att.get("size")
                 download_jobs.append(
                     {
@@ -414,7 +493,14 @@ def process_run_attachments(
     inline_limit = max(0, inline_limit)
     inline_video_limit = max(inline_limit, inline_video_limit)
 
-    def _build_skipped(job: dict, *, size_bytes: int, limit_bytes: int, reason: str, content_type: str | None = None):
+    def _build_skipped(
+        job: dict,
+        *,
+        size_bytes: int,
+        limit_bytes: int,
+        reason: str,
+        content_type: str | None = None,
+    ):
         initial_type = content_type or job.get("initial_type")
         is_image = bool(initial_type and str(initial_type).lower().startswith("image/"))
         is_video = bool(initial_type and str(initial_type).lower().startswith("video/"))
@@ -455,12 +541,32 @@ def process_run_attachments(
                 backoff=retry_backoff,
             )
         except AttachmentTooLarge as exc:
-            entry = _build_skipped(job, size_bytes=exc.size_bytes, limit_bytes=exc.limit_bytes, reason="size_limit")
-            notify("attachment_skipped", run_id=rid, attachment_id=attachment_id, size_bytes=exc.size_bytes, limit_bytes=exc.limit_bytes, skipped=True)
+            entry = _build_skipped(
+                job,
+                size_bytes=exc.size_bytes,
+                limit_bytes=exc.limit_bytes,
+                reason="size_limit",
+            )
+            notify(
+                "attachment_skipped",
+                run_id=rid,
+                attachment_id=attachment_id,
+                size_bytes=exc.size_bytes,
+                limit_bytes=exc.limit_bytes,
+                skipped=True,
+            )
             return job["test_id"], entry
         except Exception as exc:
-            print(f"Warning: download failed for attachment {attachment_id}: {exc}", file=sys.stderr)
-            entry = _build_skipped(job, size_bytes=job.get("size") or 0, limit_bytes=inline_limit, reason="download_error")
+            print(
+                f"Warning: download failed for attachment {attachment_id}: {exc}",
+                file=sys.stderr,
+            )
+            entry = _build_skipped(
+                job,
+                size_bytes=job.get("size") or 0,
+                limit_bytes=inline_limit,
+                reason="download_error",
+            )
             return job["test_id"], entry
         finally:
             local_session.close()
@@ -493,7 +599,9 @@ def process_run_attachments(
             if is_image:
                 if payload_bytes is None and tmp_path is not None and tmp_path.exists():
                     payload_bytes = tmp_path.read_bytes()
-                compressed, final_type = compress_image_data(payload_bytes or b"", final_type)
+                compressed, final_type = compress_image_data(
+                    payload_bytes or b"", final_type
+                )
                 size_bytes = len(compressed)
                 if inline_limit and 0 < size_bytes <= inline_limit:
                     inline_payload = compressed
@@ -501,7 +609,9 @@ def process_run_attachments(
                 source_path: Path
                 cleanup_paths: list[Path] = []
                 if tmp_path is None and payload_bytes is not None:
-                    fd, temp_name = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=suffix or ".bin")
+                    fd, temp_name = tempfile.mkstemp(
+                        prefix=f"att_{attachment_id}_", suffix=suffix or ".bin"
+                    )
                     os.close(fd)
                     source_path = Path(temp_name)
                     source_path.write_bytes(payload_bytes)
@@ -512,7 +622,9 @@ def process_run_attachments(
                         cleanup_paths.append(source_path)
                 final_path = source_path
                 if video_transcode_enabled and source_path is not None:
-                    fd, output_name = tempfile.mkstemp(prefix=f"att_{attachment_id}_xcode_", suffix=".mp4")
+                    fd, output_name = tempfile.mkstemp(
+                        prefix=f"att_{attachment_id}_xcode_", suffix=".mp4"
+                    )
                     os.close(fd)
                     output_path = Path(output_name)
                     try:
@@ -528,9 +640,18 @@ def process_run_attachments(
                         cleanup_paths.append(output_path)
                         final_type = "video/mp4"
                     except (VideoTranscodeError, FileNotFoundError) as exc:
-                        print(f"Warning: video transcode failed for attachment {attachment_id}: {exc}", file=sys.stderr)
+                        print(
+                            f"Warning: video transcode failed for attachment {attachment_id}: "
+                            f"{exc}",
+                            file=sys.stderr,
+                        )
                 size_bytes = _tmp_size(final_path)
-                if inline_video_limit and final_path is not None and 0 < size_bytes <= inline_video_limit and final_path.exists():
+                if (
+                    inline_video_limit
+                    and final_path is not None
+                    and 0 < size_bytes <= inline_video_limit
+                    and final_path.exists()
+                ):
                     inline_payload = final_path.read_bytes()
                 for path in cleanup_paths:
                     if path is not None:
@@ -558,7 +679,9 @@ def process_run_attachments(
         }
         if not entry["inline_embedded"]:
             entry["skipped"] = True
-            entry["skip_reason"] = "inline_limit" if (is_image or is_video) else "unsupported_type"
+            entry["skip_reason"] = (
+                "inline_limit" if (is_image or is_video) else "unsupported_type"
+            )
             entry["limit_bytes"] = inline_video_limit if is_video else inline_limit
         return job["test_id"], entry
 
@@ -568,12 +691,18 @@ def process_run_attachments(
         nonlocal completed_downloads
         max_workers_batch = min(attachment_workers, len(batch))
         with ThreadPoolExecutor(max_workers=max_workers_batch) as executor:
-            futures = {executor.submit(_process_attachment_job, idx, job): idx for idx, job in batch}
+            futures = {
+                executor.submit(_process_attachment_job, idx, job): idx
+                for idx, job in batch
+            }
             for future in as_completed(futures):
                 try:
                     test_id, entry = future.result()
                 except Exception as exc:
-                    print(f"Warning: attachment future failed for run {rid}: {exc}", file=sys.stderr)
+                    print(
+                        f"Warning: attachment future failed for run {rid}: {exc}",
+                        file=sys.stderr,
+                    )
                     continue
                 attachments_by_test.setdefault(test_id, []).append(entry)
                 completed_downloads += 1
@@ -585,7 +714,10 @@ def process_run_attachments(
         for start in range(0, len(download_jobs), attachment_batch_size):
             batch_jobs = [
                 (index, job)
-                for index, job in enumerate(download_jobs[start:start + attachment_batch_size], start=start + 1)
+                for index, job in enumerate(
+                    download_jobs[start : start + attachment_batch_size],
+                    start=start + 1,
+                )
             ]
             _process_batch(batch_jobs)
     else:
@@ -601,7 +733,6 @@ def process_run_attachments(
         items.sort(key=_attachment_sort_key)
 
     return attachments_by_test
-
 
 
 class VideoTranscodeError(Exception):
@@ -653,7 +784,9 @@ def transcode_video_file(
 
 def render_streaming_report(context: dict, runs_cache: Path, out_path: Path):
     """Render the final HTML by streaming run sections from disk."""
-    env = Environment(loader=FileSystemLoader("templates"), autoescape=select_autoescape())
+    env = Environment(
+        loader=FileSystemLoader("templates"), autoescape=select_autoescape()
+    )
     template = env.get_template("daily_report.html.j2")
 
     def _iter_tables():
@@ -680,6 +813,15 @@ def render_html(context: dict, out_path: Path):
         raise RuntimeError("render_html requires a tables cache path for streaming")
     return render_streaming_report(context, Path(cache_path), out_path)
 
+
+def _get_cached_runs(runs_cache: Path) -> int | None:
+    try:
+        with runs_cache.open("r", encoding="utf-8") as verify_fp:
+            return sum(1 for line in verify_fp if line.strip())
+    except Exception:
+        return None
+
+
 def generate_report(
     project: int,
     plan: int | None = None,
@@ -689,6 +831,7 @@ def generate_report(
     api_client: TestRailClient | None = None,
 ) -> str:
     """Generate a report for a plan or run and return the output HTML path."""
+
     def notify(stage: str, **payload):
         log_payload = {k: payload.get(k) for k in sorted(payload)}
         if VERBOSE_STAGE_LOGS or stage not in NOISY_STAGES:
@@ -735,7 +878,7 @@ def generate_report(
     # Enrichment data
     project_obj = api_client.get_project(project)
     project_name = project_obj.get("name") or f"Project {project}"
-    plan_name = None
+    plan_name: str | None = None
     run_names: dict[int, str] = {}
     plan_run_ids: list[int] = []
     if plan is not None:
@@ -754,13 +897,17 @@ def generate_report(
                 raise ValueError(f"Run IDs not found in plan {plan}: {missing}")
 
     user_lookup_allowed = True
-    users_map = {}
+    users_map: dict[int, str] = {}
     try:
         users_map = api_client.get_users_map()
     except UserLookupForbidden as err:
         # Bulk endpoint forbidden; fall back to per-user lookups until they fail too.
         users_map = {}
-        print(f"Warning: bulk user lookup forbidden ({err}); falling back to get_user per ID", file=sys.stderr)
+        print(
+            f"Warning: bulk user lookup forbidden ({err}); "
+            f"falling back to get_user per ID",
+            file=sys.stderr,
+        )
     priorities_map = api_client.get_priorities_map()
     statuses_map = api_client.get_statuses_map(defaults=DEFAULT_STATUS_MAP)
 
@@ -770,12 +917,13 @@ def generate_report(
         if run_ids:
             run_ids_resolved = [rid for rid in run_ids if rid in plan_run_ids]
         else:
-            run_ids_resolved = plan_run_ids or api_client.get_plan_runs(plan)  # type: ignore[arg-type]
+            assert plan is not None
+            run_ids_resolved = plan_run_ids or api_client.get_plan_runs(plan)
     if not run_ids_resolved:
         raise ValueError("No runs available to generate report")
 
     notify("initializing", plan=plan, run=run, run_count=len(run_ids or []))
-    summary = {"total": 0, "Passed": 0, "Failed": 0, "by_status": {}}
+    summary: Summary = {"total": 0, "Passed": 0, "Failed": 0, "by_status": {}}
 
     report_refs: set[str] = set()
     # Allow tuning concurrency with env while keeping conservative defaults
@@ -805,11 +953,13 @@ def generate_report(
     except ValueError:
         run_workers_ceiling = 4
     run_workers_ceiling = max(1, min(8, run_workers_ceiling))
-    max_workers = max(1, min(run_workers_ceiling, min(max(1, len(run_ids_resolved)), run_workers_env)))
+
 
     inline_embed_limit = int(os.getenv("ATTACHMENT_INLINE_MAX_BYTES", "250000"))
     try:
-        video_inline_limit = int(os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES", "15000000"))
+        video_inline_limit = int(
+            os.getenv("ATTACHMENT_VIDEO_INLINE_MAX_BYTES", "15000000")
+        )
     except ValueError:
         video_inline_limit = 15000000
     if video_inline_limit < inline_embed_limit:
@@ -905,7 +1055,13 @@ def generate_report(
         return base
 
     for idx, rid in enumerate(run_ids_resolved, start=1):
-        notify("processing_run", run_id=rid, index=idx, total=total_runs, remaining=len(run_ids_resolved) - idx)
+        notify(
+            "processing_run",
+            run_id=rid,
+            index=idx,
+            total=total_runs,
+            remaining=len(run_ids_resolved) - idx,
+        )
         results = api_client.get_results_for_run(rid)
         tests = api_client.get_tests_for_run(rid)
         try:
@@ -921,11 +1077,28 @@ def generate_report(
         # Ensure assignee IDs are resolvable to names
         if user_lookup_allowed:
             try:
-                test_ids = {int(x) for x in pd.Series(tests).apply(lambda r: r.get("assignedto_id") if isinstance(r, dict) else None).dropna().tolist()}
+                test_ids = {
+                    int(x)
+                    for x in pd.Series(tests)
+                    .apply(
+                        lambda r: r.get("assignedto_id")
+                        if isinstance(r, dict)
+                        else None
+                    )
+                    .dropna()
+                    .tolist()
+                }
             except Exception:
                 test_ids = set()
             try:
-                result_ids = {int(x) for x in pd.DataFrame(results).get("assignedto_id", pd.Series([], dtype="float")).dropna().astype(int).tolist()}
+                result_ids = {
+                    int(x)
+                    for x in pd.DataFrame(results)
+                    .get("assignedto_id", pd.Series([], dtype="float"))
+                    .dropna()
+                    .astype(int)
+                    .tolist()
+                }
             except Exception:
                 result_ids = set()
             missing_users = (test_ids | result_ids) - set(users_map)
@@ -936,15 +1109,25 @@ def generate_report(
                     u = api_client.get_user(uid)
                 except UserLookupForbidden as err:
                     user_lookup_allowed = False
-                    print(f"Warning: disabling per-user lookups ({err})", file=sys.stderr)
+                    print(
+                        f"Warning: disabling per-user lookups ({err})", file=sys.stderr
+                    )
                     break
                 if isinstance(u, dict) and u.get("id") is not None:
-                    users_map[int(u["id"])] = u.get("name") or u.get("email") or str(u["id"])
+                    users_map[int(u["id"])] = (
+                        u.get("name") or u.get("email") or str(u["id"])
+                    )
         notify("run_users_ready", run_id=rid, known_users=len(users_map))
 
         res_summary = summarize_results(results, status_map=statuses_map)
         notify("run_summary_ready", run_id=rid, rows=len(res_summary["df"]))
-        table_df = build_test_table(pd.DataFrame(tests), res_summary["df"], users_map=users_map, priorities_map=priorities_map, status_map=statuses_map)
+        table_df = build_test_table(
+            pd.DataFrame(tests),
+            res_summary["df"],
+            users_map=users_map,
+            priorities_map=priorities_map,
+            status_map=statuses_map,
+        )
         notify("run_table_built", run_id=rid, rows=len(table_df))
         # Compute counts from the merged table (one row per test)
         counts = table_df["status_name"].value_counts().to_dict()
@@ -957,6 +1140,7 @@ def generate_report(
         run_passed = counts.get("Passed", 0)
         run_failed = counts.get("Failed", 0)
         run_pass_rate = round((run_passed / run_total) * 100, 2) if run_total else 0.0
+
         # Build run-level donut segments/style
         def _build_segments(counts: dict[str, int]):
             status_colors = {
@@ -972,14 +1156,31 @@ def generate_report(
             if total > 0:
                 cumulative = 0.0
                 colors_lc = {k.lower(): v for k, v in status_colors.items()}
-                for label, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
+                for label, count in sorted(
+                    counts.items(), key=lambda kv: (-kv[1], kv[0])
+                ):
                     pct = (count / total) * 100.0
                     start = cumulative
                     end = cumulative + pct
                     color = colors_lc.get(str(label).lower(), "#6b7280")
-                    segments.append({"label": label, "count": count, "percent": round(pct, 2), "start": start, "end": end, "color": color})
+                    segments.append(
+                        {
+                            "label": label,
+                            "count": count,
+                            "percent": round(pct, 2),
+                            "start": start,
+                            "end": end,
+                            "color": color,
+                        }
+                    )
                     cumulative = end
-                donut_style = "conic-gradient(" + ", ".join([f"{s['color']} {s['start']}% {s['end']}%" for s in segments]) + ")"
+                donut_style = (
+                    "conic-gradient("
+                    + ", ".join(
+                        [f"{s['color']} {s['start']}% {s['end']}%" for s in segments]
+                    )
+                    + ")"
+                )
             return segments, donut_style
 
         segs, run_donut_style = _build_segments(counts)
@@ -1003,6 +1204,7 @@ def generate_report(
                 if result_id is not None and not pd.isna(result_id):
                     latest_result_ids[tid_int] = int(result_id)
         notify("run_latest_results", run_id=rid, latest=len(latest_result_ids))
+
         def _fetch_metadata(test_id: int):
             try:
                 data = api_client.get_attachments_for_test(test_id)
@@ -1012,20 +1214,32 @@ def generate_report(
                     return test_id, []
                 return test_id, data
             except Exception as e:
-                print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
+                print(
+                    f"Warning: attachments fetch failed for test {test_id}: {e}",
+                    file=sys.stderr,
+                )
                 return test_id, []
 
         metadata_map: dict[int, list] = {}
         if latest_result_ids:
-            notify("fetching_attachment_metadata", run_id=rid, count=len(latest_result_ids))
+            notify(
+                "fetching_attachment_metadata", run_id=rid, count=len(latest_result_ids)
+            )
             with ThreadPoolExecutor(max_workers=attachment_workers) as executor:
-                futures = {executor.submit(_fetch_metadata, tid): tid for tid in latest_result_ids}
+                futures = {
+                    executor.submit(_fetch_metadata, tid): tid
+                    for tid in latest_result_ids
+                }
                 for future in as_completed(futures):
                     tid = futures[future]
                     try:
                         _, payload = future.result()
                     except Exception as e:
-                        print(f"Warning: attachments metadata future failed for test {tid}: {e}", file=sys.stderr)
+                        print(
+                            f"Warning: attachments metadata future failed for test {tid}: "
+                            f"{e}",
+                            file=sys.stderr,
+                        )
                         payload = []
                     metadata_map[tid] = payload or []
             log_memory(f"after_attachment_metadata_{rid}")
@@ -1069,7 +1283,9 @@ def generate_report(
             if refs_val is None:
                 row["refs"] = []
             elif isinstance(refs_val, str):
-                row["refs"] = [ref.strip() for ref in refs_val.split(",") if ref.strip()]
+                row["refs"] = [
+                    ref.strip() for ref in refs_val.split(",") if ref.strip()
+                ]
             elif isinstance(refs_val, list):
                 row["refs"] = [str(r).strip() for r in refs_val if str(r).strip()]
             else:
@@ -1092,7 +1308,12 @@ def generate_report(
         with runs_cache.open("a", encoding="utf-8") as sink:
             json.dump(run_payload, sink)
             sink.write("\n")
-        notify("run_payload_written", run_id=rid, rows=run_total, attachments=sum(len(v) for v in attachments_by_test.values()))
+        notify(
+            "run_payload_written",
+            run_id=rid,
+            rows=run_total,
+            attachments=sum(len(v) for v in attachments_by_test.values()),
+        )
         if snapshot_enabled and len(tables_snapshot) < snapshot_limit:
             tables_snapshot.append(_snapshot_run(run_payload))
         summary["total"] += run_total
@@ -1104,16 +1325,23 @@ def generate_report(
         notify("run_summary_updated", run_id=rid, total=summary["total"])
         notify("run_stop", run_id=rid, index=idx)
         log_memory(f"run_complete_{rid}")
-        del table_df, latest_results_df, res_summary, rows_payload, attachments_by_test, metadata_map
+        del (
+            table_df,
+            latest_results_df,
+            res_summary,
+            rows_payload,
+            attachments_by_test,
+            metadata_map,
+        )
         gc.collect()
 
-    try:
-        with runs_cache.open("r", encoding="utf-8") as verify_fp:
-            cached_runs = sum(1 for line in verify_fp if line.strip())
-        notify("runs_cached", count=cached_runs, expected=total_runs)
-    except Exception:
-        cached_runs = None
-    pass_rate = round((summary["Passed"] / summary["total"]) * 100, 2) if summary["total"] else 0
+    cached_runs = _get_cached_runs(runs_cache)
+    notify("runs_cached", count=cached_runs, expected=total_runs)
+    pass_rate = (
+        round((cast(int, summary["Passed"]) / cast(int, summary["total"])) * 100, 2)
+        if summary["total"]
+        else 0
+    ) # type: ignore # type: ignore # type: ignore
     # Donut segments
     status_colors = {
         "Passed": "#16a34a",
@@ -1123,24 +1351,41 @@ def generate_report(
         "Untested": "#9ca3af",
     }
     status_counts = summary.get("by_status", {})
-    total_for_chart = sum(status_counts.values())
+    total_for_chart = sum(status_counts.values()) # type: ignore
     segments = []
     if total_for_chart > 0:
         cumulative = 0.0
         colors_lc = {k.lower(): v for k, v in status_colors.items()}
-        for label, count in sorted(status_counts.items(), key=lambda kv: (-kv[1], kv[0])):
+        for label, count in sorted(
+            status_counts.items(), key=lambda kv: (-kv[1], kv[0])
+        ):
             pct = (count / total_for_chart) * 100.0
             start = cumulative
             end = cumulative + pct
             color = colors_lc.get(str(label).lower(), "#6b7280")
-            segments.append({"label": label, "count": count, "percent": round(pct, 2), "start": start, "end": end, "color": color})
+            segments.append(
+                {
+                    "label": label,
+                    "count": count,
+                    "percent": round(pct, 2),
+                    "start": start,
+                    "end": end,
+                    "color": color,
+                }
+            )
             cumulative = end
-        donut_style = ", ".join([f"{s['color']} {s['start']}% {s['end']}%" for s in segments])
+        donut_style = ", ".join(
+            [f"{s['color']} {s['start']}% {s['end']}%" for s in segments]
+        )
         donut_style = f"conic-gradient({donut_style})"
     else:
         donut_style = "conic-gradient(#e5e7eb 0 100%)"
 
-    report_title = f"Testing Progress Report — {plan_name}" if plan_name else "Testing Progress Report"
+    report_title = (
+        f"Testing Progress Report — {plan_name}"
+        if plan_name
+        else "Testing Progress Report"
+    )
     notify("rendering_report", total_runs=total_runs)
     preview_tables: list[dict] = []
     if snapshot_enabled and not tables_snapshot:
@@ -1155,7 +1400,9 @@ def generate_report(
 
     context = {
         "report_title": report_title,
-        "generated_at": datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M"),
+        "generated_at": datetime.now(timezone.utc)
+        .astimezone()
+        .strftime("%Y-%m-%d %H:%M"),
         "summary": {**summary, "pass_rate": pass_rate},
         "notes": ["Generated automatically from TestRail API"],
         "project_name": project_name,
@@ -1177,7 +1424,7 @@ def generate_report(
         cleaned = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in name)
         return cleaned.strip("_") or "Project"
 
-    date_str = datetime.now().strftime('%d%m%y')
+    date_str = datetime.now().strftime("%d%m%y")
     base_name = plan_name if plan_name else project_name
     name_slug = _safe_filename(base_name)
     filename = f"Testing_Progress_Report_{name_slug}_{date_str}.html"
@@ -1213,7 +1460,9 @@ def main():
     try:
         if args.runs and not args.plan:
             raise ValueError("--runs can only be used together with --plan")
-        result = generate_report(project=args.project, plan=args.plan, run=args.run, run_ids=args.runs)
+        result = generate_report(
+            project=args.project, plan=args.plan, run=args.run, run_ids=args.runs
+        )
         print(f"✅ Report saved to: {result}")
     except (ValueError, requests.exceptions.RequestException) as e:
         print(f"Error: {e}", file=sys.stderr)

@@ -28,7 +28,9 @@ DEFAULT_HTTP_BACKOFF = max(0.5, _env_float("TESTRAIL_HTTP_BACKOFF", 1.6))
 
 
 # --- Telemetry helpers ---
-_telemetry_ctx: contextvars.ContextVar[dict | None] = contextvars.ContextVar("testrail_reporter_telemetry", default=None)
+_telemetry_ctx: contextvars.ContextVar[dict | None] = contextvars.ContextVar(
+    "testrail_reporter_telemetry", default=None
+)
 
 
 @contextlib.contextmanager
@@ -42,18 +44,22 @@ def capture_telemetry():
         _telemetry_ctx.reset(token)
 
 
-def record_api_call(kind: str, endpoint: str, elapsed_ms: float, status: str, error: str | None = None):
+def record_api_call(
+    kind: str, endpoint: str, elapsed_ms: float, status: str, error: str | None = None
+):
     telemetry = _telemetry_ctx.get()
     if not telemetry:
         return
-    telemetry.setdefault("api_calls", []).append({
-        "kind": kind,
-        "endpoint": endpoint,
-        "elapsed_ms": round(elapsed_ms, 2),
-        "status": status,
-        "error": error,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    })
+    telemetry.setdefault("api_calls", []).append(
+        {
+            "kind": kind,
+            "endpoint": endpoint,
+            "elapsed_ms": round(elapsed_ms, 2),
+            "status": status,
+            "error": error,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
 
 
 class UserLookupForbidden(Exception):
@@ -64,7 +70,9 @@ class AttachmentTooLarge(Exception):
     """Raised when an attachment streaming download exceeds the allowed limit."""
 
     def __init__(self, size_bytes: int, limit_bytes: int):
-        super().__init__(f"Attachment exceeded limit ({size_bytes} > {limit_bytes} bytes)")
+        super().__init__(
+            f"Attachment exceeded limit ({size_bytes} > {limit_bytes} bytes)"
+        )
         self.size_bytes = size_bytes
         self.limit_bytes = limit_bytes
 
@@ -93,27 +101,52 @@ def api_get(
             if isinstance(data, dict) and any(k in data for k in ("error", "message")):
                 msg = data.get("error") or data.get("message") or str(data)
                 raise RuntimeError(f"API error for '{endpoint}': {msg}")
-            record_api_call("GET", endpoint, (time.perf_counter() - start) * 1000.0, "ok")
+            record_api_call(
+                "GET", endpoint, (time.perf_counter() - start) * 1000.0, "ok"
+            )
             return data
         except requests.exceptions.HTTPError as exc:
             last_exc = exc
             status_code = exc.response.status_code if exc.response is not None else None
-            record_api_call("GET", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
-            retryable = status_code == 429 or (status_code is not None and 500 <= status_code < 600)
+            record_api_call(
+                "GET",
+                endpoint,
+                (time.perf_counter() - start) * 1000.0,
+                "error",
+                str(exc),
+            )
+            retryable = status_code == 429 or (
+                status_code is not None and 500 <= status_code < 600
+            )
             if not retryable or attempt == attempts:
                 raise
             time.sleep(delay)
             delay *= 1.6
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+        ) as exc:
             last_exc = exc
-            record_api_call("GET", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            record_api_call(
+                "GET",
+                endpoint,
+                (time.perf_counter() - start) * 1000.0,
+                "error",
+                str(exc),
+            )
             if attempt == attempts:
                 raise
             time.sleep(delay)
             delay *= 1.6
         except Exception as exc:
             last_exc = exc
-            record_api_call("GET", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            record_api_call(
+                "GET",
+                endpoint,
+                (time.perf_counter() - start) * 1000.0,
+                "error",
+                str(exc),
+            )
             if attempt == attempts:
                 raise
             time.sleep(delay)
@@ -146,27 +179,52 @@ def api_post(
             if isinstance(data, dict) and any(k in data for k in ("error", "message")):
                 msg = data.get("error") or data.get("message") or str(data)
                 raise RuntimeError(f"API error for '{endpoint}': {msg}")
-            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "ok")
+            record_api_call(
+                "POST", endpoint, (time.perf_counter() - start) * 1000.0, "ok"
+            )
             return data
         except requests.exceptions.HTTPError as exc:
             last_exc = exc
             status_code = exc.response.status_code if exc.response is not None else None
-            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
-            retryable = status_code == 429 or (status_code is not None and 500 <= status_code < 600)
+            record_api_call(
+                "POST",
+                endpoint,
+                (time.perf_counter() - start) * 1000.0,
+                "error",
+                str(exc),
+            )
+            retryable = status_code == 429 or (
+                status_code is not None and 500 <= status_code < 600
+            )
             if not retryable or attempt == attempts:
                 raise
             time.sleep(delay)
             delay *= 1.6
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+        except (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+        ) as exc:
             last_exc = exc
-            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            record_api_call(
+                "POST",
+                endpoint,
+                (time.perf_counter() - start) * 1000.0,
+                "error",
+                str(exc),
+            )
             if attempt == attempts:
                 raise
             time.sleep(delay)
             delay *= 1.6
         except Exception as exc:
             last_exc = exc
-            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            record_api_call(
+                "POST",
+                endpoint,
+                (time.perf_counter() - start) * 1000.0,
+                "error",
+                str(exc),
+            )
             if attempt == attempts:
                 raise
             time.sleep(delay)
@@ -175,12 +233,42 @@ def api_post(
         raise last_exc
 
 
-def get_project(session, base_url, project_id: int, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
-    return api_get(session, base_url, f"get_project/{project_id}", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+def get_project(
+    session,
+    base_url,
+    project_id: int,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
+    return api_get(
+        session,
+        base_url,
+        f"get_project/{project_id}",
+        timeout=timeout,
+        max_attempts=max_attempts,
+        backoff=backoff,
+    )
 
 
-def get_plan(session, base_url, plan_id: int, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
-    return api_get(session, base_url, f"get_plan/{plan_id}", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+def get_plan(
+    session,
+    base_url,
+    plan_id: int,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
+    return api_get(
+        session,
+        base_url,
+        f"get_plan/{plan_id}",
+        timeout=timeout,
+        max_attempts=max_attempts,
+        backoff=backoff,
+    )
 
 
 def get_cases(
@@ -204,7 +292,14 @@ def get_cases(
         if section_id is not None:
             qs.append(f"section_id={section_id}")
         endpoint = f"get_cases/{project_id}&" + "&".join(qs)
-        data = api_get(session, base_url, endpoint, timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+        data = api_get(
+            session,
+            base_url,
+            endpoint,
+            timeout=timeout,
+            max_attempts=max_attempts,
+            backoff=backoff,
+        )
         if not data:
             break
         if isinstance(data, list):
@@ -220,9 +315,23 @@ def get_cases(
     return cases
 
 
-def get_users_map(session, base_url, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
+def get_users_map(
+    session,
+    base_url,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
     try:
-        users = api_get(session, base_url, "get_users", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+        users = api_get(
+            session,
+            base_url,
+            "get_users",
+            timeout=timeout,
+            max_attempts=max_attempts,
+            backoff=backoff,
+        )
         mapping = {}
         if isinstance(users, list):
             for u in users:
@@ -244,9 +353,24 @@ def get_users_map(session, base_url, *, timeout: float | None = None, max_attemp
         return {}
 
 
-def get_user(session, base_url, user_id: int, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
+def get_user(
+    session,
+    base_url,
+    user_id: int,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
     try:
-        return api_get(session, base_url, f"get_user/{user_id}", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+        return api_get(
+            session,
+            base_url,
+            f"get_user/{user_id}",
+            timeout=timeout,
+            max_attempts=max_attempts,
+            backoff=backoff,
+        )
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 403:
             raise UserLookupForbidden("TestRail denied access to get_user") from e
@@ -257,10 +381,24 @@ def get_user(session, base_url, user_id: int, *, timeout: float | None = None, m
         return None
 
 
-def get_priorities_map(session, base_url, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
+def get_priorities_map(
+    session,
+    base_url,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
     """Return {priority_id: priority_name} mapping."""
     try:
-        items = api_get(session, base_url, "get_priorities", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+        items = api_get(
+            session,
+            base_url,
+            "get_priorities",
+            timeout=timeout,
+            max_attempts=max_attempts,
+            backoff=backoff,
+        )
         mapping = {}
         if isinstance(items, list):
             for p in items:
@@ -275,10 +413,25 @@ def get_priorities_map(session, base_url, *, timeout: float | None = None, max_a
         return {}
 
 
-def get_statuses_map(session, base_url, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None, defaults: dict | None = None):
+def get_statuses_map(
+    session,
+    base_url,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+    defaults: dict | None = None,
+):
     """Return {status_id: status_name} mapping from TestRail."""
     try:
-        items = api_get(session, base_url, "get_statuses", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+        items = api_get(
+            session,
+            base_url,
+            "get_statuses",
+            timeout=timeout,
+            max_attempts=max_attempts,
+            backoff=backoff,
+        )
         mapping = {}
         if isinstance(items, list):
             for s in items:
@@ -296,8 +449,23 @@ def get_statuses_map(session, base_url, *, timeout: float | None = None, max_att
         return (defaults or {}).copy()
 
 
-def get_plan_runs(session, base_url, plan_id: int, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
-    plan = api_get(session, base_url, f"get_plan/{plan_id}", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+def get_plan_runs(
+    session,
+    base_url,
+    plan_id: int,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
+    plan = api_get(
+        session,
+        base_url,
+        f"get_plan/{plan_id}",
+        timeout=timeout,
+        max_attempts=max_attempts,
+        backoff=backoff,
+    )
     runs = []
     for entry in plan.get("entries", []):
         for run in entry.get("runs", []):
@@ -307,7 +475,15 @@ def get_plan_runs(session, base_url, plan_id: int, *, timeout: float | None = No
     return runs
 
 
-def get_results_for_run(session, base_url, run_id: int, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
+def get_results_for_run(
+    session,
+    base_url,
+    run_id: int,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
     results = []
     offset, limit = 0, 250
     while True:
@@ -331,8 +507,11 @@ def get_results_for_run(session, base_url, run_id: int, *, timeout: float | None
         elif isinstance(batch, dict) and "results" in batch:
             items = batch.get("results", [])
         else:
-            print(f"Warning: Unexpected payload for results (run {run_id}): {type(batch)} keys={list(batch.keys()) if isinstance(batch, dict) else 'n/a'}",
-                  file=sys.stderr)
+            print(
+                f"Warning: Unexpected payload for results (run {run_id}): {type(batch)} "
+                f"keys={list(batch.keys()) if isinstance(batch, dict) else 'n/a'}",
+                file=sys.stderr,
+            )
             break
         results.extend(items)
         if len(items) < limit:
@@ -341,7 +520,15 @@ def get_results_for_run(session, base_url, run_id: int, *, timeout: float | None
     return results
 
 
-def get_tests_for_run(session, base_url, run_id: int, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
+def get_tests_for_run(
+    session,
+    base_url,
+    run_id: int,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
     tests = []
     offset, limit = 0, 250
     while True:
@@ -365,8 +552,11 @@ def get_tests_for_run(session, base_url, run_id: int, *, timeout: float | None =
         elif isinstance(batch, dict) and "tests" in batch:
             items = batch.get("tests", [])
         else:
-            print(f"Warning: Unexpected payload for tests (run {run_id}): {type(batch)} keys={list(batch.keys()) if isinstance(batch, dict) else 'n/a'}",
-                  file=sys.stderr)
+            print(
+                f"Warning: Unexpected payload for tests (run {run_id}): {type(batch)} "
+                f"keys={list(batch.keys()) if isinstance(batch, dict) else 'n/a'}",
+                file=sys.stderr,
+            )
             break
         tests.extend(items)
         if len(items) < limit:
@@ -400,7 +590,14 @@ def get_plans_for_project(
             qs.append(f"created_before={created_before}")
         endpoint = f"get_plans/{project_id}&" + "&".join(qs)
         try:
-            batch = api_get(session, base_url, endpoint, timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+            batch = api_get(
+                session,
+                base_url,
+                endpoint,
+                timeout=timeout,
+                max_attempts=max_attempts,
+                backoff=backoff,
+            )
         except Exception:
             break
         if not batch:
@@ -418,9 +615,24 @@ def get_plans_for_project(
     return plans
 
 
-def get_attachments_for_test(session, base_url, test_id: int, *, timeout: float | None = None, max_attempts: int | None = None, backoff: float | None = None):
+def get_attachments_for_test(
+    session,
+    base_url,
+    test_id: int,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
     try:
-        data = api_get(session, base_url, f"get_attachments_for_test/{test_id}", timeout=timeout, max_attempts=max_attempts, backoff=backoff)
+        data = api_get(
+            session,
+            base_url,
+            f"get_attachments_for_test/{test_id}",
+            timeout=timeout,
+            max_attempts=max_attempts,
+            backoff=backoff,
+        )
         if isinstance(data, list):
             return data
         if isinstance(data, dict):
@@ -430,10 +642,16 @@ def get_attachments_for_test(session, base_url, test_id: int, *, timeout: float 
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
             return []
-        print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
+        print(
+            f"Warning: attachments fetch failed for test {test_id}: {e}",
+            file=sys.stderr,
+        )
         return []
     except Exception as e:
-        print(f"Warning: attachments fetch failed for test {test_id}: {e}", file=sys.stderr)
+        print(
+            f"Warning: attachments fetch failed for test {test_id}: {e}",
+            file=sys.stderr,
+        )
         return []
 
 
@@ -454,7 +672,9 @@ def download_attachment(
     attempt = 0
     while True:
         try:
-            with session.get(url, stream=True, timeout=timeout or DEFAULT_HTTP_TIMEOUT) as r:
+            with session.get(
+                url, stream=True, timeout=timeout or DEFAULT_HTTP_TIMEOUT
+            ) as r:
                 if r.status_code == 429:
                     retry_after = r.headers.get("Retry-After")
                     wait_for = backoff_delay
@@ -472,7 +692,9 @@ def download_attachment(
                 r.raise_for_status()
                 content_type = r.headers.get("Content-Type")
                 # Write to a temp file to avoid holding full content in memory
-                fd, tmp_path = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
+                fd, tmp_path = tempfile.mkstemp(
+                    prefix=f"att_{attachment_id}_", suffix=".bin"
+                )
                 tmp = Path(tmp_path)
                 try:
                     bytes_downloaded = 0
@@ -481,7 +703,11 @@ def download_attachment(
                             if not chunk:
                                 continue
                             bytes_downloaded += len(chunk)
-                            if size_limit and size_limit > 0 and bytes_downloaded > size_limit:
+                            if (
+                                size_limit
+                                and size_limit > 0
+                                and bytes_downloaded > size_limit
+                            ):
                                 raise AttachmentTooLarge(bytes_downloaded, size_limit)
                             f.write(chunk)
                 except AttachmentTooLarge:
@@ -490,15 +716,32 @@ def download_attachment(
                     except Exception:
                         pass
                     raise
-                record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "ok")
+                record_api_call(
+                    "GET",
+                    f"get_attachment/{attachment_id}",
+                    (time.perf_counter() - start) * 1000.0,
+                    "ok",
+                )
                 return tmp, content_type
         except AttachmentTooLarge as exc:
-            record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "error", str(exc))
+            record_api_call(
+                "GET",
+                f"get_attachment/{attachment_id}",
+                (time.perf_counter() - start) * 1000.0,
+                "error",
+                str(exc),
+            )
             raise
         except Exception as exc:
             attempt += 1
             if attempt >= max_retries:
-                record_api_call("GET", f"get_attachment/{attachment_id}", (time.perf_counter() - start) * 1000.0, "error", str(exc))
+                record_api_call(
+                    "GET",
+                    f"get_attachment/{attachment_id}",
+                    (time.perf_counter() - start) * 1000.0,
+                    "error",
+                    str(exc),
+                )
                 raise
             time.sleep(backoff_delay)
             backoff_delay *= 1.8
@@ -521,25 +764,62 @@ class TestRailClient:
 
     def get_project(self, project_id: int):
         with self.make_session() as session:
-            return get_project(session, self.base_url, project_id, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_project(
+                session,
+                self.base_url,
+                project_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
     def get_plan(self, plan_id: int):
         with self.make_session() as session:
-            return get_plan(session, self.base_url, plan_id, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_plan(
+                session,
+                self.base_url,
+                plan_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
     def get_plan_runs(self, plan_id: int):
         with self.make_session() as session:
-            return get_plan_runs(session, self.base_url, plan_id, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_plan_runs(
+                session,
+                self.base_url,
+                plan_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
     def get_tests_for_run(self, run_id: int):
         with self.make_session() as session:
-            return get_tests_for_run(session, self.base_url, run_id, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_tests_for_run(
+                session,
+                self.base_url,
+                run_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
     def get_results_for_run(self, run_id: int):
         with self.make_session() as session:
-            return get_results_for_run(session, self.base_url, run_id, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_results_for_run(
+                session,
+                self.base_url,
+                run_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
-    def get_plans_for_project(self, project_id: int, *, is_completed: int | None = None):
+    def get_plans_for_project(
+        self, project_id: int, *, is_completed: int | None = None
+    ):
         with self.make_session() as session:
             return get_plans_for_project(
                 session,
@@ -553,25 +833,63 @@ class TestRailClient:
 
     def get_users_map(self):
         with self.make_session() as session:
-            return get_users_map(session, self.base_url, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_users_map(
+                session,
+                self.base_url,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
     def get_user(self, user_id: int):
         with self.make_session() as session:
-            return get_user(session, self.base_url, user_id, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_user(
+                session,
+                self.base_url,
+                user_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
     def get_priorities_map(self):
         with self.make_session() as session:
-            return get_priorities_map(session, self.base_url, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_priorities_map(
+                session,
+                self.base_url,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
     def get_statuses_map(self, defaults: dict | None = None):
         with self.make_session() as session:
-            return get_statuses_map(session, self.base_url, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff, defaults=defaults)
+            return get_statuses_map(
+                session,
+                self.base_url,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+                defaults=defaults,
+            )
 
     def get_attachments_for_test(self, test_id: int):
         with self.make_session() as session:
-            return get_attachments_for_test(session, self.base_url, test_id, timeout=self.timeout, max_attempts=self.max_attempts, backoff=self.backoff)
+            return get_attachments_for_test(
+                session,
+                self.base_url,
+                test_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
 
-    def get_cases(self, project_id: int, suite_id: int | None = None, section_id: int | None = None):
+    def get_cases(
+        self,
+        project_id: int,
+        suite_id: int | None = None,
+        section_id: int | None = None,
+    ):
         with self.make_session() as session:
             return get_cases(
                 session,
@@ -584,7 +902,9 @@ class TestRailClient:
                 backoff=self.backoff,
             )
 
-    def download_attachment(self, attachment_id: int, *, size_limit: int | None = None, max_retries: int = 4):
+    def download_attachment(
+        self, attachment_id: int, *, size_limit: int | None = None, max_retries: int = 4
+    ):
         with self.make_session() as session:
             return download_attachment(
                 session,

@@ -1,3 +1,6 @@
+# mypy: disable-error-code=assignment
+import json
+import os
 import threading
 import time
 import uuid
@@ -6,33 +9,30 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from fastapi import FastAPI, Request, Form, HTTPException, Query, Body, status
+import requests
+from dotenv import load_dotenv
+from fastapi import Body, FastAPI, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import os
-from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator, model_validator
-import json
 
-from testrail_daily_report import (
-    generate_report,
-    get_plans_for_project,
-    get_plan,
-    env_or_die,
-    log_memory,
-)
 from testrail_client import (
-    DEFAULT_HTTP_TIMEOUT,
-    DEFAULT_HTTP_RETRIES,
     DEFAULT_HTTP_BACKOFF,
+    DEFAULT_HTTP_RETRIES,
+    DEFAULT_HTTP_TIMEOUT,
     TestRailClient,
     capture_telemetry,
+    get_plan,
+    get_plans_for_project,
 )
-import requests
-import glob
+from testrail_daily_report import (
+    env_or_die,
+    generate_report,
+    log_memory,
+)
 
 # Ensure local .env overrides host/env settings to avoid stale provider configs
 load_dotenv(override=True)
@@ -49,7 +49,9 @@ class NoCacheStaticFiles(StaticFiles):
     async def get_response(self, path, scope):
         response = await super().get_response(path, scope)
         if response.status_code == 200:
-            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Cache-Control"] = (
+                "no-store, no-cache, must-revalidate, max-age=0"
+            )
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
@@ -162,7 +164,10 @@ class TTLCache:
         ttl = ttl_seconds if ttl_seconds is not None else self.ttl
         expires_at = time.time() + max(1, ttl)
         with self._lock:
-            self._store[key] = (expires_at, value.copy() if isinstance(value, dict) else value)
+            self._store[key] = (
+                expires_at,
+                value.copy() if isinstance(value, dict) else value,
+            )
             self._record(key)
         return expires_at
 
@@ -216,7 +221,9 @@ class ReportJob:
             "status": self.status,
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": self.completed_at.isoformat()
+            if self.completed_at
+            else None,
             "path": self.path,
             "url": self.url,
             "error": self.error,
@@ -247,7 +254,7 @@ class ReportJobManager:
             return self.jobs.get(job_id)
 
     def serialize(self, job: ReportJob) -> dict[str, Any]:
-        data = job.to_dict()
+        data: dict[str, Any] = job.to_dict()
         data["queue_position"] = self.queue_position(job.id)
         return data
 
@@ -289,7 +296,9 @@ class ReportJobManager:
             "running": running,
             "queued": queued,
             "history_limit": self.max_history,
-            "latest_job": {"id": recent_id, "status": recent_status} if recent_id else None,
+            "latest_job": {"id": recent_id, "status": recent_status}
+            if recent_id
+            else None,
         }
 
     def _trim_history(self):
@@ -330,7 +339,9 @@ class ReportJobManager:
         start = time.perf_counter()
         print(f"[report-job] {job_id} started with params={job.params}", flush=True)
         try:
-            reporter = lambda stage, payload=None: self.report_progress(job_id, stage, payload or {})
+            def reporter(stage, payload=None):
+                self.report_progress(job_id, stage, payload or {})
+
             with capture_telemetry() as telemetry:
                 path = generate_report(**job.params, progress=reporter)
             duration_ms = (time.perf_counter() - start) * 1000.0
@@ -338,7 +349,9 @@ class ReportJobManager:
             job.completed_at = completed_at
             job.path = str(path)
             job.url = "/reports/" + Path(path).name
-            api_calls = telemetry.get("api_calls", []) if isinstance(telemetry, dict) else []
+            api_calls = (
+                telemetry.get("api_calls", []) if isinstance(telemetry, dict) else []
+            )
             job.meta = {
                 "generated_at": completed_at.isoformat(),
                 "duration_ms": round(duration_ms, 2),
@@ -346,7 +359,10 @@ class ReportJobManager:
                 "api_calls": api_calls,
             }
             job.status = "success"
-            print(f"[report-job] {job_id} completed in {duration_ms:.0f}ms -> {job.url}", flush=True)
+            print(
+                f"[report-job] {job_id} completed in {duration_ms:.0f}ms -> {job.url}",
+                flush=True,
+            )
         except Exception as exc:
             job.error = str(exc)
             job.status = "error"
@@ -368,15 +384,20 @@ def _report_worker_config() -> tuple[int, int, int]:
     resolved = max(1, min(requested, configured_max))
     if resolved != requested:
         print(
-            f"INFO: REPORT_WORKERS limited to {resolved} (requested {requested}, max {configured_max}).",
+            f"INFO: REPORT_WORKERS limited to {resolved} "
+            f"(requested {requested}, max {configured_max}).",
             flush=True,
         )
     return resolved, requested, configured_max
 
 
-report_worker_count, report_worker_requested, report_worker_max = _report_worker_config()
+report_worker_count, report_worker_requested, report_worker_max = (
+    _report_worker_config()
+)
 job_history_limit = max(10, int(os.getenv("REPORT_JOB_HISTORY", "60")))
-_job_manager = ReportJobManager(max_workers=report_worker_count, max_history=job_history_limit)
+_job_manager = ReportJobManager(
+    max_workers=report_worker_count, max_history=job_history_limit
+)
 
 
 class ReportRequest(BaseModel):
@@ -406,7 +427,9 @@ class ReportRequest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_constraints(self):
-        if (self.plan is None and self.run is None) or (self.plan is not None and self.run is not None):
+        if (self.plan is None and self.run is None) or (
+            self.plan is not None and self.run is not None
+        ):
             raise ValueError("Provide exactly one of plan or run")
         if self.run_ids and self.plan is None:
             raise ValueError("Run selection requires a plan")
@@ -445,10 +468,12 @@ class ManageCase(BaseModel):
     bdd_scenarios: str | None = None
     dry_run: bool = False
 
+
 _keepalive_thread: threading.Thread | None = None
 _keepalive_stop = threading.Event()
 _memlog_thread: threading.Thread | None = None
 _memlog_stop = threading.Event()
+
 
 def _start_keepalive():
     url = os.getenv("KEEPALIVE_URL")
@@ -470,8 +495,11 @@ def _start_keepalive():
     global _keepalive_thread
     if _keepalive_thread and _keepalive_thread.is_alive():
         return
-    _keepalive_thread = threading.Thread(target=_loop, name="keepalive-thread", daemon=True)
+    _keepalive_thread = threading.Thread(
+        target=_loop, name="keepalive-thread", daemon=True
+    )
     _keepalive_thread.start()
+
 
 def _start_memlog():
     try:
@@ -493,6 +521,7 @@ def _start_memlog():
     _memlog_thread = threading.Thread(target=_loop, name="memlog-thread", daemon=True)
     _memlog_thread.start()
 
+
 def _stop_keepalive():
     global _keepalive_thread
     if not _keepalive_thread:
@@ -502,6 +531,7 @@ def _stop_keepalive():
     _keepalive_thread = None
     _keepalive_stop.clear()
 
+
 def _stop_memlog():
     global _memlog_thread
     if not _memlog_thread:
@@ -510,6 +540,7 @@ def _stop_memlog():
     _memlog_thread.join(timeout=5)
     _memlog_thread = None
     _memlog_stop.clear()
+
 
 @app.on_event("startup")
 def on_startup():
@@ -537,7 +568,7 @@ def on_startup():
         return 1
 
     web_workers = web_worker_count()
-    
+
     print("--- Worker Configuration ---")
     print(f"Report Workers:     {report_workers}")
     print(f"Run Workers:          {run_workers}")
@@ -545,15 +576,21 @@ def on_startup():
     print(f"Web Workers:          {web_workers}")
     print("--------------------------")
     if web_workers > 1:
-        print("WARNING: WEB_CONCURRENCY > 1 will break async job polling; limit uvicorn workers (WEB_CONCURRENCY) to 1.", flush=True)
+        print(
+            "WARNING: WEB_CONCURRENCY > 1 will break async job polling; "
+            "limit uvicorn workers (WEB_CONCURRENCY) to 1.",
+            flush=True,
+        )
 
     _start_keepalive()
     _start_memlog()
+
 
 @app.on_event("shutdown")
 def on_shutdown():
     _stop_keepalive()
     _stop_memlog()
+
 
 @app.get("/healthz")
 def healthz():
@@ -595,29 +632,38 @@ def index(request: Request):
 @app.post("/generate")
 def generate(
     project: int = Form(1),
-    plan: str = Form(""),  # matches <input name="plan">
-    run: str = Form(""),   # matches <input name="run">
+    plan_param: str = Form(""),  # matches <input name="plan">
+    run_param: str = Form(""),  # matches <input name="run">
     run_ids: list[str] | None = Form(default=None),
 ):
     # Convert blank strings to None, otherwise parse to int
-    plan = int(plan) if str(plan).strip() else None
-    run = int(run) if str(run).strip() else None
+    plan: int | None = int(plan_param) if plan_param.strip() else None
+    run: int | None = int(run_param) if run_param.strip() else None
     selected_run_ids = [int(x) for x in run_ids] if run_ids else None
     if selected_run_ids and plan is None:
         raise HTTPException(status_code=400, detail="Run selection requires a plan")
     if (plan is None and run is None) or (plan is not None and run is not None):
-        raise HTTPException(status_code=400, detail="Provide exactly one of plan or run")
+        raise HTTPException(
+            status_code=400, detail="Provide exactly one of plan or run"
+        )
     try:
-        path = generate_report(project=project, plan=plan, run=run, run_ids=selected_run_ids)
+        path = generate_report(
+            project=project, plan=plan, run=run, run_ids=selected_run_ids
+        )
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {e}")
+        raise HTTPException(
+            status_code=502, detail=f"Error connecting to TestRail API: {e}"
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # Catch any other unexpected errors
-        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"An unexpected error occurred: {e}"
+        )
     url = "/reports/" + Path(path).name
     return RedirectResponse(url=url, status_code=303)
+
 
 @app.get("/generate")
 def generate_get():
@@ -641,7 +687,9 @@ def api_report_sync(
     if run_ids and plan is None:
         raise HTTPException(status_code=400, detail="Run selection requires a plan")
     if (plan is None and run is None) or (plan is not None and run is not None):
-        raise HTTPException(status_code=400, detail="Provide exactly one of plan or run")
+        raise HTTPException(
+            status_code=400, detail="Provide exactly one of plan or run"
+        )
     path = generate_report(project=project, plan=plan, run=run, run_ids=run_ids)
     url = "/reports/" + Path(path).name
     return {"path": path, "url": url}
@@ -687,20 +735,31 @@ def api_manage_run(payload: ManageRun):
     client = _make_client()
     suite_id = _default_suite_id()
     if suite_id is None:
-        raise HTTPException(status_code=400, detail="DEFAULT_SUITE_ID is required to create runs when suite_id is omitted")
-    body = {
-        "suite_id": suite_id,
-        "name": payload.name,
-        "description": payload.description,
-        "include_all": payload.include_all,
-    }
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "DEFAULT_SUITE_ID is required to create runs when suite_id is omitted"
+            ),
+        )
+    assert suite_id is not None
+    body: dict[str, Any] = {}
+    body["suite_id"] = str(suite_id) # type: ignore[assignment]
+    body["name"] = payload.name
+    body["description"] = payload.description
+    body["include_all"] = payload.include_all
     if payload.refs:
         body["refs"] = payload.refs
     if payload.case_ids:
         body["case_ids"] = payload.case_ids
     if payload.dry_run:
         target = "plan_entry" if payload.plan_id else "run"
-        return {"dry_run": True, "target": target, "payload": body, "project": payload.project, "plan_id": payload.plan_id}
+        return {
+            "dry_run": True,
+            "target": target,
+            "payload": body,
+            "project": payload.project,
+            "plan_id": payload.plan_id,
+        }
     if payload.plan_id:
         created = client.add_plan_entry(payload.plan_id, body)
     else:
@@ -714,26 +773,29 @@ def api_manage_case(payload: ManageCase):
     client = _make_client()
     section_id = _default_section_id()
     if section_id is None:
-        raise HTTPException(status_code=400, detail="DEFAULT_SECTION_ID is required to create cases")
-    body = {
+        raise HTTPException(
+            status_code=400, detail="DEFAULT_SECTION_ID is required to create cases"
+        )
+    assert section_id is not None
+    body: dict[str, Any] = {
         "title": payload.title,
         "refs": payload.refs,
     }
     tmpl = _default_template_id()
     if tmpl is not None:
-        body["template_id"] = tmpl
+        body["template_id"] = tmpl # type: ignore
     typ = _default_type_id()
     if typ is not None:
-        body["type_id"] = typ
+        body["type_id"] = typ # type: ignore
     prio = _default_priority_id()
     if prio is not None:
-        body["priority_id"] = prio
+        body["priority_id"] = prio # type: ignore
     # Convert BDD text into array of {content: ...}
     bdd_text = payload.bdd_scenarios or ""
     steps = [line.strip() for line in bdd_text.splitlines() if line.strip()]
     if steps:
         combined = "\n".join(steps)
-        body["custom_testrail_bdd_scenario"] = [{"content": combined}]
+        body["custom_testrail_bdd_scenario"] = [{"content": combined}] # type: ignore
     # Remove None fields
     body = {k: v for k, v in body.items() if v is not None}
     if payload.dry_run:
@@ -757,10 +819,14 @@ def api_plans(project: int = 1, is_completed: int | None = None):
         user = env_or_die("TESTRAIL_USER")
         api_key = env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
-        raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
+        raise HTTPException(
+            status_code=500, detail="Server missing TestRail credentials"
+        )
     session = requests.Session()
     session.auth = (user, api_key)
-    plans = get_plans_for_project(session, base_url, project_id=project, is_completed=is_completed)
+    plans = get_plans_for_project(
+        session, base_url, project_id=project, is_completed=is_completed
+    )
     # return concise info
     slim = [
         {
@@ -776,6 +842,7 @@ def api_plans(project: int = 1, is_completed: int | None = None):
     resp = base_payload.copy()
     resp["meta"] = _cache_meta(False, expires_at)
     return resp
+
 
 @app.get("/api/runs")
 def api_runs(plan: int, project: int = 1):
@@ -793,7 +860,9 @@ def api_runs(plan: int, project: int = 1):
         user = env_or_die("TESTRAIL_USER")
         api_key = env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
-        raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
+        raise HTTPException(
+            status_code=500, detail="Server missing TestRail credentials"
+        )
     session = requests.Session()
     session.auth = (user, api_key)
     try:
@@ -807,12 +876,14 @@ def api_runs(plan: int, project: int = 1):
             rid = r.get("id")
             if rid is None:
                 continue
-            runs.append({
-                "id": rid,
-                "name": r.get("name") or f"Run {rid}",
-                "is_completed": r.get("is_completed"),
-                "suite_name": suite_name,
-            })
+            runs.append(
+                {
+                    "id": rid,
+                    "name": r.get("name") or f"Run {rid}",
+                    "is_completed": r.get("is_completed"),
+                    "suite_name": suite_name,
+                }
+            )
     runs.sort(key=lambda item: (item.get("is_completed", 0), item.get("name", "")))
     print(f"[api_runs] plan={plan} returned {len(runs)} runs", flush=True)
     base_payload = {"count": len(runs), "runs": runs}
@@ -823,14 +894,21 @@ def api_runs(plan: int, project: int = 1):
 
 
 @app.get("/api/cases")
-def api_cases(project: int = 1, suite_id: int | None = None, section_id: int | None = None, filters: str | None = None):
+def api_cases(
+    project: int = 1,
+    suite_id: int | None = None,
+    section_id: int | None = None,
+    filters: str | None = None,
+):
     try:
         client = _make_client()
         filter_section_id = None
         if not section_id and filters:
             try:
                 parsed = json.loads(filters)
-                section_vals = parsed.get("filters", {}).get("cases:section_id", {}).get("values")
+                section_vals = (
+                    parsed.get("filters", {}).get("cases:section_id", {}).get("values")
+                )
                 if isinstance(section_vals, list) and section_vals:
                     try:
                         filter_section_id = int(str(section_vals[0]).strip())
@@ -839,7 +917,9 @@ def api_cases(project: int = 1, suite_id: int | None = None, section_id: int | N
             except Exception:
                 filter_section_id = None
         effective_section = section_id or filter_section_id
-        cases = client.get_cases(project, suite_id=suite_id, section_id=effective_section)
+        cases = client.get_cases(
+            project, suite_id=suite_id, section_id=effective_section
+        )
     except HTTPException:
         raise
     except requests.exceptions.RequestException as e:
@@ -870,12 +950,16 @@ def api_users(project: int = 1):
     try:
         client = _make_client()
         users = client.get_users_map()
-        items = [{"id": uid, "name": name} for uid, name in sorted(users.items(), key=lambda kv: kv[1])]
+        items = [
+            {"id": uid, "name": name}
+            for uid, name in sorted(users.items(), key=lambda kv: kv[1])
+        ]
         return {"count": len(items), "users": items}
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to load users: {exc}")
+
 
 @app.get("/ui", response_class=HTMLResponse)
 def ui_alias(request: Request):

@@ -1,8 +1,16 @@
 import unittest
 from unittest.mock import patch
+
 import pandas as pd
 
-from testrail_daily_report import summarize_results, build_test_table, get_plans_for_project, extract_refs
+from testrail_daily_report import (
+    build_test_table,
+    extract_refs,
+    summarize_results,
+)
+from testrail_client import (
+    get_plans_for_project,
+)
 
 
 class TestSummarizeResults(unittest.TestCase):
@@ -29,15 +37,37 @@ class TestSummarizeResults(unittest.TestCase):
 
 class TestBuildTestTable(unittest.TestCase):
     def test_mapping_and_sorting(self):
-        tests = pd.DataFrame([
-            {"id": 1, "title": "A ok", "status_id": 1, "priority_id": 2, "assignedto_id": 20},
-            {"id": 2, "title": "B fail", "status_id": 5, "priority_id": 1, "assignedto_id": 10},
-            {"id": 3, "title": "C untested", "status_id": None, "priority_id": 2, "assignedto_id": None},
-        ])
-        results = pd.DataFrame([
-            {"test_id": 1, "comment": "ok"},
-            {"test_id": 2, "comment": "not ok"},
-        ])
+        tests = pd.DataFrame(
+            [
+                {
+                    "id": 1,
+                    "title": "A ok",
+                    "status_id": 1,
+                    "priority_id": 2,
+                    "assignedto_id": 20,
+                },
+                {
+                    "id": 2,
+                    "title": "B fail",
+                    "status_id": 5,
+                    "priority_id": 1,
+                    "assignedto_id": 10,
+                },
+                {
+                    "id": 3,
+                    "title": "C untested",
+                    "status_id": None,
+                    "priority_id": 2,
+                    "assignedto_id": None,
+                },
+            ]
+        )
+        results = pd.DataFrame(
+            [
+                {"test_id": 1, "comment": "ok"},
+                {"test_id": 2, "comment": "not ok"},
+            ]
+        )
         users = {10: "U10", 20: "U20"}
         prios = {1: "P1", 2: "P2"}
         status_map = {1: "Passed", 5: "Failed", 3: "Untested"}
@@ -70,6 +100,7 @@ class TestPlansAPIShapes(unittest.TestCase):
         plans = get_plans_for_project(object(), "http://x", 2)
         self.assertEqual([p.get("id") for p in plans], [5])
 
+
 class TestExtractRefs(unittest.TestCase):
     def test_extract_refs_from_dicts(self):
         items = [
@@ -82,12 +113,15 @@ class TestExtractRefs(unittest.TestCase):
         self.assertEqual(refs, ["ORB-1", "ORB-2", "ORB-3"])
 
     def test_extract_refs_from_dataframe(self):
-        df = pd.DataFrame([
-            {"refs": "ABC-1"},
-            {"refs": "ABC-2, ABC-3"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"refs": "ABC-1"},
+                {"refs": "ABC-2, ABC-3"},
+            ]
+        )
         refs = extract_refs(df)
         self.assertEqual(refs, ["ABC-1", "ABC-2", "ABC-3"])
+
 
 if __name__ == "__main__":
     unittest.main()

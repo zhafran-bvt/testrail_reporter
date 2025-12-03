@@ -1,0 +1,12 @@
+[tool.ruff]
+# Enable Pyflakes, pycodestyle, and isort rules.
+lint.select = ["E", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+exclude = [".venv", "node_modules"]
