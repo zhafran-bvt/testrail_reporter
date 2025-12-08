@@ -1,6 +1,8 @@
 [tool.ruff]
 # Enable Pyflakes, pycodestyle, and isort rules.
 lint.select = ["E", "F", "I"]
+lint.extend-ignore = ["E501"]
+line-length = 120
 
 [tool.ruff.format]
 quote-style = "double"

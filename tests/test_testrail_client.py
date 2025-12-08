@@ -4,7 +4,6 @@ from testrail_client import (
     AttachmentTooLarge,
     TestRailClient,
     api_get,
-    api_post,
     capture_telemetry,
     download_attachment,
 )

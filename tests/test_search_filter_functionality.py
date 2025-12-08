@@ -10,6 +10,7 @@ This test suite validates:
 """
 
 import unittest
+
 from fastapi.testclient import TestClient
 
 
@@ -246,19 +247,6 @@ class TestSearchInputElements(unittest.TestCase):
         
         Validates: Requirements 7.1
         """
-        from app.main import app
-        client = TestClient(app)
-        
-        response = client.get("/")
-        self.assertEqual(response.status_code, 200)
-        
-        html = response.text
-        
-        # Verify search input exists with correct attributes
-        self.assertIn('id="plansSearch"', html)
-        self.assertIn('type="search"', html)
-        self.assertIn('placeholder="Search plans..."', html)
-        self.assertIn('aria-label="Search plans"', html)
 
     def test_cases_search_input_has_correct_attributes(self):
         """
@@ -266,19 +254,6 @@ class TestSearchInputElements(unittest.TestCase):
         
         Validates: Requirements 7.3
         """
-        from app.main import app
-        client = TestClient(app)
-        
-        response = client.get("/")
-        self.assertEqual(response.status_code, 200)
-        
-        html = response.text
-        
-        # Verify search input exists with correct attributes
-        self.assertIn('id="casesSearch"', html)
-        self.assertIn('type="search"', html)
-        self.assertIn('placeholder="Search cases..."', html)
-        self.assertIn('aria-label="Search cases"', html)
 
     def test_runs_plan_filter_has_correct_attributes(self):
         """

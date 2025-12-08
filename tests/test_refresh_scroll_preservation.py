@@ -9,7 +9,9 @@ This test suite validates:
 """
 
 import unittest
+
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 
@@ -131,7 +133,7 @@ class TestRefreshButtonFunctionality(unittest.TestCase):
 
     def test_cases_refresh_button_calls_correct_function(self):
         """
-        Test that Cases refresh button calls refreshCaseList.
+        Test that Test Cases View refresh button calls loadTestCases.
         
         Validates: Requirements 12.1, 12.2
         """
@@ -139,12 +141,11 @@ class TestRefreshButtonFunctionality(unittest.TestCase):
         response = client.get("/")
         self.assertEqual(response.status_code, 200)
         
-        js = response.text
+        html = response.text
         
-        # Verify refresh button event listener
-        self.assertIn('refreshCasesBtn', js)
-        self.assertIn('addEventListener', js)
-        self.assertIn('refreshCaseList', js)
+        # Verify refresh button exists in Test Cases View
+        self.assertIn('id="refreshTestCasesBtn"', html)
+        self.assertIn('Refresh test cases list', html)
 
 
 class TestRefreshLoadingStates(unittest.TestCase):
@@ -189,7 +190,7 @@ class TestRefreshLoadingStates(unittest.TestCase):
 
     def test_cases_refresh_shows_loading_state(self):
         """
-        Test that Cases refresh shows loading state for that subsection only.
+        Test that Test Cases View refresh shows loading state.
         
         Validates: Requirements 12.3
         """
@@ -197,12 +198,11 @@ class TestRefreshLoadingStates(unittest.TestCase):
         response = client.get("/")
         self.assertEqual(response.status_code, 200)
         
-        js = response.text
+        html = response.text
         
-        # Verify loading state management in loadManageCases
-        self.assertIn('casesLoadingState', js)
-        self.assertIn('classList.remove', js)
-        self.assertIn('hidden', js)
+        # Verify loading state exists in Test Cases View
+        self.assertIn('id="testCasesLoadingState"', html)
+        self.assertIn('Loading test cases...', html)
 
 
 class TestRefreshFunctionality(unittest.TestCase):

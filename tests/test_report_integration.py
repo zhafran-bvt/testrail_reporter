@@ -5,7 +5,7 @@ This module contains property-based tests for report generation integration.
 """
 
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -23,8 +23,9 @@ class TestReportGenerationIntegration(unittest.TestCase):
         plan_id=st.integers(min_value=1, max_value=10000),
     )
     def test_plan_report_generation_uses_correct_parameters(self, project_id, plan_id):
-        """For any plan selected in dashboard, report generation should use correct plan parameters."""
+        """For any plan selected, report generation uses correct parameters."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -59,8 +60,9 @@ class TestReportGenerationIntegration(unittest.TestCase):
         run_id=st.integers(min_value=1, max_value=10000),
     )
     def test_run_report_generation_uses_correct_parameters(self, project_id, run_id):
-        """For any run selected in dashboard, report generation should use correct run parameters."""
+        """For any run selected, report generation uses correct parameters."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -98,6 +100,7 @@ class TestReportGenerationIntegration(unittest.TestCase):
     def test_report_generation_returns_valid_url(self, project_id, entity_id, is_plan):
         """For any plan or run, report generation should return a valid URL."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -138,8 +141,9 @@ class TestReportGenerationFlow(unittest.TestCase):
     """Integration tests for report generation flow from dashboard."""
 
     def test_clicking_plan_generates_report_for_that_plan(self):
-        """Test that clicking plan report button generates report for that specific plan."""
+        """Test that clicking plan report button generates report for that plan."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -172,8 +176,9 @@ class TestReportGenerationFlow(unittest.TestCase):
             self.assertTrue(data["url"].startswith("/reports/"))
 
     def test_clicking_run_generates_report_for_that_run(self):
-        """Test that clicking run report button generates report for that specific run."""
+        """Test that clicking run report button generates report for that run."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -208,6 +213,7 @@ class TestReportGenerationFlow(unittest.TestCase):
     def test_report_opens_in_new_tab(self):
         """Test that report URL can be opened (simulates opening in new tab)."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -241,6 +247,7 @@ class TestReportGenerationFlow(unittest.TestCase):
     def test_report_generation_with_error_handling(self):
         """Test that report generation errors result in error responses."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -254,15 +261,14 @@ class TestReportGenerationFlow(unittest.TestCase):
 
             # Attempt to generate report - exception will propagate as 500
             with self.assertRaises(ValueError):
-                response = client.get(
-                    f"/api/report?project={project_id}&plan={plan_id}"
-                )
+                client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
     def test_report_generation_with_api_error(self):
         """Test that TestRail API errors during report generation propagate."""
-        from fastapi.testclient import TestClient
-        from app.main import app
         import requests
+        from fastapi.testclient import TestClient
+
+        from app.main import app
 
         client = TestClient(app)
 
@@ -271,17 +277,17 @@ class TestReportGenerationFlow(unittest.TestCase):
 
         # Mock the report generation to raise API error
         with patch("app.main.generate_report") as mock_generate:
-            mock_generate.side_effect = requests.exceptions.RequestException("API connection failed")
+            err_msg = "API connection failed"
+            mock_generate.side_effect = requests.exceptions.RequestException(err_msg)
 
             # Attempt to generate report - exception will propagate
             with self.assertRaises(requests.exceptions.RequestException):
-                response = client.get(
-                    f"/api/report?project={project_id}&plan={plan_id}"
-                )
+                client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
     def test_multiple_report_generations(self):
         """Test that multiple reports can be generated sequentially."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)

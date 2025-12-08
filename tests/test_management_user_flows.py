@@ -18,9 +18,7 @@ view components are properly structured and the user flows are correctly
 implemented.
 """
 
-import json
-from unittest.mock import MagicMock, patch, Mock
-import types
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -589,14 +587,7 @@ class TestManagementViewHTMLStructure:
         assert 'id="runsListContainer"' in html
         assert 'id="runsCount"' in html
 
-        # Verify Cases subsection
-        assert 'id="manageCasesSubsection"' in html
-        assert 'id="casesSearch"' in html
-        assert 'id="refreshCasesBtn"' in html
-        assert 'id="casesLoadingState"' in html
-        assert 'id="casesEmptyState"' in html
-        assert 'id="casesListContainer"' in html
-        assert 'id="casesCount"' in html
+        # Cases subsection has been removed from the Management view
 
         # Verify delete confirmation modal
         assert 'id="deleteConfirmModal"' in html

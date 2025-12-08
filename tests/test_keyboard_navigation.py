@@ -1,5 +1,7 @@
 import unittest
+
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 
@@ -164,11 +166,10 @@ class TestKeyboardNavigationTabOrder(unittest.TestCase):
         # Verify buttons exist and are focusable (no tabindex=-1)
         self.assertIn('id="refreshPlansBtn"', html)
         self.assertIn('id="refreshRunsBtn"', html)
-        self.assertIn('id="refreshCasesBtn"', html)
+        self.assertIn('id="refreshTestCasesBtn"', html)
         
         # Verify search inputs exist
         self.assertIn('id="plansSearch"', html)
-        self.assertIn('id="casesSearch"', html)
         
         # Verify create section toggle exists
         self.assertIn('class="create-section-toggle"', html)

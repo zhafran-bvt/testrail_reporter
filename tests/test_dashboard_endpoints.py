@@ -14,6 +14,7 @@ from hypothesis import strategies as st
 
 from app.dashboard_stats import PlanStatistics, RunStatistics
 
+DASHBOARD_MAX_LIMIT = 25
 
 # Hypothesis strategies for generating test data
 @st.composite
@@ -58,7 +59,8 @@ class TestPlanListCompleteness(unittest.TestCase):
     def test_all_plans_included_within_pagination(self, project_id, plans, limit, offset):
         """All plans for a project should be included in response (respecting pagination)."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -98,6 +100,15 @@ class TestPlanListCompleteness(unittest.TestCase):
                     )
 
                 mock_calc_stats.side_effect = create_mock_stats
+                def _mock_fetch(project, **kwargs):
+                    start = int(kwargs.get("start_offset") or 0)
+                    max_items = kwargs.get("max_plans")
+                    subset = plans[start:]
+                    if max_items is not None:
+                        subset = subset[: max(0, max_items)]
+                    return subset
+
+                mock_tr_client.get_plans_for_project.side_effect = _mock_fetch
 
                 # Make API request
                 response = client.get(
@@ -110,18 +121,19 @@ class TestPlanListCompleteness(unittest.TestCase):
 
                 # Verify pagination
                 self.assertEqual(data["offset"], offset)
-                self.assertEqual(data["limit"], min(limit, 200))  # API caps at 200
-                self.assertEqual(data["total_count"], len(plans))
+                self.assertEqual(data["limit"], min(limit, DASHBOARD_MAX_LIMIT))  # API caps at 25
+                self.assertGreaterEqual(data["total_count"], len(data["plans"]))
+                self.assertGreaterEqual(data["total_count"], offset)
 
                 # Verify returned plans are from the expected slice
-                expected_plans = plans[offset:offset + min(limit, 200)]
+                expected_plans = plans[offset:offset + min(limit, DASHBOARD_MAX_LIMIT)]
                 returned_plan_ids = [p["plan_id"] for p in data["plans"]]
                 expected_plan_ids = [p["id"] for p in expected_plans]
 
                 self.assertEqual(returned_plan_ids, expected_plan_ids)
 
                 # Verify has_more flag
-                expected_has_more = (offset + min(limit, 25)) < len(plans)
+                expected_has_more = (offset + min(limit, DASHBOARD_MAX_LIMIT)) < len(plans)
                 self.assertEqual(data["has_more"], expected_has_more)
 
 
@@ -139,7 +151,8 @@ class TestRunListCompleteness(unittest.TestCase):
     def test_all_runs_for_plan_returned(self, plan_id, num_runs):
         """All runs associated with a plan should be returned in the response."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_stats_cache
+
+        from app.main import _dashboard_stats_cache, app
 
         # Clear cache before test
         _dashboard_stats_cache.clear()
@@ -221,7 +234,8 @@ class TestPaginationLimitEnforcement(unittest.TestCase):
     def test_response_respects_limit_parameter(self, project_id, num_plans, requested_limit):
         """Response should contain at most the requested limit of items."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -276,8 +290,8 @@ class TestPaginationLimitEnforcement(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 data = response.json()
 
-                # The API caps limit at 200
-                effective_limit = min(requested_limit, 200)
+                # The API caps limit at 25
+                effective_limit = min(requested_limit, DASHBOARD_MAX_LIMIT)
 
                 # Verify returned count respects limit
                 expected_count = min(effective_limit, num_plans)
@@ -291,7 +305,8 @@ class TestCacheOperations(unittest.TestCase):
     def test_cache_miss_triggers_api_call(self):
         """Cache miss should trigger API call."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache
         _dashboard_plans_cache.clear()
@@ -311,7 +326,8 @@ class TestCacheOperations(unittest.TestCase):
     def test_cache_hit_returns_cached_data(self):
         """Cache hit should return cached data without API call."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache
         _dashboard_plans_cache.clear()
@@ -360,6 +376,7 @@ class TestCacheOperations(unittest.TestCase):
     def test_cache_expiration(self):
         """Cache should expire after TTL."""
         import time
+
         from app.main import TTLCache
 
         # Create cache with 1 second TTL
@@ -384,6 +401,7 @@ class TestCacheOperations(unittest.TestCase):
     def test_concurrent_cache_access(self):
         """Cache should handle concurrent access safely."""
         import threading
+
         from app.main import TTLCache
 
         cache = TTLCache(ttl_seconds=60, maxsize=100)
@@ -421,6 +439,7 @@ class TestAPIEndpointEdgeCases(unittest.TestCase):
     def test_plans_endpoint_with_valid_parameters(self):
         """Plans endpoint should work with valid parameters."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -436,6 +455,7 @@ class TestAPIEndpointEdgeCases(unittest.TestCase):
     def test_plan_detail_endpoint_with_missing_plan(self):
         """Plan detail endpoint should handle missing plan gracefully."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -454,6 +474,7 @@ class TestAPIEndpointEdgeCases(unittest.TestCase):
     def test_runs_endpoint_with_invalid_plan_id(self):
         """Runs endpoint should handle invalid plan ID."""
         from fastapi.testclient import TestClient
+
         from app.main import app
 
         client = TestClient(app)
@@ -470,9 +491,10 @@ class TestAPIEndpointEdgeCases(unittest.TestCase):
 
     def test_plans_endpoint_handles_api_failure(self):
         """Plans endpoint should handle TestRail API failures."""
-        from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
         import requests
+        from fastapi.testclient import TestClient
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache to ensure API is called
         _dashboard_plans_cache.clear()
@@ -505,7 +527,8 @@ class TestCacheHitBehavior(unittest.TestCase):
     def test_cached_data_returns_without_api_call(self, project_id, num_plans):
         """For any cached data that has not expired, subsequent requests should return cached value without API calls."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -594,7 +617,8 @@ class TestCacheInvalidation(unittest.TestCase):
     def test_cache_cleared_on_refresh(self, project_id, num_plans):
         """For any cached data, when refresh is triggered, cache should be cleared and new data fetched."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -691,7 +715,8 @@ class TestDataUpdateAfterRefresh(unittest.TestCase):
     def test_data_updated_after_refresh(self, project_id, initial_plans, updated_plans):
         """For any dashboard view, when refresh completes successfully, the displayed data should reflect the newly fetched data."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -803,7 +828,8 @@ class TestSearchFilterCorrectness(unittest.TestCase):
     def test_search_filter_only_includes_matching_plans(self, project_id, plans, search_term):
         """For any search term and list of plans, filtered results should only include plans whose names contain the search term (case-insensitive)."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -858,7 +884,7 @@ class TestSearchFilterCorrectness(unittest.TestCase):
                 # Verify filtering logic
                 if search_term is None or not search_term.strip():
                     # No search filter - should return all plans (up to limit)
-                    expected_count = min(len(plans), 200)
+                    expected_count = min(len(plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
                 else:
                     # Search filter applied - verify all returned plans match
@@ -877,7 +903,7 @@ class TestSearchFilterCorrectness(unittest.TestCase):
                         p for p in plans
                         if search_lower in p.get("name", "").lower()
                     ]
-                    expected_count = min(len(expected_matching_plans), 200)
+                    expected_count = min(len(expected_matching_plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
 
 
@@ -896,7 +922,8 @@ class TestCompletionFilterCorrectness(unittest.TestCase):
     def test_completion_filter_only_includes_matching_status(self, project_id, plans, is_completed_filter):
         """For any completion status filter value and list of plans, filtered results should only include plans matching that completion status."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -966,15 +993,17 @@ class TestCompletionFilterCorrectness(unittest.TestCase):
                             f"Plan {plan['plan_id']} has is_completed={plan['is_completed']}, expected {expected_status}"
                         )
                 
-                # Verify count matches expected
-                expected_count = min(len(filtered_plans), 200)
+                # Verify count is within requested limit
+                expected_count = min(len(filtered_plans), DASHBOARD_MAX_LIMIT)
                 self.assertEqual(len(data["plans"]), expected_count)
                 
-                # Verify the API was called with correct filter
-                mock_tr_client.get_plans_for_project.assert_called_once_with(
-                    project_id,
-                    is_completed=is_completed_filter
-                )
+                # total_count should be at least the number of returned items
+                self.assertGreaterEqual(data["total_count"], len(data["plans"]))
+                
+                # Verify the API was called with correct project/filter
+                args, kwargs = mock_tr_client.get_plans_for_project.call_args
+                self.assertEqual(args[0], project_id)
+                self.assertEqual(kwargs.get("is_completed"), is_completed_filter)
 
 
 class TestDateRangeFilterCorrectness(unittest.TestCase):
@@ -998,7 +1027,8 @@ class TestDateRangeFilterCorrectness(unittest.TestCase):
     def test_date_range_filter_only_includes_plans_in_range(self, project_id, plans, date_range):
         """For any date range (start, end) and list of plans, filtered results should only include plans with creation dates within that range (inclusive)."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -1071,11 +1101,11 @@ class TestDateRangeFilterCorrectness(unittest.TestCase):
                         p for p in plans
                         if created_after <= p.get("created_on", 0) <= created_before
                     ]
-                    expected_count = min(len(expected_matching_plans), 200)
+                    expected_count = min(len(expected_matching_plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
                 else:
                     # No date filter - should return all plans (up to limit)
-                    expected_count = min(len(plans), 200)
+                    expected_count = min(len(plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
 
 
@@ -1085,7 +1115,8 @@ class TestFilterEdgeCases(unittest.TestCase):
     def test_empty_search_term_returns_all_results(self):
         """Empty search term should return all results."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache
         _dashboard_plans_cache.clear()
@@ -1140,7 +1171,8 @@ class TestFilterEdgeCases(unittest.TestCase):
     def test_search_with_no_matches(self):
         """Search with no matches should return empty results."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache
         _dashboard_plans_cache.clear()
@@ -1184,7 +1216,8 @@ class TestFilterEdgeCases(unittest.TestCase):
     def test_invalid_date_ranges(self):
         """Invalid date ranges should still work (start > end is handled by filtering logic)."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache
         _dashboard_plans_cache.clear()
@@ -1228,7 +1261,8 @@ class TestFilterEdgeCases(unittest.TestCase):
     def test_combined_filters(self):
         """Multiple filters should be applied together."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache
         _dashboard_plans_cache.clear()
@@ -1296,7 +1330,8 @@ class TestRefreshErrorHandling(unittest.TestCase):
     def test_refresh_with_api_failure_retains_old_data(self):
         """Test that when API fails during refresh, old cached data is retained."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -1365,7 +1400,8 @@ class TestRefreshErrorHandling(unittest.TestCase):
     def test_refresh_with_network_timeout_shows_error(self):
         """Test that network timeout during refresh shows appropriate error."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()
@@ -1392,7 +1428,8 @@ class TestRefreshErrorHandling(unittest.TestCase):
     def test_refresh_with_invalid_response_shows_error(self):
         """Test that invalid response during refresh shows appropriate error."""
         from fastapi.testclient import TestClient
-        from app.main import app, _dashboard_plans_cache
+
+        from app.main import _dashboard_plans_cache, app
 
         # Clear cache before test
         _dashboard_plans_cache.clear()

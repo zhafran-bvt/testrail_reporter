@@ -6,7 +6,6 @@ plans by various criteria.
 """
 
 import unittest
-from datetime import datetime
 
 from hypothesis import given, settings
 from hypothesis import strategies as st

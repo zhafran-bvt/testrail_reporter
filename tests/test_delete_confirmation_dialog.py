@@ -5,7 +5,9 @@ These tests verify the enhanced delete confirmation modal that implements
 Requirements 8.1, 8.2, 8.3, 8.4, and 8.5 from the Management UX Redesign spec.
 """
 import unittest
+
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 

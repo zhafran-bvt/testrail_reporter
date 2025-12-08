@@ -18,7 +18,6 @@ These tests simulate real user interactions and verify that all components
 work together correctly.
 """
 
-import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -499,7 +498,7 @@ class TestDashboardPerformance:
         response = client.get("/api/dashboard/plans?project=1&limit=1000")
         assert response.status_code == 200
         data = response.json()
-        assert len(data["plans"]) <= 200  # Max page size
+        assert len(data["plans"]) <= 25  # Max page size
 
     def test_cache_reduces_api_calls(self, client, mock_testrail_client):
         """Test that caching reduces API calls."""

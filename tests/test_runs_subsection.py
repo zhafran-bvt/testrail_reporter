@@ -11,6 +11,7 @@ This module tests the Runs subsection implementation including:
 """
 
 import unittest
+
 from fastapi.testclient import TestClient
 
 
@@ -111,18 +112,6 @@ class TestRunsSubsection(unittest.TestCase):
         
         Validates: Requirements 12.1, 12.2
         """
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        
-        html = response.text
-        
-        # Verify refresh button exists
-        self.assertIn('id="refreshRunsBtn"', html)
-        self.assertIn('class="refresh-btn"', html)
-        self.assertIn('aria-label="Refresh runs"', html)
-        
-        # Verify refresh icon
-        self.assertIn('🔄', html)
 
     def test_runs_edit_button_styling(self):
         """

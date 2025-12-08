@@ -12,8 +12,6 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from app.dashboard_stats import (
-    PlanStatistics,
-    RunStatistics,
     calculate_completion_rate,
     calculate_pass_rate,
     calculate_plan_statistics,

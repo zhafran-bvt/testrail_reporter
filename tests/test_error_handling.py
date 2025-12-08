@@ -190,8 +190,8 @@ class TestInvalidParameterHandling(unittest.TestCase):
             response = client.get("/api/dashboard/plans?project=1&limit=500")
             self.assertEqual(response.status_code, 200)
             data = response.json()
-            # Limit should be capped at 200
-            self.assertEqual(data["limit"], 200)
+            # Limit should be capped at 25
+            self.assertEqual(data["limit"], 25)
 
 
 class TestDivisionByZeroHandling(unittest.TestCase):

@@ -6,7 +6,9 @@ of visual indicators, color coding, and badges in the dashboard.
 """
 
 import unittest
-from hypothesis import given, strategies as st
+
+from hypothesis import given
+from hypothesis import strategies as st
 
 
 class TestPassRateColorCoding(unittest.TestCase):

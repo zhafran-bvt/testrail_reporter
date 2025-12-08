@@ -39,9 +39,9 @@ class TestLoadingStates(unittest.TestCase):
         self.assertIn('id="runsLoadingState"', html)
         self.assertIn('Loading runs...', html)
 
-        # Verify Cases loading state
-        self.assertIn('id="casesLoadingState"', html)
-        self.assertIn('Loading cases...', html)
+        # Verify Test Cases View loading state (replaces Cases subsection)
+        self.assertIn('id="testCasesLoadingState"', html)
+        self.assertIn('Loading test cases...', html)
 
     def test_loading_state_css_spinner_animation(self):
         """Test that spinner CSS animation is defined."""
@@ -257,19 +257,20 @@ class TestLoadingStates(unittest.TestCase):
             ts = f.read()
 
         # Requirement 9.5: Consistent loading UX
-        # All three load functions should follow the same pattern
+        # Plans and Runs load functions should follow the same pattern
+        # (Cases subsection was removed, replaced by Test Cases View)
         
-        # Pattern 1: Show loading state
-        self.assertEqual(ts.count('loadingState.classList.remove("hidden")'), 3)
+        # Pattern 1: Show loading state (at least 2 for plans and runs)
+        self.assertGreaterEqual(ts.count('loadingState.classList.remove("hidden")'), 2)
         
-        # Pattern 2: Disable buttons
-        self.assertEqual(ts.count('refreshBtn.disabled = true'), 3)
+        # Pattern 2: Disable buttons (at least 2 for plans and runs)
+        self.assertGreaterEqual(ts.count('refreshBtn.disabled = true'), 2)
         
-        # Pattern 3: Call showErrorState on error (appears 3 times in calls + 1 in function definition)
-        self.assertGreaterEqual(ts.count('showErrorState('), 3)
+        # Pattern 3: Call showErrorState on error
+        self.assertGreaterEqual(ts.count('showErrorState('), 2)
         
-        # Pattern 4: Re-enable buttons in finally
-        self.assertEqual(ts.count('refreshBtn.disabled = false'), 3)
+        # Pattern 4: Re-enable buttons in finally (at least 2 for plans and runs)
+        self.assertGreaterEqual(ts.count('refreshBtn.disabled = false'), 2)
 
     def test_compiled_javascript_includes_loading_logic(self):
         """Test that compiled JavaScript includes loading state logic."""

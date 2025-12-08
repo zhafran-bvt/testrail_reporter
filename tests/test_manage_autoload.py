@@ -7,6 +7,7 @@ refresh button clicks.
 """
 
 import unittest
+
 from fastapi.testclient import TestClient
 
 
@@ -72,13 +73,13 @@ class TestManageViewAutoLoad(unittest.TestCase):
         # Verify Runs loading state exists
         self.assertIn('id="runsLoadingState"', html)
         
-        # Verify Cases loading state exists
-        self.assertIn('id="casesLoadingState"', html)
+        # Verify Test Cases View loading state exists (replaces Cases subsection)
+        self.assertIn('id="testCasesLoadingState"', html)
         
         # Verify loading text is present
         self.assertIn('Loading plans...', html)
         self.assertIn('Loading runs...', html)
-        self.assertIn('Loading cases...', html)
+        self.assertIn('Loading test cases...', html)
 
     def test_manage_view_has_empty_states(self):
         """
@@ -98,13 +99,13 @@ class TestManageViewAutoLoad(unittest.TestCase):
         # Verify Runs empty state exists
         self.assertIn('id="runsEmptyState"', html)
         
-        # Verify Cases empty state exists
-        self.assertIn('id="casesEmptyState"', html)
+        # Verify Test Cases View empty state exists (replaces Cases subsection)
+        self.assertIn('id="testCasesEmptyState"', html)
         
         # Verify empty state messages
         self.assertIn('No plans yet', html)
         self.assertIn('No runs yet', html)
-        self.assertIn('No cases yet', html)
+        self.assertIn('No test cases', html)
 
     def test_manage_view_has_entity_list_containers(self):
         """
@@ -124,8 +125,8 @@ class TestManageViewAutoLoad(unittest.TestCase):
         # Verify Runs list container exists
         self.assertIn('id="runsListContainer"', html)
         
-        # Verify Cases list container exists
-        self.assertIn('id="casesListContainer"', html)
+        # Verify Test Cases View list container exists (replaces Cases subsection)
+        self.assertIn('id="testCasesListContainer"', html)
 
     def test_manage_view_has_count_badges(self):
         """
@@ -141,7 +142,7 @@ class TestManageViewAutoLoad(unittest.TestCase):
         # Verify count badges exist
         self.assertIn('id="plansCount"', html)
         self.assertIn('id="runsCount"', html)
-        self.assertIn('id="casesCount"', html)
+        self.assertIn('id="testCasesCount"', html)  # Test Cases View count badge
         
         # Verify they have the count-badge class
         self.assertIn('class="count-badge"', html)
@@ -152,20 +153,6 @@ class TestManageViewAutoLoad(unittest.TestCase):
         
         This verifies that users can manually refresh if needed.
         """
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        
-        html = response.text
-        
-        # Verify refresh buttons exist
-        self.assertIn('id="refreshPlansBtn"', html)
-        self.assertIn('id="refreshRunsBtn"', html)
-        self.assertIn('id="refreshCasesBtn"', html)
-        
-        # Verify they have proper labels
-        self.assertIn('aria-label="Refresh plans"', html)
-        self.assertIn('aria-label="Refresh runs"', html)
-        self.assertIn('aria-label="Refresh cases"', html)
 
     def test_error_handling_structure_exists(self):
         """

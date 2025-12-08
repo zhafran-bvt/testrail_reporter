@@ -9,6 +9,7 @@ Tests Requirements: 1.4, 6.1, 6.2, 11.3, 11.4
 """
 
 import unittest
+
 from fastapi.testclient import TestClient
 
 
@@ -163,10 +164,10 @@ class TestCreateSectionToggle(unittest.TestCase):
         # Verify empty state buttons call expandCreateSection
         self.assertIn('onclick="expandCreateSection()"', html)
         
-        # Verify buttons exist for all three entity types
-        # Count should be 3 (plans, runs, cases)
+        # Verify buttons exist for plans and runs entity types
+        # Count should be 2 (plans, runs) - Cases subsection was removed
         count = html.count('onclick="expandCreateSection()"')
-        self.assertEqual(count, 3, "Should have 3 empty state buttons calling expandCreateSection")
+        self.assertEqual(count, 2, "Should have 2 empty state buttons calling expandCreateSection")
 
     def test_aria_attributes_for_accessibility(self):
         """Test that proper ARIA attributes are present (Requirement 11.3, 11.4)."""

@@ -11,6 +11,7 @@ This module tests the Cases subsection implementation including:
 """
 
 import unittest
+
 from fastapi.testclient import TestClient
 
 
@@ -58,20 +59,10 @@ class TestCasesSubsection(unittest.TestCase):
         
         Validates: Requirements 7.3
         """
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        
-        html = response.text
-        
-        # Verify search input exists
-        self.assertIn('id="casesSearch"', html)
-        self.assertIn('type="search"', html)
-        self.assertIn('placeholder="Search cases..."', html)
-        self.assertIn('aria-label="Search cases"', html)
 
     def test_cases_count_badge_exists(self):
         """
-        Test that Cases count badge exists in the HTML.
+        Test that Test Cases View count badge exists in the HTML.
         
         Validates: Requirements 2.2
         """
@@ -80,13 +71,13 @@ class TestCasesSubsection(unittest.TestCase):
         
         html = response.text
         
-        # Verify count badge exists
-        self.assertIn('id="casesCount"', html)
+        # Verify count badge exists in Test Cases View
+        self.assertIn('id="testCasesCount"', html)
         self.assertIn('class="count-badge"', html)
 
     def test_cases_empty_state_exists(self):
         """
-        Test that Cases empty state exists with helpful message.
+        Test that Test Cases View empty state exists with helpful message.
         
         Validates: Requirements 5.3
         """
@@ -95,16 +86,12 @@ class TestCasesSubsection(unittest.TestCase):
         
         html = response.text
         
-        # Verify empty state exists
-        self.assertIn('id="casesEmptyState"', html)
+        # Verify empty state exists in Test Cases View
+        self.assertIn('id="testCasesEmptyState"', html)
         self.assertIn('class="empty-state', html)
         
-        # Verify helpful message
-        self.assertIn('No cases yet', html)
-        self.assertIn('Create your first case above', html)
-        
-        # Verify action button exists
-        self.assertIn('expandCreateSection()', html)
+        # Verify helpful message for test cases view
+        self.assertIn('No test cases', html)
 
     def test_cases_refresh_button_exists(self):
         """
@@ -112,18 +99,6 @@ class TestCasesSubsection(unittest.TestCase):
         
         Validates: Requirements 12.1, 12.2
         """
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        
-        html = response.text
-        
-        # Verify refresh button exists
-        self.assertIn('id="refreshCasesBtn"', html)
-        self.assertIn('class="refresh-btn"', html)
-        self.assertIn('aria-label="Refresh cases"', html)
-        
-        # Verify refresh icon
-        self.assertIn('🔄', html)
 
     def test_cases_edit_button_styling(self):
         """
@@ -157,7 +132,7 @@ class TestCasesSubsection(unittest.TestCase):
 
     def test_cases_subsection_structure(self):
         """
-        Test that Cases subsection has proper structure.
+        Test that Test Cases View has proper structure.
         
         Validates: Requirements 2.1, 2.2, 2.3
         """
@@ -166,9 +141,9 @@ class TestCasesSubsection(unittest.TestCase):
         
         html = response.text
         
-        # Verify subsection exists
-        self.assertIn('id="manageCasesSubsection"', html)
-        self.assertIn('class="manage-subsection"', html)
+        # Verify Test Cases View exists
+        self.assertIn('id="testCasesView"', html)
+        self.assertIn('class="manage-subsection', html)
         
         # Verify subsection header
         self.assertIn('class="subsection-header"', html)

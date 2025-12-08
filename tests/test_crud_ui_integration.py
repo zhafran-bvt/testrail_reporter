@@ -4,9 +4,9 @@ Integration tests for CRUD UI flows.
 These tests verify that the UI correctly handles edit and delete operations
 for plans, runs, and cases.
 """
-import unittest
-from unittest.mock import Mock, patch
 import types
+import unittest
+from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
 
@@ -149,8 +149,6 @@ class TestCRUDUIFlows(unittest.TestCase):
 
     def test_cancel_delete_retains_entity(self):
         """Test that canceling deletion retains the entity."""
-        plan_id = 123
-        
         # When user cancels, no DELETE request is sent
         # So the entity remains (we verify by not calling delete)
         

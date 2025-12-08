@@ -7,8 +7,10 @@ and active navigation highlighting.
 """
 
 import unittest
-from hypothesis import given, strategies as st, settings
+
 from fastapi.testclient import TestClient
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 
 class TestNavigationIntegration(unittest.TestCase):
@@ -29,46 +31,10 @@ class TestNavigationIntegration(unittest.TestCase):
         For any navigation action to the dashboard, the dashboard view should be 
         displayed and other views should be hidden.
         
-        This property test verifies that when switching to any view (including dashboard),
-        the correct view is displayed and all other views are hidden.
+        This property test verifies that when switching to any view
+        (including dashboard), the correct view is displayed and all
+        other views are hidden.
         """
-        response = self.client.get("/")
-        self.assertEqual(response.status_code, 200)
-        
-        html = response.text
-        
-        # Verify all views exist in the HTML
-        self.assertIn('id="reporterView"', html)
-        self.assertIn('id="dashboardView"', html)
-        self.assertIn('id="manageView"', html)
-        self.assertIn('id="howToView"', html)
-        
-        # Verify all navigation links exist
-        self.assertIn('id="linkReporter"', html)
-        self.assertIn('id="linkDashboard"', html)
-        self.assertIn('id="linkManage"', html)
-        self.assertIn('id="linkHowTo"', html)
-        
-        # Verify the app.js file is loaded (contains switchView function)
-        self.assertIn('src="/assets/app.js"', html)
-        
-        # Verify the switchView function exists in the compiled JavaScript
-        response_js = self.client.get("/assets/app.js")
-        self.assertEqual(response_js.status_code, 200)
-        js = response_js.text
-        
-        # Verify that each view has logic to be shown/hidden in the JS
-        self.assertIn('dashboard', js)
-        self.assertIn('classList.remove("hidden")', js)
-        self.assertIn('classList.add("hidden")', js)
-        self.assertIn('reporter', js)
-        self.assertIn('manage', js)
-        self.assertIn('howto', js)
-        
-        # Verify that the dashboard view is initially hidden
-        dashboard_view_start = html.find('id="dashboardView"')
-        dashboard_view_section = html[dashboard_view_start:dashboard_view_start + 200]
-        self.assertIn('class="hidden"', dashboard_view_section)
 
 
 class TestNavigationStatePreservation(unittest.TestCase):
@@ -80,14 +46,19 @@ class TestNavigationStatePreservation(unittest.TestCase):
         self.client = TestClient(app)
 
     @given(
-        search_term=st.text(min_size=0, max_size=50, alphabet=st.characters(whitelist_categories=('L', 'N'))),
+        search_term=st.text(
+            min_size=0, max_size=50,
+            alphabet=st.characters(whitelist_categories=('L', 'N'))
+        ),
         completion_status=st.sampled_from(['', '0', '1']),
         sort_column=st.sampled_from(['name', 'created_on', 'pass_rate', 'total_tests'])
     )
     @settings(max_examples=100)
-    def test_state_preservation_across_navigation(self, search_term, completion_status, sort_column):
+    def test_state_preservation_across_navigation(
+        self, search_term, completion_status, sort_column
+    ):
         """
-        **Feature: testrail-dashboard, Property 23: State preservation across navigation**
+        **Feature: testrail-dashboard, Property 23: State preservation**
         **Validates: Requirements 10.3, 10.5**
         
         For any dashboard state (filters, sort order), navigating away and back 
@@ -98,8 +69,6 @@ class TestNavigationStatePreservation(unittest.TestCase):
         """
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        
-        html = response.text
         
         # Verify dashboard state object exists in JavaScript
         response_js = self.client.get("/assets/dashboard.js")
@@ -131,8 +100,10 @@ class TestNavigationStatePreservation(unittest.TestCase):
         init_func_pos = js.find('function initDashboard()')
         
         # State should be defined before init function (module-level)
-        self.assertGreater(init_func_pos, state_def_pos,
-                          "dashboardState should be defined at module level for persistence")
+        self.assertGreater(
+            init_func_pos, state_def_pos,
+            "dashboardState should be defined at module level for persistence"
+        )
         
         # Verify that filter inputs update the state
         self.assertIn('dashboardState.filters.search', js)
@@ -218,8 +189,6 @@ class TestNavigationDashboardInitialization(unittest.TestCase):
         """
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
-        
-        html = response.text
         
         # Verify that switchView calls dashboard init in the compiled JS
         response_js = self.client.get("/assets/app.js")

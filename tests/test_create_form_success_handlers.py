@@ -7,9 +7,9 @@ These tests verify that after successful entity creation:
 3. Create section stays expanded (Requirement 6.5)
 4. Form fields are cleared (Requirement 6.4)
 """
-import unittest
-from unittest.mock import Mock, patch
 import types
+import unittest
+from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
 

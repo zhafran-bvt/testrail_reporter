@@ -139,8 +139,8 @@ DASHBOARD_STATS_CACHE_TTL=120         # Statistics cache (2 minutes)
 DASHBOARD_RUN_STATS_CACHE_TTL=120     # Run statistics cache (2 minutes)
 
 # Pagination
-DASHBOARD_DEFAULT_PAGE_SIZE=50        # Default number of plans per page
-DASHBOARD_MAX_PAGE_SIZE=200           # Maximum allowed page size
+DASHBOARD_DEFAULT_PAGE_SIZE=25        # Default number of plans per page
+DASHBOARD_MAX_PAGE_SIZE=25            # Maximum allowed page size
 
 # Visual thresholds (percentages)
 DASHBOARD_PASS_RATE_HIGH=80           # Green color threshold (>= 80%)
@@ -184,7 +184,7 @@ Notes:
 | `MEM_LOG_INTERVAL` | seconds between `[mem-log]` heartbeat lines | Helps observe allocator behavior in production. |
 | `TESTRAIL_HTTP_TIMEOUT`, `TESTRAIL_HTTP_RETRIES`, `TESTRAIL_HTTP_BACKOFF` | request timeout/retry/backoff for all TestRail calls (including attachments) | Retries on 429, 5xx, timeouts, and connection errors; backoff grows each attempt. |
 | `DASHBOARD_PLANS_CACHE_TTL`, `DASHBOARD_PLAN_DETAIL_CACHE_TTL`, `DASHBOARD_STATS_CACHE_TTL`, `DASHBOARD_RUN_STATS_CACHE_TTL` | cache TTL in seconds for dashboard data | Controls how long dashboard data is cached before refreshing. Defaults: 300, 180, 120, 120. |
-| `DASHBOARD_DEFAULT_PAGE_SIZE`, `DASHBOARD_MAX_PAGE_SIZE` | pagination limits for dashboard plan lists | Default page size is 50, maximum is 200. |
+| `DASHBOARD_DEFAULT_PAGE_SIZE`, `DASHBOARD_MAX_PAGE_SIZE` | pagination limits for dashboard plan lists | Default page size is 25, maximum is 25. |
 | `DASHBOARD_PASS_RATE_HIGH`, `DASHBOARD_PASS_RATE_MEDIUM` | pass rate thresholds for color coding (percentages) | Green for >= high (80), yellow for >= medium (50), red for < medium. |
 | `DASHBOARD_CRITICAL_FAIL_THRESHOLD`, `DASHBOARD_CRITICAL_BLOCK_THRESHOLD` | thresholds for highlighting critical issues (percentages) | Plans/runs with failed > 20% or blocked > 10% get prominent highlighting. |
 
