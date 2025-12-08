@@ -33,6 +33,7 @@ import {
   getSelectedCases,
 } from "./casePicker";
 import { ReportJob, ReportJobMeta } from "./types";
+import { initManagement, initManageView, refreshPlanList } from "./manage";
 
 function updateReportMeta(meta: ReportJobMeta | undefined, params?: any) {
   const container = document.getElementById("reportMeta");
@@ -252,13 +253,25 @@ async function submitPlanForm(event: Event) {
       body: JSON.stringify(payload),
     });
     const planId = data?.plan?.id;
-    showToast(planId ? `Plan created: #${planId}` : "Plan created", "success");
+    const planName = payload.name;
+    
+    // Show success toast with entity name (Requirement 6.4)
+    showToast(`Plan "${planName}" created successfully`, "success");
+    
+    // Clear form fields (Requirement 6.4)
     const nameEl = document.getElementById("planName") as HTMLInputElement | null;
     const descEl = document.getElementById("planDesc") as HTMLTextAreaElement | null;
     const milestoneEl = document.getElementById("planMilestone") as HTMLInputElement | null;
     if (nameEl) nameEl.value = "";
     if (descEl) descEl.value = "";
     if (milestoneEl) milestoneEl.value = "";
+    
+    // Refresh corresponding Manage subsection (Requirement 6.4)
+    await refreshPlanList();
+    
+    // Keep Create section expanded for additional creations (Requirement 6.5)
+    // The section is already expanded if the user is submitting the form
+    // No action needed - it stays expanded by default
   } catch (err: any) {
     showToast(err?.message || "Failed to create plan", "error");
   }
@@ -298,18 +311,29 @@ async function submitRunForm(event: Event) {
       body: JSON.stringify(payload),
     });
     const runId = data?.run?.id;
-    showToast(runId ? `Run created: #${runId}` : "Run created", "success");
-    const runName = document.getElementById("runName") as HTMLInputElement | null;
+    const runName = payload.name;
+    
+    // Show success toast with entity name (Requirement 6.4)
+    showToast(`Run "${runName}" created successfully`, "success");
+    
+    // Clear form fields (Requirement 6.4)
+    const runNameEl = document.getElementById("runName") as HTMLInputElement | null;
     const runDesc = document.getElementById("runDesc") as HTMLTextAreaElement | null;
     const runRefs = document.getElementById("runRefs") as HTMLInputElement | null;
     const runCaseIds = document.getElementById("runCaseIds") as HTMLInputElement | null;
-    if (runName) runName.value = "";
+    if (runNameEl) runNameEl.value = "";
     if (runDesc) runDesc.value = "";
     if (runRefs) runRefs.value = "";
     if (runCaseIds) runCaseIds.value = "";
     resetSelectedCases();
     updateCasePickerStatus();
     applySelectionToList();
+    
+    // Refresh removed - runs subsection no longer exists in hierarchical navigation
+    
+    // Keep Create section expanded for additional creations (Requirement 6.5)
+    // The section is already expanded if the user is submitting the form
+    // No action needed - it stays expanded by default
   } catch (err: any) {
     showToast(err?.message || "Failed to create run", "error");
   }
@@ -334,15 +358,24 @@ async function submitCaseForm(event: Event) {
       body: JSON.stringify(payload),
     });
     const caseId = data?.case?.id;
-    const msg = caseId ? `Case created: #${caseId}` : "Case created";
-    showToast(msg, "success");
-    togglePanel("casePanel", "close");
-    const caseTitle = document.getElementById("caseTitle") as HTMLInputElement | null;
+    const caseTitle = payload.title;
+    
+    // Show success toast with entity name (Requirement 6.4)
+    showToast(`Case "${caseTitle}" created successfully`, "success");
+    
+    // Clear form fields (Requirement 6.4)
+    const caseTitleEl = document.getElementById("caseTitle") as HTMLInputElement | null;
     const caseRefs = document.getElementById("caseRefs") as HTMLInputElement | null;
     const caseBdd = document.getElementById("caseBdd") as HTMLTextAreaElement | null;
-    if (caseTitle) caseTitle.value = "";
+    if (caseTitleEl) caseTitleEl.value = "";
     if (caseRefs) caseRefs.value = "";
     if (caseBdd) caseBdd.value = "";
+    
+    // Refresh removed - cases subsection no longer exists in hierarchical navigation
+    
+    // Keep Create section expanded for additional creations (Requirement 6.5)
+    // The section is already expanded if the user is submitting the form
+    // No action needed - it stays expanded by default
   } catch (err: any) {
     showToast(err?.message || "Failed to create case", "error");
   }
@@ -416,6 +449,10 @@ function init() {
   updateReportMeta(undefined);
   loadPlans().catch((err) => console.error("loadPlans error", err));
   loadManagePlans().catch((err) => console.error("loadManagePlans error", err));
+  initManagement();
+  
+  // Expose initManageView globally for views.ts
+  (window as any).initManageView = initManageView;
 
   const runSearch = document.getElementById("runSearch") as HTMLInputElement | null;
   if (runSearch) {
@@ -436,8 +473,8 @@ function init() {
     setRunSelections(false);
     filterRuns();
   });
-  const refreshPlansBtn = document.getElementById("refreshPlansBtn");
-  refreshPlansBtn?.addEventListener("click", () => loadPlans(true));
+  const refreshReportPlansBtn = document.getElementById("refreshReportPlansBtn");
+  refreshReportPlansBtn?.addEventListener("click", () => loadPlans(true));
   const refreshManagePlansBtn = document.getElementById("refreshManagePlansBtn");
   refreshManagePlansBtn?.addEventListener("click", () => loadManagePlans(true));
   document.getElementById("casePickerToggle")?.addEventListener("click", openCasePicker);
@@ -466,6 +503,10 @@ function init() {
   document.getElementById("linkReporter")?.addEventListener("click", (e) => {
     e.preventDefault();
     switchView("reporter");
+  });
+  document.getElementById("linkDashboard")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    switchView("dashboard");
   });
   document.getElementById("linkManage")?.addEventListener("click", (e) => {
     e.preventDefault();

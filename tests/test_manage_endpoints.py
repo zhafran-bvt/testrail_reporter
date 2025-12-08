@@ -5,9 +5,19 @@ from fastapi.testclient import TestClient
 import app.main as main
 
 
-def test_manage_plan_requires_write_flag():
-    client = TestClient(main.app)
-    resp = client.post("/api/manage/plan", json={"project": 1, "name": "X"})
+def test_manage_plan_requires_write_flag(monkeypatch):
+    """Test that manage plan endpoint works when write is enabled."""
+    api = TestClient(main.app)
+    fake = types.SimpleNamespace()
+    
+    def add_plan(project_id, payload):
+        return {"id": 999, "name": payload["name"]}
+    
+    fake.add_plan = add_plan
+    monkeypatch.setattr(main, "_make_client", lambda: fake)
+    monkeypatch.setattr(main, "_write_enabled", lambda: True)
+    
+    resp = api.post("/api/manage/plan", json={"project": 1, "name": "X"})
     assert resp.status_code in (200, 201)
 
 

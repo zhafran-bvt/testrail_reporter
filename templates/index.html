@@ -142,6 +142,7 @@
     }
     button:not(.panel-toggle):hover { background: var(--primary-600); }
     button:not(.panel-toggle):active { transform: translateY(1px); }
+    button:not(.panel-toggle):focus { outline: 2px solid var(--primary); outline-offset: 2px; }
 
     /* Toast styles handled by Bootstrap */
     .runs-section { margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(15,23,42,0.02); }
@@ -236,9 +237,11 @@
       color: var(--muted);
     }
     .modal-close:hover { color: var(--primary); }
+    .modal-close:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
     .runs-actions { display:flex; gap:8px; flex-wrap:wrap; }
     .runs-action-btn { padding:4px 10px; font-size:12px; border-radius:8px; border:1px solid var(--border); background: transparent; cursor:pointer; color: var(--muted); }
     .runs-action-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .runs-action-btn:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
     .loading-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.45); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#fff; font-weight:600; font-size:14px; letter-spacing:.4px; z-index:9999; text-align:center; padding:0 16px; }
     .spinner { width:32px; height:32px; border:3px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; animation: spin 0.9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -361,8 +364,989 @@
       cursor: pointer;
       transition: border-color .12s ease, color .12s ease, background .12s ease;
     }
-    .refresh-btn:hover { border-color: var(--primary); color: var(--primary); background: rgba(26,138,133,0.06); }
-    .refresh-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .refresh-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); background: rgba(26,138,133,0.06); }
+    .refresh-btn:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .refresh-btn:disabled { opacity: .6; cursor: not-allowed; background: rgba(0,0,0,0.04); color: var(--muted); border-color: var(--border); }
+    .delete-btn {
+      border: 1px solid #ef4444;
+      background: transparent;
+      color: #ef4444;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color .12s ease, color .12s ease, background .12s ease;
+    }
+    .delete-btn:hover { background: rgba(239, 68, 68, 0.1); border-color: #dc2626; color: #dc2626; }
+    .delete-btn:focus { outline: 2px solid #ef4444; outline-offset: 2px; }
+    .delete-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .entity-card {
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--card-bg);
+      transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+      margin-bottom: 10px;
+    }
+    .entity-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      transform: translateY(-1px);
+    }
+    .entity-card:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .entity-card-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .entity-card-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text);
+      margin: 0 0 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .entity-card-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+    }
+    .entity-card-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+      margin-left: 12px;
+    }
+    
+    /* ========================================
+       Management View Redesign Styles
+       ======================================== */
+    
+    /* Create Section - Collapsible, Compact Header */
+    .create-section {
+      margin-bottom: 24px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #f9fafb;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      transition: box-shadow .2s ease;
+    }
+    
+    [data-theme="dark"] .create-section,
+    [data-bs-theme="dark"] .create-section {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .create-section-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: background .15s ease;
+      text-align: left;
+    }
+    
+    .create-section-toggle:hover {
+      background: rgba(0,0,0,0.02);
+    }
+    
+    [data-theme="dark"] .create-section-toggle:hover,
+    [data-bs-theme="dark"] .create-section-toggle:hover {
+      background: rgba(255,255,255,0.05);
+    }
+    
+    .create-section-toggle:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+    }
+    
+    .create-section-toggle .icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    
+    .create-section-toggle h2 {
+      flex: 1;
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.2px;
+    }
+    
+    .create-section-toggle .toggle-indicator {
+      font-size: 14px;
+      color: var(--muted);
+      transition: transform .3s ease;
+      line-height: 1;
+    }
+    
+    .create-section-toggle[aria-expanded="true"] .toggle-indicator {
+      transform: rotate(180deg);
+    }
+    .create-section-content {
+      padding: 0 20px 20px;
+      transition: max-height .3s ease, opacity .3s ease;
+      animation: slideDown .3s ease;
+    }
+    
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .create-section-content.hidden {
+      display: none;
+    }
+    
+    .create-forms-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    
+    .create-form-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      transition: box-shadow .2s ease, border-color .2s ease;
+    }
+    
+    [data-theme="dark"] .create-form-card,
+    [data-bs-theme="dark"] .create-form-card {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .create-form-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-color: var(--primary);
+    }
+    
+    .create-form-card h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    /* Manage Section - Always Visible, Subsections */
+    .manage-section {
+      margin-top: 32px;
+    }
+    
+    .manage-section-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 20px;
+      color: var(--text);
+      letter-spacing: 0.3px;
+    }
+    
+    .manage-subsection {
+      margin-bottom: 32px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--card-bg);
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      transition: box-shadow .2s ease;
+    }
+    
+    .manage-subsection:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .subsection-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .subsection-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .subsection-title .icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+    
+    .subsection-title h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.2px;
+    }
+    
+    .count-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 8px;
+      background: var(--primary);
+      color: white;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .subsection-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    
+    .subsection-controls input[type="search"],
+    .subsection-controls select {
+      min-width: 200px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    
+    .subsection-controls input[type="search"]:focus,
+    .subsection-controls select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+    
+    .subsection-controls input[type="search"]::placeholder {
+      color: var(--muted);
+      opacity: 0.7;
+    }
+    
+    .subsection-controls input[type="search"]:disabled,
+    .subsection-controls select:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: rgba(0,0,0,0.02);
+    }
+    
+    [data-theme="dark"] .subsection-controls input[type="search"]:disabled,
+    [data-bs-theme="dark"] .subsection-controls input[type="search"]:disabled,
+    [data-theme="dark"] .subsection-controls select:disabled,
+    [data-bs-theme="dark"] .subsection-controls select:disabled {
+      opacity: 0.4;
+      background: rgba(255,255,255,0.02);
+    }
+    
+    .subsection-content {
+      position: relative;
+      min-height: 100px;
+    }
+    
+    .entity-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    /* Loading States with Spinners */
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      animation: fadeIn .3s ease;
+    }
+    
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    
+    .loading-state .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(0,0,0,0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    
+    [data-theme="dark"] .loading-state .spinner,
+    [data-bs-theme="dark"] .loading-state .spinner {
+      border-color: rgba(255,255,255,0.1);
+      border-top-color: var(--primary);
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-state .loading-text {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+    
+    /* Empty States with Icons and Helpful Messages */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+      animation: fadeIn .3s ease;
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+      line-height: 1;
+      filter: grayscale(0.3);
+    }
+    
+    .empty-state-title {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0.2px;
+    }
+    
+    .empty-state-message {
+      margin: 0 0 16px;
+      font-size: 14px;
+      color: var(--muted);
+      max-width: 400px;
+      line-height: 1.5;
+    }
+    
+    .empty-state .btn-primary {
+      margin-top: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      border-radius: 8px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background .15s ease, transform .05s ease;
+    }
+    
+    .empty-state .btn-primary:hover {
+      background: var(--primary-600);
+      transform: translateY(-1px);
+    }
+    
+    .empty-state .btn-primary:active {
+      transform: translateY(0);
+    }
+    
+    .empty-state .btn-primary:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    
+    /* Improved Entity Cards with Better Button Hierarchy */
+    .entity-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    
+    .entity-card-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text);
+      margin: 0;
+      flex: 1;
+      line-height: 1.4;
+    }
+    
+    .entity-card-badges {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    
+    .entity-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    .entity-card-meta .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .entity-card-meta .icon {
+      font-size: 14px;
+      opacity: 0.7;
+    }
+    
+    .entity-card-actions {
+      display: flex;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    
+    /* Edit Button - Neutral Gray */
+    .btn-edit {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: 1px solid #d1d5db;
+      background: transparent;
+      color: #6b7280;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s ease;
+      font-weight: 500;
+    }
+    
+    .btn-edit:hover:not(:disabled) {
+      border-color: #9ca3af;
+      background: #f9fafb;
+      color: #4b5563;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    
+    .btn-edit:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    
+    .btn-edit:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    
+    .btn-edit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: rgba(0,0,0,0.02);
+    }
+    
+    .btn-edit .icon {
+      font-size: 14px;
+    }
+    
+    [data-theme="dark"] .btn-edit,
+    [data-bs-theme="dark"] .btn-edit {
+      border-color: #4b5563;
+      color: #9ca3af;
+    }
+    
+    [data-theme="dark"] .btn-edit:hover:not(:disabled),
+    [data-bs-theme="dark"] .btn-edit:hover:not(:disabled) {
+      border-color: #6b7280;
+      background: rgba(255,255,255,0.05);
+      color: #d1d5db;
+    }
+    
+    [data-theme="dark"] .btn-edit:disabled,
+    [data-bs-theme="dark"] .btn-edit:disabled {
+      opacity: 0.4;
+      background: rgba(255,255,255,0.02);
+    }
+    
+    /* Delete Button - Red with Trash Icon */
+    .btn-delete {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: 1px solid #fecaca;
+      background: transparent;
+      color: #ef4444;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s ease;
+      font-weight: 500;
+    }
+    
+    .btn-delete:hover:not(:disabled) {
+      border-color: #ef4444;
+      background: #fef2f2;
+      color: #dc2626;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+    }
+    
+    .btn-delete:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    
+    .btn-delete:focus {
+      outline: 2px solid #ef4444;
+      outline-offset: 2px;
+    }
+    
+    .btn-delete:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: rgba(0,0,0,0.02);
+    }
+    
+    .btn-delete .icon {
+      font-size: 14px;
+    }
+    
+    [data-theme="dark"] .btn-delete,
+    [data-bs-theme="dark"] .btn-delete {
+      border-color: #7f1d1d;
+      color: #f87171;
+    }
+    
+    [data-theme="dark"] .btn-delete:hover:not(:disabled),
+    [data-bs-theme="dark"] .btn-delete:hover:not(:disabled) {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+      color: #fca5a5;
+    }
+    
+    [data-theme="dark"] .btn-delete:disabled,
+    [data-bs-theme="dark"] .btn-delete:disabled {
+      opacity: 0.4;
+      background: rgba(239, 68, 68, 0.05);
+    }
+    
+    /* Modal Delete Button */
+    .btn-modal-delete {
+      background: #ef4444;
+      border: 1px solid #ef4444;
+      color: white;
+      font-weight: 700;
+      transition: background .15s ease, transform .1s ease;
+    }
+    
+    .btn-modal-delete:hover {
+      background: #dc2626;
+      border-color: #dc2626;
+    }
+    
+    .btn-modal-delete:focus {
+      outline: 2px solid #ef4444;
+      outline-offset: 2px;
+    }
+    
+    /* Badge Styles */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      line-height: 1;
+    }
+    
+    .badge-active {
+      background: rgba(59, 130, 246, 0.15);
+      color: #3b82f6;
+    }
+    
+    .badge-completed {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+    }
+    
+    .badge-inactive {
+      background: rgba(107, 114, 128, 0.15);
+      color: #6b7280;
+    }
+    
+    /* Status Badges for Test Cases */
+    .badge-passed {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+    }
+    
+    .badge-failed {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+    }
+    
+    .badge-untested {
+      background: rgba(107, 114, 128, 0.15);
+      color: #6b7280;
+    }
+    
+    .badge-blocked {
+      background: rgba(245, 158, 11, 0.15);
+      color: #f59e0b;
+    }
+    
+    .badge-retest {
+      background: rgba(234, 179, 8, 0.15);
+      color: #eab308;
+    }
+    
+    /* ========================================
+       Responsive Design Breakpoints
+       ======================================== */
+    
+    /* Desktop (default) - Multi-column layout */
+    @media (min-width: 1025px) {
+      .create-forms-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      
+      .manage-subsection {
+        padding: 24px;
+      }
+      
+      .entity-card-actions {
+        flex-direction: row;
+      }
+    }
+    
+    /* Tablet (768px - 1024px) - Adjusted columns */
+    @media (max-width: 1024px) and (min-width: 768px) {
+      .create-forms-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      
+      .create-section-content {
+        padding: 0 16px 16px;
+      }
+      
+      .manage-subsection {
+        padding: 18px;
+      }
+      
+      .subsection-header {
+        flex-direction: row;
+        align-items: center;
+      }
+      
+      .subsection-controls input[type="search"] {
+        min-width: 180px;
+      }
+      
+      .entity-card-actions {
+        flex-direction: row;
+      }
+    }
+    
+    /* Mobile (below 768px) - Single column layout */
+    @media (max-width: 767px) {
+      .create-section {
+        margin-bottom: 16px;
+        border-radius: 10px;
+      }
+      
+      .create-section-toggle {
+        padding: 14px 16px;
+        gap: 10px;
+      }
+      
+      .create-section-toggle h2 {
+        font-size: 16px;
+      }
+      
+      .create-section-toggle .icon {
+        font-size: 18px;
+      }
+      
+      .create-section-content {
+        padding: 0 12px 12px;
+      }
+      
+      .create-forms-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+      
+      .create-form-card {
+        padding: 14px;
+      }
+      
+      .create-form-card h3 {
+        font-size: 15px;
+      }
+      
+      .manage-section {
+        margin-top: 24px;
+      }
+      
+      .manage-section-title {
+        font-size: 18px;
+        margin-bottom: 16px;
+      }
+      
+      .manage-subsection {
+        margin-bottom: 20px;
+        padding: 16px;
+        border-radius: 10px;
+      }
+      
+      .subsection-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding-bottom: 10px;
+      }
+      
+      .subsection-title {
+        gap: 8px;
+      }
+      
+      .subsection-title .icon {
+        font-size: 18px;
+      }
+      
+      .subsection-title h3 {
+        font-size: 15px;
+      }
+      
+      .count-badge {
+        min-width: 22px;
+        height: 22px;
+        font-size: 11px;
+        padding: 0 6px;
+      }
+      
+      .subsection-controls {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      
+      .subsection-controls input[type="search"] {
+        width: 100%;
+        min-width: 0;
+        font-size: 14px;
+      }
+      
+      .subsection-controls .refresh-btn {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      .entity-list {
+        gap: 8px;
+      }
+      
+      .entity-card {
+        padding: 12px;
+      }
+      
+      .entity-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      
+      .entity-card-title {
+        font-size: 13px;
+      }
+      
+      .entity-card-meta {
+        gap: 10px;
+        font-size: 11px;
+      }
+      
+      .entity-card-actions {
+        width: 100%;
+        flex-direction: column;
+        gap: 6px;
+      }
+      
+      .btn-edit,
+      .btn-delete {
+        width: 100%;
+        justify-content: center;
+        font-size: 12px;
+        padding: 8px 12px;
+      }
+      
+      .loading-state,
+      .empty-state {
+        padding: 30px 16px;
+      }
+      
+      .empty-state-icon {
+        font-size: 40px;
+      }
+      
+      .empty-state-title {
+        font-size: 15px;
+      }
+      
+      .empty-state-message {
+        font-size: 13px;
+      }
+    }
+    
+    /* Extra small mobile (below 480px) - Optimize for very small screens */
+    @media (max-width: 479px) {
+      .create-section-toggle {
+        padding: 12px 14px;
+      }
+      
+      .create-section-toggle h2 {
+        font-size: 15px;
+      }
+      
+      .create-section-content {
+        padding: 0 10px 10px;
+      }
+      
+      .create-form-card {
+        padding: 12px;
+      }
+      
+      .manage-subsection {
+        padding: 14px;
+      }
+      
+      .subsection-title h3 {
+        font-size: 14px;
+      }
+      
+      .entity-card {
+        padding: 10px;
+      }
+      
+      .entity-card-title {
+        font-size: 12px;
+      }
+      
+      .entity-card-meta {
+        font-size: 10px;
+        gap: 8px;
+      }
+      
+      .btn-edit,
+      .btn-delete {
+        font-size: 11px;
+        padding: 7px 10px;
+      }
+      
+      .empty-state-icon {
+        font-size: 36px;
+      }
+      
+      .empty-state-title {
+        font-size: 14px;
+      }
+      
+      .empty-state-message {
+        font-size: 12px;
+      }
+    }
+    
+    /* Touch-friendly adjustments for mobile */
+    @media (max-width: 767px) and (hover: none) {
+      .btn-edit,
+      .btn-delete,
+      .create-section-toggle,
+      .refresh-btn {
+        min-height: 44px; /* iOS recommended touch target size */
+      }
+      
+      .subsection-controls input[type="search"] {
+        min-height: 44px;
+      }
+    }
+    
+    /* Landscape orientation adjustments for mobile */
+    @media (max-width: 767px) and (orientation: landscape) {
+      .create-forms-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .entity-card-actions {
+        flex-direction: row;
+      }
+      
+      .btn-edit,
+      .btn-delete {
+        width: auto;
+        flex: 1;
+      }
+    }
+    
+    /* Print styles for Management view */
+    @media print {
+      .create-section {
+        display: none !important;
+      }
+      
+      .subsection-controls,
+      .refresh-btn,
+      .btn-edit,
+      .btn-delete {
+        display: none !important;
+      }
+      
+      .manage-subsection {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+      
+      .entity-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    }
+    
     .toast-layer {
       position: fixed;
       top: 16px;
@@ -381,13 +1365,1624 @@
       margin-bottom: 6px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.28);
     }
+    
+    /* Dashboard specific styles */
+    .dashboard-plan-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      transition: box-shadow .15s ease, border-color .15s ease;
+    }
+    .dashboard-plan-card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border-color: var(--primary);
+    }
+    .dashboard-plan-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .dashboard-plan-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 4px;
+    }
+    .dashboard-plan-meta {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 0;
+    }
+    .dashboard-plan-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .dashboard-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .dashboard-stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .dashboard-stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .dashboard-stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .dashboard-stat-value.pass-rate-high {
+      color: #10b981;
+    }
+    .dashboard-stat-value.pass-rate-medium {
+      color: #f59e0b;
+    }
+    .dashboard-stat-value.pass-rate-low {
+      color: #ef4444;
+    }
+    .dashboard-status-bar {
+      display: flex;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+      background: var(--border);
+      margin-top: 8px;
+    }
+    .dashboard-status-segment {
+      height: 100%;
+      transition: width .3s ease;
+    }
+    .dashboard-status-segment.status-passed {
+      background: #10b981;
+    }
+    .dashboard-status-segment.status-failed {
+      background: #ef4444;
+    }
+    .dashboard-status-segment.status-blocked {
+      background: #f59e0b;
+    }
+    .dashboard-status-segment.status-retest {
+      background: #8b5cf6;
+    }
+    .dashboard-status-segment.status-untested {
+      background: #94a3b8;
+    }
+    .dashboard-status-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+    .dashboard-status-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+    }
+    .dashboard-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dashboard-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .dashboard-badge.badge-completed {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+    }
+    .dashboard-badge.badge-active {
+      background: rgba(59, 130, 246, 0.15);
+      color: #3b82f6;
+    }
+    .dashboard-badge.badge-critical {
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    .dashboard-runs-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .dashboard-runs-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: none;
+      border: none;
+      padding: 8px 0;
+      cursor: pointer;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 14px;
+      width: 100%;
+      text-align: left;
+    }
+    .dashboard-runs-toggle:hover {
+      color: var(--primary);
+    }
+    .dashboard-runs-toggle-icon {
+      width: 16px;
+      height: 16px;
+      transition: transform .2s ease;
+    }
+    .dashboard-runs-toggle.expanded .dashboard-runs-toggle-icon {
+      transform: rotate(90deg);
+    }
+    .dashboard-runs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .dashboard-run-card {
+      background: rgba(0, 0, 0, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    [data-theme="dark"] .dashboard-run-card,
+    [data-bs-theme="dark"] .dashboard-run-card {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .dashboard-run-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .dashboard-run-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 2px;
+    }
+    .dashboard-run-suite {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+    }
+    .dashboard-run-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+    .dashboard-run-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .dashboard-run-stat-label {
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .dashboard-run-stat-value {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .dashboard-expand-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .dashboard-expand-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: rgba(26, 138, 133, 0.06);
+    }
+    .dashboard-report-btn {
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--primary);
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    .dashboard-report-btn:hover {
+      background: var(--primary-600);
+    }
+    .dashboard-sort-header {
+      position: relative;
+    }
+    .dashboard-sort-header:hover {
+      border-color: var(--primary);
+      background: rgba(26, 138, 133, 0.06);
+    }
+    .dashboard-sort-header.sort-active {
+      border-color: var(--primary);
+      background: rgba(26, 138, 133, 0.1);
+      font-weight: 600;
+    }
+    .dashboard-sort-header .sort-icon {
+      opacity: 0.3;
+      transition: transform .2s ease, opacity .2s ease;
+    }
+    .dashboard-sort-header.sort-active .sort-icon {
+      opacity: 1;
+    }
+    .dashboard-sort-header.sort-asc .sort-icon {
+      transform: rotate(180deg);
+    }
+    .dashboard-sort-header.sort-desc .sort-icon {
+      transform: rotate(0deg);
+    }
+    
+    /* Responsive Design - Media Queries */
+    
+    /* Desktop (default) - Multi-column layout */
+    @media (min-width: 1025px) {
+      #dashboardView {
+        width: 90vw;
+        max-width: 1400px;
+      }
+      
+      .dashboard-stats-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+      
+      .dashboard-status-legend {
+        flex-wrap: nowrap;
+      }
+    }
+    
+    /* Tablet (768px - 1024px) - Adjusted columns */
+    @media (max-width: 1024px) and (min-width: 768px) {
+      #dashboardView {
+        width: 95vw;
+        max-width: none;
+      }
+      
+      .dashboard-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .dashboard-plan-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .dashboard-plan-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      
+      .dashboard-status-legend {
+        flex-wrap: wrap;
+      }
+      
+      /* Adjust filter grid for tablet */
+      .card > div[style*="grid-template-columns"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      
+      /* Adjust sort controls for tablet */
+      .card > div[style*="flex-wrap"] > div[style*="flex-wrap"] {
+        width: 100%;
+        justify-content: flex-start;
+      }
+    }
+    
+    /* Mobile (below 768px) - Single column layout */
+    @media (max-width: 767px) {
+      #dashboardView {
+        width: 100%;
+        padding: 0 12px;
+      }
+      
+      /* Single column for all grids */
+      .dashboard-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      
+      /* Stack plan header elements */
+      .dashboard-plan-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      
+      .dashboard-plan-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+      
+      /* Adjust plan card padding */
+      .dashboard-plan-card {
+        padding: 12px;
+      }
+      
+      /* Stack run header elements */
+      .dashboard-run-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      
+      .dashboard-run-header > div:last-child {
+        width: 100%;
+        justify-content: space-between;
+      }
+      
+      /* Adjust run card padding */
+      .dashboard-run-card {
+        padding: 10px;
+      }
+      
+      /* Stack run stats */
+      .dashboard-run-stats {
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+      }
+      
+      .dashboard-run-stat {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      /* Wrap status legend */
+      .dashboard-status-legend {
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 11px;
+      }
+      
+      /* Single column for filter grid */
+      .card > div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        gap: 10px;
+      }
+      
+      /* Stack dashboard header */
+      .card > div[style*="justify-content: space-between"] {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 12px;
+      }
+      
+      .card > div[style*="justify-content: space-between"] > div {
+        width: 100%;
+      }
+      
+      .card > div[style*="justify-content: space-between"] > div[style*="display: flex"] {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
+      
+      /* Full width project input */
+      .input-group[style*="min-width"] {
+        min-width: 100% !important;
+        width: 100% !important;
+      }
+      
+      /* Stack sort controls */
+      .card > div[style*="flex-wrap"] > div[style*="flex-wrap"] {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      
+      .dashboard-sort-header {
+        font-size: 12px;
+        padding: 5px 10px;
+      }
+      
+      /* Adjust pagination for mobile */
+      #dashboardPagination > div {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: 10px;
+      }
+      
+      #dashboardPagination > div > div:last-child {
+        width: 100%;
+        justify-content: space-between;
+      }
+      
+      /* Smaller buttons on mobile */
+      .dashboard-report-btn,
+      .dashboard-expand-btn {
+        font-size: 11px;
+        padding: 4px 8px;
+      }
+      
+      /* Adjust badge size */
+      .dashboard-badge {
+        font-size: 10px;
+        padding: 3px 8px;
+      }
+      
+      /* Smaller stat values for better fit */
+      .dashboard-stat-value {
+        font-size: 18px;
+      }
+      
+      .dashboard-stat-label {
+        font-size: 10px;
+      }
+      
+      /* Adjust card margins */
+      .card {
+        margin-bottom: 12px;
+      }
+      
+      /* Ensure text doesn't overflow */
+      .dashboard-plan-title,
+      .dashboard-run-title {
+        word-break: break-word;
+        font-size: 15px;
+      }
+      
+      .dashboard-plan-meta,
+      .dashboard-run-suite {
+        font-size: 11px;
+      }
+    }
+    
+    /* Extra small mobile (below 480px) - Optimize for very small screens */
+    @media (max-width: 479px) {
+      #dashboardView {
+        padding: 0 8px;
+      }
+      
+      .card {
+        padding: 12px;
+      }
+      
+      .dashboard-plan-card,
+      .dashboard-run-card {
+        padding: 10px;
+      }
+      
+      /* Even smaller text on tiny screens */
+      .dashboard-stat-value {
+        font-size: 16px;
+      }
+      
+      .dashboard-stat-label {
+        font-size: 9px;
+      }
+      
+      .dashboard-plan-title {
+        font-size: 14px;
+      }
+      
+      .dashboard-run-title {
+        font-size: 13px;
+      }
+      
+      /* Compact status legend */
+      .dashboard-status-legend {
+        font-size: 10px;
+        gap: 6px;
+      }
+      
+      .dashboard-status-dot {
+        width: 8px;
+        height: 8px;
+      }
+      
+      /* Smaller buttons */
+      button:not(.panel-toggle) {
+        font-size: 13px;
+        padding: 8px 12px;
+      }
+      
+      .dashboard-report-btn,
+      .dashboard-expand-btn,
+      .refresh-btn {
+        font-size: 11px;
+        padding: 4px 8px;
+      }
+      
+      /* Compact sort buttons */
+      .dashboard-sort-header {
+        font-size: 11px;
+        padding: 4px 8px;
+      }
+      
+      .dashboard-sort-header .sort-icon {
+        width: 12px;
+        height: 12px;
+      }
+    }
+    
+    /* Landscape orientation adjustments for mobile */
+    @media (max-width: 767px) and (orientation: landscape) {
+      .dashboard-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .dashboard-run-stats {
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+    }
+    
+    /* Print styles for dashboard */
+    @media print {
+      .side-nav,
+      .masthead-right,
+      .refresh-btn,
+      .dashboard-report-btn,
+      .dashboard-expand-btn,
+      .dashboard-runs-toggle,
+      #dashboardPagination {
+        display: none !important;
+      }
+      
+      .nav-shell {
+        grid-template-columns: 1fr;
+      }
+      
+      .dashboard-plan-card,
+      .dashboard-run-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      
+      .card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+    }
+    
+    /* ========================================
+       Edit Modal Styles
+       ======================================== */
+    
+    /* Form Field Styling */
+    .edit-modal-form .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .edit-modal-form .form-label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    
+    .edit-modal-form .form-label .required {
+      color: #ef4444;
+      margin-left: 2px;
+    }
+    
+    .edit-modal-form .form-input,
+    .edit-modal-form .form-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      background: var(--card-bg);
+      color: var(--text);
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    
+    .edit-modal-form .form-input:focus,
+    .edit-modal-form .form-textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+    
+    .edit-modal-form .form-textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    .edit-modal-form .form-hint {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    /* Validation Error Styling */
+    .edit-modal-form .form-input.is-invalid,
+    .edit-modal-form .form-textarea.is-invalid {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+    }
+    
+    .edit-modal-form .form-input.is-invalid:focus,
+    .edit-modal-form .form-textarea.is-invalid:focus {
+      border-color: #ef4444;
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+    }
+    
+    .edit-modal-form .form-error {
+      margin: 6px 0 0;
+      color: #ef4444;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .edit-modal-form .form-error::before {
+      content: "⚠";
+      font-size: 14px;
+    }
+    
+    .edit-modal-form .form-error.hidden {
+      display: none;
+    }
+    
+    /* Loading Overlay for Modals */
+    .modal-loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      border-radius: 14px;
+      backdrop-filter: blur(2px);
+    }
+    
+    [data-theme="dark"] .modal-loading-overlay,
+    [data-bs-theme="dark"] .modal-loading-overlay {
+      background: rgba(28, 28, 28, 0.92);
+    }
+    
+    .modal-loading-overlay .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(0, 0, 0, 0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    [data-theme="dark"] .modal-loading-overlay .spinner,
+    [data-bs-theme="dark"] .modal-loading-overlay .spinner {
+      border-color: rgba(255, 255, 255, 0.1);
+      border-top-color: var(--primary);
+    }
+    
+    .modal-loading-overlay .loading-text {
+      margin-top: 12px;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    
+    .modal-loading-overlay.hidden {
+      display: none;
+    }
+    
+    /* ========================================
+       Run Details Modal Styles
+       ======================================== */
+    
+    /* Run Details Form Styling */
+    #runDetailsForm .form-group {
+      margin-bottom: 16px;
+    }
+    
+    #runDetailsForm .form-label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    
+    #runDetailsForm .form-label .required {
+      color: #ef4444;
+      margin-left: 2px;
+    }
+    
+    #runDetailsForm .form-input,
+    #runDetailsForm .form-textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      background: var(--card-bg);
+      color: var(--text);
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    
+    #runDetailsForm .form-input:focus,
+    #runDetailsForm .form-textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+    
+    #runDetailsForm .form-textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    
+    /* Test Cases List in Run Details Modal */
+    #runDetailsCasesList .entity-card {
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--card-bg);
+      transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+      margin-bottom: 10px;
+    }
+    
+    #runDetailsCasesList .entity-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      transform: translateY(-1px);
+    }
+    
+    #runDetailsCasesList .entity-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    
+    #runDetailsCasesList .entity-card-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text);
+      margin: 0;
+      flex: 1;
+      line-height: 1.4;
+    }
+    
+    #runDetailsCasesList .entity-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    #runDetailsCasesList .entity-card-meta .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    #runDetailsCasesList .entity-card-actions {
+      display: flex;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    
+    /* Back Button Styling in Run Details Modal */
+    #runDetailsBackBtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border: 1px solid #d1d5db;
+      background: transparent;
+      color: #6b7280;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s ease;
+      font-weight: 500;
+    }
+    
+    #runDetailsBackBtn:hover {
+      border-color: #9ca3af;
+      background: #f9fafb;
+      color: #4b5563;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    
+    #runDetailsBackBtn:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    
+    [data-theme="dark"] #runDetailsBackBtn,
+    [data-bs-theme="dark"] #runDetailsBackBtn {
+      border-color: #4b5563;
+      color: #9ca3af;
+    }
+    
+    [data-theme="dark"] #runDetailsBackBtn:hover,
+    [data-bs-theme="dark"] #runDetailsBackBtn:hover {
+      border-color: #6b7280;
+      background: rgba(255,255,255,0.05);
+      color: #d1d5db;
+    }
+    
+    /* Save Button Styling */
+    #runDetailsSaveBtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 10px;
+      border: 1px solid var(--primary);
+      background: var(--primary);
+      color: #fff;
+      transition: background .15s ease, transform .05s ease;
+      font-weight: 600;
+    }
+    
+    #runDetailsSaveBtn:hover:not(:disabled) {
+      background: var(--primary-600);
+      transform: translateY(-1px);
+    }
+    
+    #runDetailsSaveBtn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+    
+    #runDetailsSaveBtn:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    
+    #runDetailsSaveBtn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      background: rgba(0,0,0,0.1);
+    }
+    
+    /* Responsive adjustments for Run Details Modal */
+    @media (max-width: 767px) {
+      #runDetailsModal .modal-card {
+        max-width: 100%;
+        width: 100%;
+        margin: 0;
+        border-radius: 0;
+        max-height: 100vh;
+      }
+      
+      #runDetailsForm .form-group {
+        margin-bottom: 14px;
+      }
+      
+      #runDetailsCasesList .entity-card {
+        padding: 12px;
+      }
+      
+      #runDetailsCasesList .entity-card-actions {
+        flex-direction: column;
+        gap: 6px;
+      }
+      
+      #runDetailsCasesList .btn-edit,
+      #runDetailsCasesList .btn-delete {
+        width: 100%;
+        justify-content: center;
+      }
+      
+      #runDetailsBackBtn {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      
+      #runDetailsSaveBtn {
+        padding: 8px 14px;
+        font-size: 13px;
+      }
+    }
+    
+    /* ========================================
+       Plan Runs Modal Styles
+       ======================================== */
+    
+    /* Plan Runs Modal Specific Positioning */
+    #planRunsModal .modal-card {
+      max-width: 800px;
+    }
+    
+    /* Breadcrumb Navigation in Modal */
+    #planRunsModal nav[aria-label="Breadcrumb"] ol {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    
+    #planRunsModal nav[aria-label="Breadcrumb"] a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color .15s ease;
+    }
+    
+    #planRunsModal nav[aria-label="Breadcrumb"] a:hover {
+      color: var(--primary-600);
+      text-decoration: underline;
+    }
+    
+    #planRunsModal nav[aria-label="Breadcrumb"] a:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    
+    /* Runs List Items in Modal */
+    #planRunsList .entity-card {
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--card-bg);
+      transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+      margin-bottom: 10px;
+    }
+    
+    #planRunsList .entity-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      transform: translateY(-1px);
+    }
+    
+    #planRunsList .entity-card:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    
+    #planRunsList .entity-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    
+    #planRunsList .entity-card-content {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    #planRunsList .entity-card-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text);
+      margin: 0 0 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    #planRunsList .entity-card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    #planRunsList .entity-card-meta .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    #planRunsList .entity-card-actions {
+      display: flex;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    
+    /* Run Edit/Delete Buttons in Modal */
+    #planRunsList .btn-edit,
+    #planRunsList .btn-delete {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .15s ease;
+      font-weight: 500;
+    }
+    
+    #planRunsList .btn-edit {
+      border: 1px solid #d1d5db;
+      background: transparent;
+      color: #6b7280;
+    }
+    
+    #planRunsList .btn-edit:hover:not(:disabled) {
+      border-color: #9ca3af;
+      background: #f9fafb;
+      color: #4b5563;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+    
+    #planRunsList .btn-delete {
+      border: 1px solid #fecaca;
+      background: transparent;
+      color: #ef4444;
+    }
+    
+    #planRunsList .btn-delete:hover:not(:disabled) {
+      border-color: #ef4444;
+      background: #fef2f2;
+      color: #dc2626;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
+    }
+    
+    #planRunsList .btn-edit:focus,
+    #planRunsList .btn-delete:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    
+    #planRunsList .btn-edit:disabled,
+    #planRunsList .btn-delete:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: rgba(0,0,0,0.02);
+    }
+    
+    /* Dark Mode Adjustments for Plan Runs Modal */
+    [data-theme="dark"] #planRunsList .btn-edit,
+    [data-bs-theme="dark"] #planRunsList .btn-edit {
+      border-color: #4b5563;
+      color: #9ca3af;
+    }
+    
+    [data-theme="dark"] #planRunsList .btn-edit:hover:not(:disabled),
+    [data-bs-theme="dark"] #planRunsList .btn-edit:hover:not(:disabled) {
+      border-color: #6b7280;
+      background: rgba(255,255,255,0.05);
+      color: #d1d5db;
+    }
+    
+    [data-theme="dark"] #planRunsList .btn-delete,
+    [data-bs-theme="dark"] #planRunsList .btn-delete {
+      border-color: #7f1d1d;
+      color: #f87171;
+    }
+    
+    [data-theme="dark"] #planRunsList .btn-delete:hover:not(:disabled),
+    [data-bs-theme="dark"] #planRunsList .btn-delete:hover:not(:disabled) {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+      color: #fca5a5;
+    }
+    
+    /* Loading State in Plan Runs Modal */
+    #planRunsLoadingState .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(0,0,0,0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+    
+    [data-theme="dark"] #planRunsLoadingState .spinner,
+    [data-bs-theme="dark"] #planRunsLoadingState .spinner {
+      border-color: rgba(255,255,255,0.1);
+      border-top-color: var(--primary);
+    }
+    
+    #planRunsLoadingState .loading-text {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      color: var(--muted);
+    }
+    
+    /* Empty State in Plan Runs Modal */
+    #planRunsEmptyState {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    
+    #planRunsEmptyState .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+      line-height: 1;
+    }
+    
+    #planRunsEmptyState .empty-state-title {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: 0.2px;
+    }
+    
+    #planRunsEmptyState .empty-state-message {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted);
+      max-width: 400px;
+      line-height: 1.5;
+    }
+    
+    /* Error State in Plan Runs Modal */
+    #planRunsErrorState {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+    }
+    
+    #planRunsErrorState h4 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    
+    #planRunsErrorState p {
+      margin: 0 0 16px;
+      font-size: 14px;
+      color: var(--muted);
+      max-width: 400px;
+    }
+    
+    /* Responsive Adjustments for Plan Runs Modal */
+    @media (max-width: 767px) {
+      #planRunsModal .modal-card {
+        max-width: 95vw;
+      }
+      
+      #planRunsList .entity-card {
+        padding: 12px;
+      }
+      
+      #planRunsList .entity-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      
+      #planRunsList .entity-card-actions {
+        width: 100%;
+        flex-direction: column;
+        gap: 6px;
+      }
+      
+      #planRunsList .btn-edit,
+      #planRunsList .btn-delete {
+        width: 100%;
+        justify-content: center;
+        font-size: 12px;
+        padding: 8px 12px;
+      }
+      
+      #planRunsModal nav[aria-label="Breadcrumb"] {
+        font-size: 12px;
+      }
+    }
+    
+    @media (max-width: 479px) {
+      #planRunsModal .modal-card {
+        max-width: 100vw;
+        border-radius: 0;
+      }
+      
+      #planRunsList .entity-card {
+        padding: 10px;
+      }
+      
+      #planRunsList .entity-card-title {
+        font-size: 13px;
+      }
+      
+      #planRunsList .entity-card-meta {
+        font-size: 11px;
+        gap: 8px;
+      }
+      
+      #planRunsList .btn-edit,
+      #planRunsList .btn-delete {
+        font-size: 11px;
+        padding: 7px 10px;
+      }
+    }
+    
+    /* ========================================
+       File Upload Zone Styles
+       ======================================== */
+    
+    /* Drag and Drop Area */
+    .file-upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, transform .1s ease;
+      background: rgba(0, 0, 0, 0.01);
+    }
+    
+    [data-theme="dark"] .file-upload-zone,
+    [data-bs-theme="dark"] .file-upload-zone {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    
+    .file-upload-zone:hover {
+      border-color: var(--primary);
+      background: rgba(26, 138, 133, 0.04);
+    }
+    
+    .file-upload-zone:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+    
+    .file-upload-zone.drag-over {
+      border-color: var(--primary);
+      background: rgba(26, 138, 133, 0.08);
+      transform: scale(1.01);
+    }
+    
+    .file-upload-zone.drag-over .upload-icon {
+      transform: scale(1.1);
+    }
+    
+    .file-upload-zone .upload-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+      opacity: 0.5;
+      transition: transform .15s ease;
+      line-height: 1;
+    }
+    
+    .file-upload-zone .upload-title {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+    }
+    
+    .file-upload-zone .upload-hint {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    /* File Upload Error */
+    .file-upload-error {
+      margin: 8px 0 0;
+      padding: 8px 12px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 6px;
+      color: #ef4444;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .file-upload-error::before {
+      content: "⚠";
+      font-size: 14px;
+    }
+    
+    .file-upload-error.hidden {
+      display: none;
+    }
+    
+    /* Upload Progress Indicator */
+    .upload-progress {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(26, 138, 133, 0.06);
+      border: 1px solid rgba(26, 138, 133, 0.15);
+      border-radius: 8px;
+    }
+    
+    .upload-progress.hidden {
+      display: none;
+    }
+    
+    .upload-progress-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .upload-progress .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(0, 0, 0, 0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    
+    [data-theme="dark"] .upload-progress .spinner,
+    [data-bs-theme="dark"] .upload-progress .spinner {
+      border-color: rgba(255, 255, 255, 0.1);
+      border-top-color: var(--primary);
+    }
+    
+    .upload-progress .upload-filename {
+      font-size: 13px;
+      color: var(--text);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .upload-progress-bar {
+      margin-top: 8px;
+      height: 4px;
+      background: rgba(0, 0, 0, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    
+    [data-theme="dark"] .upload-progress-bar,
+    [data-bs-theme="dark"] .upload-progress-bar {
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    .upload-progress-fill {
+      height: 100%;
+      background: var(--primary);
+      border-radius: 2px;
+      transition: width .3s ease;
+      width: 0%;
+    }
+    
+    /* File Preview Thumbnails */
+    .attachments-list {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .attachment-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    
+    .attachment-item:hover {
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    
+    .attachment-thumbnail {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: rgba(0, 0, 0, 0.05);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: var(--muted);
+    }
+    
+    .attachment-thumbnail img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+    
+    .attachment-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .attachment-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin: 0 0 2px;
+    }
+    
+    .attachment-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin: 0;
+    }
+    
+    .attachment-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    
+    .attachment-btn {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all .15s ease;
+    }
+    
+    .attachment-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: rgba(26, 138, 133, 0.06);
+    }
+    
+    .attachment-btn:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+    
+    .attachment-btn.btn-remove {
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+    
+    .attachment-btn.btn-remove:hover {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+    
+    /* File Type Icons */
+    .file-icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    
+    .file-icon.file-image {
+      background: rgba(59, 130, 246, 0.1);
+      color: #3b82f6;
+    }
+    
+    .file-icon.file-video {
+      background: rgba(139, 92, 246, 0.1);
+      color: #8b5cf6;
+    }
+    
+    .file-icon.file-pdf {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+    
+    .file-icon.file-other {
+      background: rgba(107, 114, 128, 0.1);
+      color: #6b7280;
+    }
+    
+    /* Responsive adjustments for file upload */
+    @media (max-width: 767px) {
+      .file-upload-zone {
+        padding: 20px 16px;
+      }
+      
+      .file-upload-zone .upload-icon {
+        font-size: 28px;
+      }
+      
+      .file-upload-zone .upload-title {
+        font-size: 13px;
+      }
+      
+      .file-upload-zone .upload-hint {
+        font-size: 11px;
+      }
+      
+      .attachment-item {
+        padding: 8px 10px;
+      }
+      
+      .attachment-thumbnail,
+      .file-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+      }
+      
+      .attachment-name {
+        font-size: 12px;
+      }
+      
+      .attachment-meta {
+        font-size: 10px;
+      }
+      
+      .attachment-btn {
+        padding: 5px 8px;
+        font-size: 11px;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
   <div class="shell">
     <div class="masthead">
-      <div class="titles" style="display:flex; align-items:center; gap:10px;">
+      <div class="titles" style="display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;">
         <img class="logo" src="{{ logo_url }}" alt="Bhumi Varta Logo" />
         <div>
           <h1>TestRail Control Center</h1>
@@ -410,6 +3005,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h7.586a2 2 0 0 1 1.414.586l3.414 3.414A2 2 0 0 1 19 8.414V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z" fill="currentColor" fill-opacity=".15"/><path d="M13.586 3.586a2 2 0 0 0-1.414-.586H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8.414a2 2 0 0 0-.586-1.414l-3.414-3.414ZM18 19H6V5h6v4a1 1 0 0 0 1 1h5v9Z" fill="currentColor"/></svg>
           Reporter
         </a>
+        <a href="#" id="linkDashboard" class="nav-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z" fill="currentColor" fill-opacity=".15"/><path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8-2h8v8h-8v-8zm2 2v4h4v-4h-4z" fill="currentColor"/></svg>
+          Dashboard
+        </a>
         <a href="#" id="linkManage" class="nav-item">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2h-2V6H7v4h10v2H7v6H5V6Z" fill="currentColor" fill-opacity=".15"/><path d="M9 13h10v-2H9v2Zm8-7H7v4h10V6Zm-10 8h10v2H7v-2Zm0 4h5v2H7v-2Z" fill="currentColor"/></svg>
           Management
@@ -421,11 +3020,11 @@
       </nav>
 
       <div class="content">
-        <div id="reporterView" class="grid-panels" style="grid-template-columns: 1fr; max-width: 860px;">
+        <div id="reporterView" class="grid-panels" style="grid-template-columns: 1fr; width: 90vw; max-width: 900px; margin: 0 auto;">
           <div class="card">
             <div class="logo-wrap" style="margin-bottom:8px;align-items:center;justify-content:space-between;width:100%;">
               <h2 style="margin:0;">Plan/Run Reports</h2>
-              <button type="button" class="refresh-btn" id="refreshPlansBtn">Refresh</button>
+              <button type="button" class="refresh-btn" id="refreshReportPlansBtn">Refresh</button>
             </div>
           <form method="post" action="/generate" id="reportForm" target="_blank">
             <div class="grid">
@@ -480,110 +3079,345 @@
         </div>
       </div>
 
-      <div id="manageView" class="manage-stack hidden" style="margin-top:16px; width: 75vw; margin: 0 auto;">
-        <div class="card" style="margin-bottom:12px;">
-          <button class="panel-toggle" type="button" data-panel="planPanel" aria-expanded="false">
-            <span class="toggle-icon">▶</span>
+      <div id="dashboardView" class="hidden" style="width: 90vw; max-width: 1400px; margin: 0 auto;">
+        <!-- Dashboard Header -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <div>
-              <h2 style="margin:0;">Create Test Plan</h2>
-              <p class="subtitle" style="margin:0;">Click to expand/collapse</p>
+              <h2 style="margin: 0 0 4px;">Test Plans Dashboard</h2>
+              <p class="subtitle" style="margin: 0;">Monitor test execution progress across plans and runs</p>
             </div>
-          </button>
-          <div id="planPanel" class="hidden">
-            <form id="planCreateForm">
-              <div class="input-group" style="margin-top:6px;">
-                <span class="input-group-text">Project</span>
-                <input type="number" id="planProject" value="{{ default_project }}" required>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <div class="input-group" style="width: auto; min-width: 140px;">
+                <span class="input-group-text" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M12 2a1 1 0 0 1 1 1v1h7a1 1 0 0 1 0 2h-1v13h1a1 1 0 0 1 0 2H5a1 1 0 1 1 0-2h1V6H5a1 1 0 1 1 0-2h7V3a1 1 0 0 1 1-1Zm5 5H7v13h10V7Z"/></svg>
+                </span>
+                <input type="number" id="dashboardProject" value="{{ default_project }}" aria-label="Project ID" style="width: 100px;" />
               </div>
-              <input type="text" id="planName" placeholder="Plan name" required style="margin-top:8px;">
-              <textarea id="planDesc" placeholder="Description (optional)" style="margin-top:8px; width:100%; min-height:68px;"></textarea>
-              <div class="input-group" style="margin-top:8px;">
-                <span class="input-group-text">Milestone</span>
-                <input type="number" id="planMilestone" placeholder="Milestone ID (optional)">
-              </div>
-              <div class="actions" style="justify-content:flex-start; margin-top:12px;">
-                <button type="submit">Create Test Plan</button>
-              </div>
-            </form>
+              <button type="button" class="refresh-btn" id="dashboardRefreshBtn">
+                <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;" aria-hidden="true">
+                  <path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+                </svg>
+                Refresh
+              </button>
+            </div>
           </div>
         </div>
 
-        <div class="card" style="margin-bottom:12px;">
-          <button class="panel-toggle" type="button" data-panel="runPanel" aria-expanded="false">
-            <span class="toggle-icon">▶</span>
+        <!-- Filter Panel -->
+        <div class="card" style="margin-bottom: 16px;">
+          <h2 style="margin: 0 0 12px;">Filters</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
             <div>
-              <h2 style="margin:0;">Create Test Run</h2>
-              <p class="subtitle" style="margin:0;">Click to expand/collapse</p>
+              <label style="margin: 0 0 6px;">Search Plans</label>
+              <input type="search" id="dashboardSearch" class="run-search" placeholder="Search by plan name..." style="width: 100%; margin: 0;" />
             </div>
-          </button>
-          <div id="runPanel" class="hidden">
-            <form id="runCreateForm">
-              <div class="input-group" style="margin-top:6px;">
-                <span class="input-group-text">Project</span>
-                <input type="number" id="runProject" value="{{ default_project }}" required>
-              </div>
-              <div class="input-group" style="margin-top:8px;">
-                <span class="input-group-text">Plan</span>
-                <select id="runPlanSelect">
-                </select>
-              </div>
-              <input type="text" id="runName" placeholder="Run name" required style="margin-top:8px;">
-              <textarea id="runDesc" placeholder="Description (optional)" style="margin-top:8px; width:100%; min-height:68px;"></textarea>
-              <input type="text" id="runRefs" placeholder="Refs (comma separated, optional)" style="margin-top:8px;">
-              <div style="margin-top:8px;">
-              <label><input type="checkbox" id="runIncludeAll" checked> Include all cases</label>
+            <div>
+              <label style="margin: 0 0 6px;">Completion Status</label>
+              <select id="dashboardCompletionFilter" style="width: 100%; margin: 0;">
+                <option value="">All Plans</option>
+                <option value="0">Active Plans</option>
+                <option value="1">Completed Plans</option>
+              </select>
             </div>
-            <input type="text" id="runCaseIds" placeholder="Case IDs (comma separated, optional)" style="margin-top:8px;">
-            <div class="actions" style="justify-content:flex-start; gap:8px; margin-top:8px;">
-              <button type="button" class="refresh-btn" id="casePickerToggle">Select cases</button>
-              <span id="casePickerStatus" class="note" style="margin:0; text-align:left;">No cases selected.</span>
+            <div>
+              <label style="margin: 0 0 6px;">Created After</label>
+              <input type="date" id="dashboardDateFrom" style="width: 100%; margin: 0;" />
             </div>
-            <div class="actions" style="justify-content:flex-start; margin-top:12px;">
-              <button type="submit">Create Test Run</button>
-              <button type="button" class="refresh-btn" id="refreshManagePlansBtn" style="margin-left:8px;">Refresh plans</button>
-            </div>
-          </form>
-        </div>
-        </div>
-
-          <div class="card">
-            <button class="panel-toggle" type="button" data-panel="casePanel" aria-expanded="false">
-              <span class="toggle-icon">▶</span>
-              <div>
-                <h2 style="margin:0;">Create Test Case</h2>
-                <p class="subtitle" style="margin:0;">Click to expand/collapse</p>
-              </div>
-            </button>
-            <div id="casePanel" class="hidden">
-              <form id="caseCreateForm">
-                <div class="input-group" style="margin-top:6px;">
-                  <span class="input-group-text">Project</span>
-                  <input type="number" id="caseProject" value="{{ default_project }}" required>
-                </div>
-                <input type="text" id="caseTitle" placeholder="Case title" required style="margin-top:8px;">
-                <textarea id="caseBdd" placeholder="BDD Scenarios (optional)" style="margin-top:8px; width:100%; min-height:80px;"></textarea>
-                <input type="text" id="caseRefs" placeholder="Refs (comma separated, optional)" style="margin-top:8px;">
-                <div class="actions" style="justify-content:flex-start; margin-top:12px;">
-                  <button type="submit">Create Test Case</button>
-                </div>
-              </form>
+            <div>
+              <label style="margin: 0 0 6px;">Created Before</label>
+              <input type="date" id="dashboardDateTo" style="width: 100%; margin: 0;" />
             </div>
           </div>
+        </div>
+
+        <!-- Sort Controls -->
+        <div class="card" style="margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <h2 style="margin: 0;">Sort By</h2>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="dashboard-sort-header sort-active sort-desc" data-sort-column="created_on" style="padding: 6px 12px; font-size: 13px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .15s ease;">
+                <span>Date Created</span>
+                <svg class="sort-icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;" aria-hidden="true">
+                  <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+                </svg>
+              </button>
+              <button type="button" class="dashboard-sort-header" data-sort-column="name" style="padding: 6px 12px; font-size: 13px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .15s ease;">
+                <span>Name</span>
+                <svg class="sort-icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;" aria-hidden="true">
+                  <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+                </svg>
+              </button>
+              <button type="button" class="dashboard-sort-header" data-sort-column="pass_rate" style="padding: 6px 12px; font-size: 13px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .15s ease;">
+                <span>Pass Rate</span>
+                <svg class="sort-icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;" aria-hidden="true">
+                  <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+                </svg>
+              </button>
+              <button type="button" class="dashboard-sort-header" data-sort-column="total_tests" style="padding: 6px 12px; font-size: 13px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .15s ease;">
+                <span>Test Count</span>
+                <svg class="sort-icon" viewBox="0 0 24 24" style="width: 14px; height: 14px;" aria-hidden="true">
+                  <path fill="currentColor" d="M7 10l5 5 5-5z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plans List Container -->
+        <div id="dashboardPlansContainer">
+          <!-- Loading indicator -->
+          <div id="dashboardLoading" class="card" style="text-align: center; padding: 40px; display: none;">
+            <div class="spinner" style="margin: 0 auto 12px;"></div>
+            <p style="color: var(--muted); margin: 0;">Loading plans...</p>
+          </div>
+
+          <!-- Empty state -->
+          <div id="dashboardEmpty" class="card" style="text-align: center; padding: 40px; display: none;">
+            <svg viewBox="0 0 24 24" style="width: 48px; height: 48px; margin: 0 auto 12px; opacity: 0.3;" aria-hidden="true">
+              <path fill="currentColor" d="M9 2a2 2 0 0 0-2 2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2a2 2 0 0 0-2-2Zm0 2h6v2h4v12H5V6h4Z"/>
+            </svg>
+            <p style="color: var(--muted); margin: 0; font-size: 14px;">No plans found matching your filters.</p>
+            <p style="color: var(--muted); margin: 8px 0 0; font-size: 13px;">Try adjusting your search criteria or refresh the data.</p>
+          </div>
+
+          <!-- Plans list -->
+          <div id="dashboardPlansList" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Plan cards will be inserted here dynamically -->
+          </div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div id="dashboardPagination" class="card" style="margin-top: 16px; display: none;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div style="color: var(--muted); font-size: 13px;">
+              <span id="dashboardPaginationInfo">Showing 0-0 of 0 plans</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" id="dashboardPrevBtn" class="refresh-btn" disabled>
+                <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;" aria-hidden="true">
+                  <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                </svg>
+                Previous
+              </button>
+              <button type="button" id="dashboardNextBtn" class="refresh-btn" disabled>
+                Next
+                <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;" aria-hidden="true">
+                  <path fill="currentColor" d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="manageView" class="hidden" style="width: 90vw; max-width: 1400px; margin: 0 auto;">
+        
+        <!-- Create Section - Collapsible, Compact Header -->
+        <div class="create-section" role="region" aria-labelledby="createSectionHeading">
+          <button class="create-section-toggle" type="button" aria-expanded="false" aria-controls="createSectionContent" aria-label="Toggle create new entity section">
+            <span class="icon" aria-hidden="true">➕</span>
+            <h2 id="createSectionHeading">Create New</h2>
+            <span class="toggle-indicator" aria-hidden="true">▼</span>
+          </button>
+          
+          <div id="createSectionContent" class="create-section-content hidden">
+            <div class="create-forms-grid">
+              
+              <!-- Create Test Plan Form -->
+              <div class="create-form-card" role="form" aria-labelledby="planFormHeading">
+                <h3 id="planFormHeading"><span aria-hidden="true">📋</span> Create Test Plan</h3>
+                <form id="planCreateForm" aria-describedby="planFormDesc">
+                  <span id="planFormDesc" class="sr-only">Form to create a new test plan</span>
+                  <div class="input-group" style="margin-top:6px;">
+                    <span class="input-group-text" id="planProjectLabel">Project</span>
+                    <input type="number" id="planProject" value="{{ default_project }}" required aria-labelledby="planProjectLabel" aria-describedby="planProjectDesc">
+                    <span id="planProjectDesc" class="sr-only">Enter the project ID for the test plan</span>
+                  </div>
+                  <input type="text" id="planName" placeholder="Plan name" required style="margin-top:8px;" aria-label="Plan name" aria-required="true">
+                  <textarea id="planDesc" placeholder="Description (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="Plan description (optional)"></textarea>
+                  <div class="input-group" style="margin-top:8px;">
+                    <span class="input-group-text" id="planMilestoneLabel">Milestone</span>
+                    <input type="number" id="planMilestone" placeholder="Milestone ID (optional)" aria-labelledby="planMilestoneLabel" aria-describedby="planMilestoneDesc">
+                    <span id="planMilestoneDesc" class="sr-only">Optional milestone ID to associate with the plan</span>
+                  </div>
+                  <div class="actions" style="justify-content:flex-start; margin-top:12px;">
+                    <button type="submit" aria-label="Create test plan">Create Test Plan</button>
+                  </div>
+                </form>
+              </div>
+              
+              <!-- Create Test Run Form -->
+              <div class="create-form-card" role="form" aria-labelledby="runFormHeading">
+                <h3 id="runFormHeading"><span aria-hidden="true">🏃</span> Create Test Run</h3>
+                <form id="runCreateForm" aria-describedby="runFormDesc">
+                  <span id="runFormDesc" class="sr-only">Form to create a new test run</span>
+                  <div class="input-group" style="margin-top:6px;">
+                    <span class="input-group-text" id="runProjectLabel">Project</span>
+                    <input type="number" id="runProject" value="{{ default_project }}" required aria-labelledby="runProjectLabel">
+                  </div>
+                  <div class="input-group" style="margin-top:8px;">
+                    <span class="input-group-text" id="runPlanLabel">Plan</span>
+                    <select id="runPlanSelect" aria-labelledby="runPlanLabel" aria-describedby="runPlanDesc">
+                    </select>
+                    <span id="runPlanDesc" class="sr-only">Select the test plan to add this run to</span>
+                  </div>
+                  <input type="text" id="runName" placeholder="Run name" required style="margin-top:8px;" aria-label="Run name" aria-required="true">
+                  <textarea id="runDesc" placeholder="Description (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="Run description (optional)"></textarea>
+                  <input type="text" id="runRefs" placeholder="Refs (comma separated, optional)" style="margin-top:8px;" aria-label="References (comma separated, optional)">
+                  <div style="margin-top:8px;">
+                    <label><input type="checkbox" id="runIncludeAll" checked aria-describedby="runIncludeAllDesc"> Include all cases</label>
+                    <span id="runIncludeAllDesc" class="sr-only">When checked, all test cases will be included in this run</span>
+                  </div>
+                  <input type="text" id="runCaseIds" placeholder="Case IDs (comma separated, optional)" style="margin-top:8px;" aria-label="Case IDs (comma separated, optional)">
+                  <div class="actions" style="justify-content:flex-start; gap:8px; margin-top:8px;">
+                    <button type="button" class="refresh-btn" id="casePickerToggle" aria-label="Open case picker to select test cases">Select cases</button>
+                    <span id="casePickerStatus" class="note" style="margin:0; text-align:left;" aria-live="polite">No cases selected.</span>
+                  </div>
+                  <div class="actions" style="justify-content:flex-start; margin-top:12px;">
+                    <button type="submit" aria-label="Create test run">Create Test Run</button>
+                    <button type="button" class="refresh-btn" id="refreshManagePlansBtn" style="margin-left:8px;" aria-label="Refresh available plans list">Refresh plans</button>
+                  </div>
+                </form>
+              </div>
+              
+              <!-- Create Test Case Form -->
+              <div class="create-form-card" role="form" aria-labelledby="caseFormHeading">
+                <h3 id="caseFormHeading"><span aria-hidden="true">📝</span> Create Test Case</h3>
+                <form id="caseCreateForm" aria-describedby="caseFormDesc">
+                  <span id="caseFormDesc" class="sr-only">Form to create a new test case</span>
+                  <div class="input-group" style="margin-top:6px;">
+                    <span class="input-group-text" id="caseProjectLabel">Project</span>
+                    <input type="number" id="caseProject" value="{{ default_project }}" required aria-labelledby="caseProjectLabel">
+                  </div>
+                  <input type="text" id="caseTitle" placeholder="Case title" required style="margin-top:8px;" aria-label="Case title" aria-required="true">
+                  <input type="text" id="caseRefs" placeholder="Refs (comma separated, optional)" style="margin-top:8px;" aria-label="References (comma separated, optional)">
+                  <textarea id="caseBdd" placeholder="BDD scenarios (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="BDD scenarios (optional)"></textarea>
+                  <div class="actions" style="justify-content:flex-start; margin-top:12px;">
+                    <button type="submit" aria-label="Create test case">Create Test Case</button>
+                  </div>
+                </form>
+              </div>
+              
+            </div>
+          </div>
+        </div>
+        
+        <!-- Manage Section - Always Visible, Auto-loads -->
+        <div class="manage-section" role="region" aria-labelledby="manageSectionTitle">
+          <h2 class="manage-section-title" id="manageSectionTitle">Manage Entities</h2>
+          
+          <!-- Live region for status announcements -->
+          <div id="manageStatusAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+          
+          <!-- Plans Subsection -->
+          <div class="manage-subsection" id="managePlansSubsection" role="region" aria-labelledby="plansSubsectionTitle">
+            <div class="subsection-header">
+              <div class="subsection-title">
+                <span class="icon" aria-hidden="true">📋</span>
+                <h3 id="plansSubsectionTitle">Plans</h3>
+                <span class="count-badge" id="plansCount" aria-label="Number of plans">0</span>
+              </div>
+              <div class="subsection-controls">
+                <input type="search" id="plansSearch" placeholder="Search plans..." aria-label="Search plans by name" aria-describedby="plansSearchDesc" />
+                <span id="plansSearchDesc" class="sr-only">Type to filter plans by name</span>
+                <button class="refresh-btn" id="refreshPlansBtn" aria-label="Refresh plans list">
+                  <span class="icon" aria-hidden="true">🔄</span> Refresh
+                </button>
+              </div>
+            </div>
+            
+            <div class="subsection-content" aria-live="polite" aria-busy="false">
+              <div id="plansLoadingState" class="loading-state" role="status" aria-label="Loading plans">
+                <div class="spinner" aria-hidden="true"></div>
+                <span class="loading-text">Loading plans...</span>
+              </div>
+              
+              <div id="plansEmptyState" class="empty-state hidden" role="status" aria-label="No plans available">
+                <div class="empty-state-icon" aria-hidden="true">📋</div>
+                <h4 class="empty-state-title">No plans yet</h4>
+                <p class="empty-state-message">Create your first plan above ↑</p>
+                <button class="btn-primary" onclick="expandCreateSection()" aria-label="Expand create section to create a new plan">
+                  <span class="icon" aria-hidden="true">➕</span> Create Plan
+                </button>
+              </div>
+              
+              <div id="plansListContainer" class="entity-list hidden" role="list" aria-label="List of test plans">
+                <!-- Plan cards will be rendered here -->
+              </div>
+            </div>
+          </div>
+          
+          <!-- Runs and Cases subsections removed for hierarchical navigation -->
+          
+        </div>
       </div>
       <div id="howToView" class="hidden" style="max-width: 900px; margin: 0 auto; padding: 12px 0;">
         <div class="card" style="margin-bottom:12px;">
           <h2 style="margin:0 0 8px;">How to Use</h2>
           <p class="subtitle" style="margin:0 0 12px;">Quick steps to generate reports and manage TestRail content.</p>
+          
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">📊 Reporter</h3>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
+            <li>Pilih <b>Project</b> dan <b>Plan</b> dari dropdown (klik <b>Refresh</b> jika daftar kosong)</li>
+            <li>Gunakan kolom <b>search</b> untuk mencari run berdasarkan nama</li>
+            <li>Centang run yang ingin dilaporkan (bisa lebih dari satu)</li>
+            <li>Klik <b>Preview Report</b> - report HTML akan terbuka di tab baru dan bisa langsung diunduh</li>
+            <li><b>Tips</b>: Lampiran akan dikompresi dan di-inline di report; video bisa ditranscode bila fitur aktif</li>
+          </ul>
+
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">⚙️ Management - Hierarchical Navigation</h3>
+          <p style="margin:0 0 8px; color: var(--muted); font-size:14px;">Management menggunakan navigasi hierarki: <b>Plans → Runs → Test Cases</b></p>
+          
+          <h4 style="margin:12px 0 6px; font-size:14px; font-weight:600;">📋 Plans</h4>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
+            <li>Lihat daftar test plans (diurutkan berdasarkan <b>update terbaru</b>)</li>
+            <li>Setiap plan menampilkan: ID, status (Active/Completed), dan <b>waktu terakhir diupdate</b></li>
+            <li>Gunakan <b>search bar</b> untuk filter plans berdasarkan nama</li>
+            <li>Klik tombol <b>Refresh</b> untuk mendapatkan data terbaru</li>
+            <li>Klik tombol <b>Edit</b> pada plan untuk melihat runs di dalam plan tersebut</li>
+          </ul>
+
+          <h4 style="margin:12px 0 6px; font-size:14px; font-weight:600;">🏃 Runs (dalam Plan)</h4>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
+            <li>Setelah klik <b>Edit</b> pada plan, modal akan muncul menampilkan daftar runs</li>
+            <li>Breadcrumb menunjukkan posisi: <b>Plans > [Nama Plan]</b></li>
+            <li>Klik tombol <b>Edit</b> pada run untuk melihat detail run dan test cases</li>
+            <li>Klik tombol <b>Delete</b> untuk menghapus run (dengan konfirmasi)</li>
+            <li>Klik <b>Back</b> atau breadcrumb <b>Plans</b> untuk kembali ke daftar plans</li>
+          </ul>
+
+          <h4 style="margin:12px 0 6px; font-size:14px; font-weight:600;">✅ Test Cases (dalam Run)</h4>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
+            <li>Setelah klik <b>Edit</b> pada run, modal akan muncul menampilkan detail run dan test cases</li>
+            <li>Breadcrumb menunjukkan posisi: <b>Plans > [Nama Plan] > [Nama Run]</b></li>
+            <li>Edit <b>Run Details</b>: nama, deskripsi, dan references</li>
+            <li>Klik <b>Save Changes</b> untuk menyimpan perubahan run</li>
+            <li>Klik tombol <b>Edit</b> pada test case untuk mengedit case (title, refs, BDD scenarios, attachments)</li>
+            <li>Klik tombol <b>Delete</b> pada test case untuk menghapus (dengan konfirmasi)</li>
+            <li>Klik <b>Back</b> atau breadcrumb untuk navigasi ke level sebelumnya</li>
+          </ul>
+
+          <h4 style="margin:12px 0 6px; font-size:14px; font-weight:600;">📝 Edit Test Case</h4>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
+            <li>Modal edit case akan muncul <b>di atas</b> modal run details</li>
+            <li>Edit <b>Title</b> (required), <b>References</b>, dan <b>BDD Scenarios</b></li>
+            <li>Upload <b>Attachments</b>: drag & drop atau klik untuk browse (PNG, JPG, GIF, MP4, WebM, PDF, max 25MB)</li>
+            <li>Klik <b>Save Changes</b> untuk menyimpan</li>
+            <li>Klik <b>Cancel</b> untuk kembali ke run details tanpa menyimpan</li>
+          </ul>
+
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">🎯 Create New Content</h3>
           <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0; font-size:14px;">
-            <li><b>Reporter</b>: pilih Project & Plan (klik Refresh bila daftar kosong), cari nama run di kolom search, centang run yang mau dilaporkan, lalu klik <b>Preview Report</b>. Report HTML terbuka di tab baru dan bisa langsung diunduh.</li>
-            <li><b>Management → Plan</b>: isi nama plan dan (opsional) milestone, lalu submit. Form otomatis bersih setelah sukses.</li>
-            <li><b>Management → Run</b>: pilih plan yang aktif, isi nama/desc/refs. Untuk scope: centang “Include all cases” atau klik <b>Select cases</b> untuk buka modal, cari/seleksi case (bisa “Select visible” atau “Clear”), lalu submit.</li>
-            <li><b>Management → Case</b>: buat case baru dengan title + refs opsional. Jika ada BDD, tempelkan skenario di kolom BDD (satu baris per langkah).</li>
-            <li><b>Tips</b>: tombol Refresh tersedia di plan/run/case picker. Lampiran akan dikompresi dan di-inline di report; video bisa ditranscode bila fitur video aktif.</li>
+            <li><b>Create Plan</b>: Isi nama plan dan (opsional) milestone, lalu submit. Form otomatis bersih setelah sukses</li>
+            <li><b>Create Run</b>: Pilih plan yang aktif, isi nama/desc/refs. Untuk scope: centang "Include all cases" atau klik <b>Select cases</b> untuk memilih case tertentu</li>
+            <li><b>Create Case</b>: Buat case baru dengan title + refs opsional. Jika ada BDD, tempelkan skenario di kolom BDD (satu baris per langkah)</li>
           </ul>
         </div>
       </div>
     </div>
+  </div>
+  </div>
   </div>
   <div aria-live="polite" aria-atomic="true" class="toast-layer">
     <div id="toastContainer" class="toast-container"></div>
@@ -626,13 +3460,1347 @@
       </div>
     </div>
   </div>
+
+  <!-- Edit Plan Modal -->
+  <div id="editPlanModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editPlanTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="editPlanTitle" style="margin:0; font-size:16px;">Edit Test Plan</h3>
+        <button type="button" id="editPlanClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="editPlanForm">
+          <input type="hidden" id="editPlanId" />
+          <label style="margin: 8px 0 6px;">Plan Name</label>
+          <input type="text" id="editPlanName" placeholder="Plan name" required style="width: 100%;" />
+          <label style="margin: 8px 0 6px;">Description (optional)</label>
+          <textarea id="editPlanDesc" placeholder="Description" style="width: 100%; min-height: 80px;"></textarea>
+          <label style="margin: 8px 0 6px;">Milestone ID (optional)</label>
+          <input type="number" id="editPlanMilestone" placeholder="Milestone ID" style="width: 100%;" />
+        </form>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="refresh-btn" id="editPlanCancel">Cancel</button>
+        <button type="button" id="editPlanSave">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Run Modal -->
+  <div id="editRunModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editRunTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="editRunTitle" style="margin:0; font-size:16px;">Edit Test Run</h3>
+        <button type="button" id="editRunClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="editRunForm">
+          <input type="hidden" id="editRunId" />
+          <label style="margin: 8px 0 6px;">Run Name</label>
+          <input type="text" id="editRunName" placeholder="Run name" required style="width: 100%;" />
+          <label style="margin: 8px 0 6px;">Description (optional)</label>
+          <textarea id="editRunDesc" placeholder="Description" style="width: 100%; min-height: 80px;"></textarea>
+          <label style="margin: 8px 0 6px;">Refs (optional)</label>
+          <input type="text" id="editRunRefs" placeholder="Comma separated refs" style="width: 100%;" />
+        </form>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="refresh-btn" id="editRunCancel">Cancel</button>
+        <button type="button" id="editRunSave">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Case Modal -->
+  <div id="editCaseModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editCaseTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="editCaseTitle" style="margin:0; font-size:16px;">Edit Test Case</h3>
+        <button type="button" id="editCaseClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="editCaseForm">
+          <input type="hidden" id="editCaseId" />
+          <label style="margin: 8px 0 6px;">Case Title</label>
+          <input type="text" id="editCaseTitle" placeholder="Case title" required style="width: 100%;" />
+          <label style="margin: 8px 0 6px;">BDD Scenarios (optional)</label>
+          <textarea id="editCaseBdd" placeholder="BDD scenarios" style="width: 100%; min-height: 100px;"></textarea>
+          <label style="margin: 8px 0 6px;">Refs (optional)</label>
+          <input type="text" id="editCaseRefs" placeholder="Comma separated refs" style="width: 100%;" />
+        </form>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="refresh-btn" id="editCaseCancel">Cancel</button>
+        <button type="button" id="editCaseSave">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteConfirmModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="deleteConfirmTitle">
+    <div class="modal-card" style="max-width: 540px;">
+      <div class="modal-head" style="background: rgba(239, 68, 68, 0.08); border-bottom: 2px solid #ef4444;">
+        <h3 id="deleteConfirmTitle" style="margin:0; font-size:17px; color: #ef4444; font-weight: 700;">
+          <svg viewBox="0 0 24 24" style="width: 22px; height: 22px; display: inline-block; vertical-align: middle; margin-right: 8px;" aria-hidden="true">
+            <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          </svg>
+          Confirm Deletion
+        </h3>
+        <button type="button" id="deleteConfirmClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin: 0 0 16px; color: var(--text); font-size: 15px; font-weight: 500;">Are you sure you want to delete this item?</p>
+        
+        <!-- Entity Information Card -->
+        <div style="background: rgba(239, 68, 68, 0.12); border: 2px solid rgba(239, 68, 68, 0.4); border-radius: 10px; padding: 16px; margin-bottom: 16px;">
+          <p style="margin: 0 0 6px; font-weight: 700; color: var(--text); font-size: 16px; word-break: break-word;" id="deleteConfirmEntityName"></p>
+          <p style="margin: 0; color: var(--muted); font-size: 13px; font-weight: 500;" id="deleteConfirmEntityType"></p>
+        </div>
+        
+        <!-- Cascade Warning (hidden by default, shown for plans) -->
+        <div id="deleteConfirmCascadeWarning" class="hidden" style="background: rgba(245, 158, 11, 0.12); border: 2px solid rgba(245, 158, 11, 0.5); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+          <p style="margin: 0; color: #d97706; font-size: 13px; font-weight: 600; display: flex; align-items: flex-start; gap: 8px;">
+            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;" aria-hidden="true">
+              <path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
+            <span id="deleteConfirmCascadeMessage">Deleting this plan will also delete all associated test runs.</span>
+          </p>
+        </div>
+        
+        <!-- Type to Confirm Section (optional, hidden by default) -->
+        <div id="deleteConfirmTypeSection" class="hidden" style="margin-bottom: 16px;">
+          <label for="deleteConfirmTypeInput" style="display: block; margin: 0 0 8px; color: var(--text); font-size: 13px; font-weight: 600;">
+            Type "<span id="deleteConfirmTypeName" style="color: #ef4444; font-weight: 700;"></span>" to confirm:
+          </label>
+          <input 
+            type="text" 
+            id="deleteConfirmTypeInput" 
+            placeholder="Type name to confirm" 
+            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
+            autocomplete="off"
+          />
+          <p id="deleteConfirmTypeError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
+            Name doesn't match. Please type the exact name.
+          </p>
+        </div>
+        
+        <!-- Warning Message -->
+        <p style="margin: 0; color: #ef4444; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; flex-shrink: 0;" aria-hidden="true">
+            <path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+          </svg>
+          This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-actions" style="background: rgba(0,0,0,0.02); padding: 16px 20px;">
+        <button type="button" class="refresh-btn" id="deleteConfirmCancel" style="font-weight: 600;">Cancel</button>
+        <button type="button" class="btn-modal-delete" id="deleteConfirmDelete">
+          <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" aria-hidden="true">
+            <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+          </svg>
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run Edit Modal -->
+  <div id="runEditModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="runEditModalTitle">
+    <div class="modal-card" style="max-width: 600px;">
+      <!-- Loading Overlay -->
+      <div id="runEditLoadingOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 14px;">
+        <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="margin-top: 12px; font-size: 14px; color: var(--muted); font-weight: 500;">Saving changes...</span>
+      </div>
+      
+      <div class="modal-head" style="background: rgba(26, 138, 133, 0.08); border-bottom: 2px solid var(--primary);">
+        <h3 id="runEditModalTitle" style="margin:0; font-size:17px; color: var(--primary); font-weight: 700;">
+          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 8px;" aria-hidden="true">
+            <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+          </svg>
+          Edit Test Run
+        </h3>
+        <button type="button" id="runEditModalClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      
+      <form id="runEditForm" class="modal-body" style="padding: 20px;">
+        <!-- Hidden field for run ID -->
+        <input type="hidden" id="runEditId" value="" />
+        
+        <!-- Run Name Field (Required) -->
+        <div style="margin-bottom: 16px;">
+          <label for="runEditName" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+            Name <span style="color: #ef4444;">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="runEditName" 
+            name="name"
+            placeholder="Enter run name" 
+            required
+            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
+            aria-describedby="runEditNameError"
+          />
+          <p id="runEditNameError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
+            Name is required and cannot be empty or whitespace only.
+          </p>
+        </div>
+        
+        <!-- Description Field -->
+        <div style="margin-bottom: 16px;">
+          <label for="runEditDescription" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+            Description
+          </label>
+          <textarea 
+            id="runEditDescription" 
+            name="description"
+            placeholder="Enter run description (optional)" 
+            rows="3"
+            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; resize: vertical; min-height: 80px; transition: border-color .15s ease, box-shadow .15s ease;"
+          ></textarea>
+        </div>
+        
+        <!-- References Field -->
+        <div style="margin-bottom: 16px;">
+          <label for="runEditRefs" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+            References
+          </label>
+          <input 
+            type="text" 
+            id="runEditRefs" 
+            name="refs"
+            placeholder="e.g., JIRA-123, TICKET-456" 
+            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
+          />
+          <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
+            Comma-separated list of references (e.g., ticket IDs)
+          </p>
+        </div>
+      </form>
+      
+      <div class="modal-actions" style="background: rgba(0,0,0,0.02); padding: 16px 20px;">
+        <button type="button" class="refresh-btn" id="runEditCancel" style="font-weight: 600;">Cancel</button>
+        <button type="submit" form="runEditForm" id="runEditSave" style="background: var(--primary); border: 1px solid var(--primary); color: #fff; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: background .15s ease;">
+          <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" aria-hidden="true">
+            <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+          </svg>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Case Edit Modal -->
+  <div id="caseEditModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="caseEditModalTitle">
+    <div class="modal-card" style="max-width: 700px;">
+      <!-- Loading Overlay -->
+      <div id="caseEditLoadingOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 14px;">
+        <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="margin-top: 12px; font-size: 14px; color: var(--muted); font-weight: 500;">Saving changes...</span>
+      </div>
+      
+      <div class="modal-head" style="background: rgba(26, 138, 133, 0.08); border-bottom: 2px solid var(--primary);">
+        <h3 id="caseEditModalTitle" style="margin:0; font-size:17px; color: var(--primary); font-weight: 700;">
+          <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 8px;" aria-hidden="true">
+            <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+          </svg>
+          Edit Test Case
+        </h3>
+        <button type="button" id="caseEditModalClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      
+      <!-- Breadcrumb Navigation -->
+      <nav aria-label="Breadcrumb" style="padding: 12px 20px; background: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border);">
+        <ol style="list-style: none; padding: 0; margin: 0; display: flex; align-items: center; gap: 6px;">
+          <li>
+            <a href="#" id="caseEditBreadcrumbPlans" style="color: var(--primary); text-decoration: none; font-weight: 500;">Plans</a>
+          </li>
+          <li aria-hidden="true" style="color: var(--muted);">›</li>
+          <li>
+            <a href="#" id="caseEditBreadcrumbPlanName" style="color: var(--primary); text-decoration: none; font-weight: 500;">Test Plan</a>
+          </li>
+          <li aria-hidden="true" style="color: var(--muted);">›</li>
+          <li>
+            <a href="#" id="caseEditBreadcrumbRunName" style="color: var(--primary); text-decoration: none; font-weight: 500;">Test Run</a>
+          </li>
+          <li aria-hidden="true" style="color: var(--muted);">›</li>
+          <li aria-current="page" style="color: var(--text); font-weight: 500;">
+            <span id="caseEditBreadcrumbCaseTitle">Test Case</span>
+          </li>
+        </ol>
+      </nav>
+      
+      <form id="caseEditForm" class="modal-body" style="padding: 20px; max-height: 70vh; overflow-y: auto;">
+        <!-- Hidden field for case ID -->
+        <input type="hidden" id="caseEditId" value="" />
+        
+        <!-- Case Title Field (Required) -->
+        <div style="margin-bottom: 16px;">
+          <label for="caseEditTitle" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+            Title <span style="color: #ef4444;">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="caseEditTitle" 
+            name="title"
+            placeholder="Enter case title" 
+            required
+            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
+            aria-describedby="caseEditTitleError"
+          />
+          <p id="caseEditTitleError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
+            Title is required and cannot be empty or whitespace only.
+          </p>
+        </div>
+        
+        <!-- References Field -->
+        <div style="margin-bottom: 16px;">
+          <label for="caseEditRefs" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+            References
+          </label>
+          <input 
+            type="text" 
+            id="caseEditRefs" 
+            name="refs"
+            placeholder="e.g., JIRA-123, TICKET-456" 
+            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
+          />
+          <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
+            Comma-separated list of references (e.g., ticket IDs)
+          </p>
+        </div>
+        
+        <!-- BDD Scenarios Field (Textarea) -->
+        <div style="margin-bottom: 16px;">
+          <label for="caseEditBddScenarios" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+            BDD Scenarios
+          </label>
+          <textarea 
+            id="caseEditBddScenarios" 
+            name="bdd_scenarios"
+            placeholder="Enter BDD scenarios (Gherkin format)" 
+            rows="5"
+            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; resize: vertical; min-height: 100px; font-family: 'Consolas', 'Monaco', monospace; transition: border-color .15s ease, box-shadow .15s ease;"
+          ></textarea>
+          <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
+            Optional BDD scenarios in Gherkin format (Given/When/Then)
+          </p>
+        </div>
+        
+        <!-- File Upload Section -->
+        <div style="margin-bottom: 16px;">
+          <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+            Attachments
+          </label>
+          
+          <!-- Drag and Drop Zone -->
+          <div 
+            id="caseEditDropZone" 
+            style="border: 2px dashed var(--border); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: border-color .15s ease, background .15s ease;"
+            role="button"
+            tabindex="0"
+            aria-label="Click or drag files to upload"
+          >
+            <div style="font-size: 32px; margin-bottom: 8px; opacity: 0.5;" aria-hidden="true">📎</div>
+            <p style="margin: 0 0 8px; font-size: 14px; color: var(--text); font-weight: 500;">
+              Drag & drop files here or click to browse
+            </p>
+            <p style="margin: 0; font-size: 12px; color: var(--muted);">
+              Supported: PNG, JPG, GIF, MP4, WebM, PDF (max 25MB)
+            </p>
+            <input 
+              type="file" 
+              id="caseEditFileInput" 
+              accept=".png,.jpg,.jpeg,.gif,.mp4,.webm,.pdf,image/png,image/jpeg,image/gif,video/mp4,video/webm,application/pdf"
+              style="display: none;"
+              aria-describedby="caseEditFileError"
+            />
+          </div>
+          
+          <!-- File Validation Error -->
+          <p id="caseEditFileError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
+            Invalid file. Please select a valid file type (PNG, JPG, GIF, MP4, WebM, PDF) under 25MB.
+          </p>
+          
+          <!-- Upload Progress -->
+          <div id="caseEditUploadProgress" class="hidden" style="margin-top: 12px; padding: 12px; background: rgba(26, 138, 133, 0.06); border-radius: 8px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div class="spinner" style="width: 20px; height: 20px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;"></div>
+              <span id="caseEditUploadFileName" style="font-size: 13px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Uploading...</span>
+            </div>
+          </div>
+          
+          <!-- Attachments List -->
+          <div id="caseEditAttachmentsList" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Attachments will be rendered here -->
+          </div>
+        </div>
+      </form>
+      
+      <div class="modal-actions" style="background: rgba(0,0,0,0.02); padding: 16px 20px;">
+        <button type="button" class="refresh-btn" id="caseEditCancel" style="font-weight: 600;">Cancel</button>
+        <button type="submit" form="caseEditForm" id="caseEditSave" style="background: var(--primary); border: 1px solid var(--primary); color: #fff; padding: 10px 20px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: background .15s ease;">
+          <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" aria-hidden="true">
+            <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+          </svg>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  <!-- Dashboard Templates -->
+  <template id="dashboardPlanCardTemplate">
+    <div class="dashboard-plan-card" data-plan-id="">
+      <div class="dashboard-plan-header">
+        <div style="flex: 1;">
+          <h3 class="dashboard-plan-title"></h3>
+          <div class="dashboard-plan-meta">
+            <span class="plan-created"></span>
+            <span class="plan-updated"></span>
+          </div>
+        </div>
+        <div class="dashboard-plan-actions">
+          <span class="dashboard-badge badge-status"></span>
+          <button type="button" class="dashboard-report-btn plan-report-btn" title="Generate Report">
+            <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;" aria-hidden="true">
+              <path fill="currentColor" d="M4 5a2 2 0 0 1 2-2h7.586a2 2 0 0 1 1.414.586l3.414 3.414A2 2 0 0 1 19 8.414V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z"/>
+            </svg>
+            Report
+          </button>
+        </div>
+      </div>
+      
+      <div class="dashboard-stats-grid">
+        <div class="dashboard-stat-item">
+          <span class="dashboard-stat-label">Total Tests</span>
+          <span class="dashboard-stat-value plan-total-tests">0</span>
+        </div>
+        <div class="dashboard-stat-item">
+          <span class="dashboard-stat-label">Pass Rate</span>
+          <span class="dashboard-stat-value plan-pass-rate">0%</span>
+        </div>
+        <div class="dashboard-stat-item">
+          <span class="dashboard-stat-label">Completion</span>
+          <span class="dashboard-stat-value plan-completion-rate">0%</span>
+        </div>
+        <div class="dashboard-stat-item">
+          <span class="dashboard-stat-label">Total Runs</span>
+          <span class="dashboard-stat-value plan-total-runs">0</span>
+        </div>
+      </div>
+      
+      <div class="dashboard-status-bar">
+        <div class="dashboard-status-segment status-passed" style="width: 0%;" data-status="passed"></div>
+        <div class="dashboard-status-segment status-failed" style="width: 0%;" data-status="failed"></div>
+        <div class="dashboard-status-segment status-blocked" style="width: 0%;" data-status="blocked"></div>
+        <div class="dashboard-status-segment status-retest" style="width: 0%;" data-status="retest"></div>
+        <div class="dashboard-status-segment status-untested" style="width: 0%;" data-status="untested"></div>
+      </div>
+      
+      <div class="dashboard-status-legend">
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #10b981;"></span>
+          <span>Passed: <strong class="status-count-passed">0</strong></span>
+        </div>
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #ef4444;"></span>
+          <span>Failed: <strong class="status-count-failed">0</strong></span>
+        </div>
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #f59e0b;"></span>
+          <span>Blocked: <strong class="status-count-blocked">0</strong></span>
+        </div>
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #8b5cf6;"></span>
+          <span>Retest: <strong class="status-count-retest">0</strong></span>
+        </div>
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #94a3b8;"></span>
+          <span>Untested: <strong class="status-count-untested">0</strong></span>
+        </div>
+      </div>
+      
+      <div class="dashboard-runs-section" style="display: none;">
+        <button type="button" class="dashboard-runs-toggle">
+          <svg class="dashboard-runs-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
+          </svg>
+          <span class="runs-count-text">View Runs (0)</span>
+        </button>
+        <div class="dashboard-runs-list" style="display: none;">
+          <!-- Run cards will be inserted here -->
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="dashboardRunCardTemplate">
+    <div class="dashboard-run-card" data-run-id="">
+      <div class="dashboard-run-header">
+        <div style="flex: 1;">
+          <h4 class="dashboard-run-title"></h4>
+          <p class="dashboard-run-suite"></p>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: flex-start;">
+          <span class="dashboard-badge badge-status"></span>
+          <button type="button" class="dashboard-report-btn run-report-btn" title="Generate Report">
+            <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;" aria-hidden="true">
+              <path fill="currentColor" d="M4 5a2 2 0 0 1 2-2h7.586a2 2 0 0 1 1.414.586l3.414 3.414A2 2 0 0 1 19 8.414V19a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5Z"/>
+            </svg>
+            Report
+          </button>
+        </div>
+      </div>
+      
+      <div class="dashboard-run-stats">
+        <div class="dashboard-run-stat">
+          <span class="dashboard-run-stat-label">Total Tests</span>
+          <span class="dashboard-run-stat-value run-total-tests">0</span>
+        </div>
+        <div class="dashboard-run-stat">
+          <span class="dashboard-run-stat-label">Pass Rate</span>
+          <span class="dashboard-run-stat-value run-pass-rate">0%</span>
+        </div>
+        <div class="dashboard-run-stat">
+          <span class="dashboard-run-stat-label">Completion</span>
+          <span class="dashboard-run-stat-value run-completion-rate">0%</span>
+        </div>
+      </div>
+      
+      <div class="dashboard-status-bar" style="margin-top: 8px;">
+        <div class="dashboard-status-segment status-passed" style="width: 0%;" data-status="passed"></div>
+        <div class="dashboard-status-segment status-failed" style="width: 0%;" data-status="failed"></div>
+        <div class="dashboard-status-segment status-blocked" style="width: 0%;" data-status="blocked"></div>
+        <div class="dashboard-status-segment status-retest" style="width: 0%;" data-status="retest"></div>
+        <div class="dashboard-status-segment status-untested" style="width: 0%;" data-status="untested"></div>
+      </div>
+      
+      <div class="dashboard-status-legend" style="margin-top: 6px;">
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #10b981;"></span>
+          <span><strong class="status-count-passed">0</strong></span>
+        </div>
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #ef4444;"></span>
+          <span><strong class="status-count-failed">0</strong></span>
+        </div>
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #f59e0b;"></span>
+          <span><strong class="status-count-blocked">0</strong></span>
+        </div>
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #8b5cf6;"></span>
+          <span><strong class="status-count-retest">0</strong></span>
+        </div>
+        <div class="dashboard-status-legend-item">
+          <span class="dashboard-status-dot" style="background: #94a3b8;"></span>
+          <span><strong class="status-count-untested">0</strong></span>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Plan Runs Modal -->
+  <div id="planRunsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="planRunsModalTitle">
+    <div class="modal-card" style="max-width: 800px;">
+      <!-- Loading Overlay -->
+      <div id="planRunsLoadingOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 14px;">
+        <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="margin-top: 12px; font-size: 14px; color: var(--muted); font-weight: 500;">Loading runs...</span>
+      </div>
+      
+      <div class="modal-head" style="background: rgba(26, 138, 133, 0.08); border-bottom: 2px solid var(--primary);">
+        <div style="flex: 1;">
+          <h3 id="planRunsModalTitle" style="margin:0 0 6px; font-size:17px; color: var(--primary); font-weight: 700;">
+            <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 8px;" aria-hidden="true">
+              <path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+            </svg>
+            <span id="planRunsModalPlanName">Test Plan</span>
+          </h3>
+          <!-- Breadcrumb -->
+          <nav aria-label="Breadcrumb" style="font-size: 13px; color: var(--muted);">
+            <ol style="list-style: none; padding: 0; margin: 0; display: flex; align-items: center; gap: 6px;">
+              <li>
+                <a href="#" id="planRunsBreadcrumbPlans" style="color: var(--primary); text-decoration: none; font-weight: 500;">Plans</a>
+              </li>
+              <li aria-hidden="true" style="color: var(--muted);">›</li>
+              <li aria-current="page" style="color: var(--text); font-weight: 500;">
+                <span id="planRunsBreadcrumbPlanName">Test Plan</span>
+              </li>
+            </ol>
+          </nav>
+        </div>
+        <button type="button" id="planRunsModalClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      
+      <div class="modal-body" style="padding: 20px;">
+        <!-- Runs List Container -->
+        <div id="planRunsListContainer">
+          <!-- Loading State -->
+          <div id="planRunsLoadingState" class="loading-state hidden">
+            <div class="spinner"></div>
+            <span class="loading-text">Loading runs...</span>
+          </div>
+          
+          <!-- Error State -->
+          <div id="planRunsErrorState" class="hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.5;">⚠️</div>
+            <h4 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: var(--text);">Failed to Load Runs</h4>
+            <p id="planRunsErrorMessage" style="margin: 0 0 16px; font-size: 14px; color: var(--muted); max-width: 400px;">
+              An error occurred while loading the runs for this plan.
+            </p>
+            <button type="button" id="planRunsRetryBtn" class="refresh-btn" style="padding: 8px 16px; font-weight: 600;">
+              <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" aria-hidden="true">
+                <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
+              Retry
+            </button>
+          </div>
+          
+          <!-- Empty State -->
+          <div id="planRunsEmptyState" class="empty-state hidden">
+            <div class="empty-state-icon">📋</div>
+            <h4 class="empty-state-title">No Runs Found</h4>
+            <p class="empty-state-message">
+              This test plan doesn't have any runs yet. Create a run to get started.
+            </p>
+          </div>
+          
+          <!-- Runs List -->
+          <div id="planRunsList" class="entity-list hidden">
+            <!-- Runs will be dynamically inserted here -->
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-actions" style="background: rgba(0,0,0,0.02); padding: 16px 20px;">
+        <button type="button" class="refresh-btn" id="planRunsCloseBtn" style="font-weight: 600;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run Details Modal -->
+  <div id="runDetailsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="runDetailsModalTitle">
+    <div class="modal-card" style="max-width: 900px;">
+      <!-- Loading Overlay -->
+      <div id="runDetailsLoadingOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 14px;">
+        <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="margin-top: 12px; font-size: 14px; color: var(--muted); font-weight: 500;">Loading run details...</span>
+      </div>
+      
+      <div class="modal-head" style="background: rgba(26, 138, 133, 0.08); border-bottom: 2px solid var(--primary);">
+        <div style="flex: 1;">
+          <h3 id="runDetailsModalTitle" style="margin:0 0 6px; font-size:17px; color: var(--primary); font-weight: 700;">
+            <button type="button" id="runDetailsBackBtn" class="btn-edit" style="padding: 4px 8px; margin-right: 8px; border-radius: 6px; font-size: 13px;" aria-label="Back to runs">
+              <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle;" aria-hidden="true">
+                <path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+              </svg>
+            </button>
+            <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; display: inline-block; vertical-align: middle; margin-right: 8px;" aria-hidden="true">
+              <path fill="currentColor" d="M9 11H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2zm2-7h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/>
+            </svg>
+            <span id="runDetailsModalRunName">Test Run</span>
+          </h3>
+          <!-- Breadcrumb -->
+          <nav aria-label="Breadcrumb" style="font-size: 13px; color: var(--muted);">
+            <ol style="list-style: none; padding: 0; margin: 0; display: flex; align-items: center; gap: 6px;">
+              <li>
+                <a href="#" id="runDetailsBreadcrumbPlans" style="color: var(--primary); text-decoration: none; font-weight: 500;">Plans</a>
+              </li>
+              <li aria-hidden="true" style="color: var(--muted);">›</li>
+              <li>
+                <a href="#" id="runDetailsBreadcrumbPlanName" style="color: var(--primary); text-decoration: none; font-weight: 500;">Test Plan</a>
+              </li>
+              <li aria-hidden="true" style="color: var(--muted);">›</li>
+              <li aria-current="page" style="color: var(--text); font-weight: 500;">
+                <span id="runDetailsBreadcrumbRunName">Test Run</span>
+              </li>
+            </ol>
+          </nav>
+        </div>
+        <button type="button" id="runDetailsModalClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      
+      <div class="modal-body" style="padding: 20px;">
+        <!-- Run Edit Form -->
+        <div id="runDetailsFormContainer" class="hidden">
+          <h4 style="margin: 0 0 16px; font-size: 15px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+            Run Details
+          </h4>
+          <form id="runDetailsForm">
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label for="runDetailsName" class="form-label">
+                Name <span class="required">*</span>
+              </label>
+              <input 
+                type="text" 
+                id="runDetailsName" 
+                class="form-input" 
+                placeholder="Enter run name"
+                required
+                style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text);"
+              />
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label for="runDetailsDescription" class="form-label">
+                Description
+              </label>
+              <textarea 
+                id="runDetailsDescription" 
+                class="form-textarea" 
+                rows="3"
+                placeholder="Enter run description (optional)"
+                style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text); resize: vertical;"
+              ></textarea>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label for="runDetailsRefs" class="form-label">
+                References
+              </label>
+              <input 
+                type="text" 
+                id="runDetailsRefs" 
+                class="form-input" 
+                placeholder="Enter references (e.g., JIRA-123, JIRA-456)"
+                style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text);"
+              />
+            </div>
+          </form>
+        </div>
+        
+        <!-- Test Cases Section -->
+        <div id="runDetailsCasesContainer" class="hidden" style="margin-top: 24px;">
+          <h4 style="margin: 0 0 16px; font-size: 15px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+            Test Cases
+          </h4>
+          
+          <!-- Loading State -->
+          <div id="runDetailsCasesLoadingState" class="loading-state hidden">
+            <div class="spinner"></div>
+            <span class="loading-text">Loading test cases...</span>
+          </div>
+          
+          <!-- Error State -->
+          <div id="runDetailsCasesErrorState" class="hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.5;">⚠️</div>
+            <h4 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: var(--text);">Failed to Load Test Cases</h4>
+            <p id="runDetailsCasesErrorMessage" style="margin: 0 0 16px; font-size: 14px; color: var(--muted); max-width: 400px;">
+              An error occurred while loading the test cases for this run.
+            </p>
+            <button type="button" id="runDetailsCasesRetryBtn" class="refresh-btn" style="padding: 8px 16px; font-weight: 600;">
+              <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" aria-hidden="true">
+                <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
+              Retry
+            </button>
+          </div>
+          
+          <!-- Empty State -->
+          <div id="runDetailsCasesEmptyState" class="empty-state hidden">
+            <div class="empty-state-icon">📝</div>
+            <h4 class="empty-state-title">No Test Cases Found</h4>
+            <p class="empty-state-message">
+              This test run doesn't have any test cases yet.
+            </p>
+          </div>
+          
+          <!-- Test Cases List -->
+          <div id="runDetailsCasesList" class="entity-list hidden">
+            <!-- Test cases will be dynamically inserted here -->
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-actions" style="background: rgba(0,0,0,0.02); padding: 16px 20px;">
+        <button type="button" class="btn-edit" id="runDetailsBackFooterBtn" style="font-weight: 600;">
+          <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;" aria-hidden="true">
+            <path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+          </svg>
+          Back
+        </button>
+        <button type="button" id="runDetailsSaveBtn" style="padding: 10px 16px; font-size: 14px; cursor: pointer; border-radius: 10px; border: 1px solid var(--primary); background: var(--primary); color: #fff; transition: background .15s ease, transform .05s ease; font-weight: 600;">
+          <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 4px;" aria-hidden="true">
+            <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+          </svg>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     window.__APP_CONFIG__ = {
       defaultSuiteId: {{ default_suite_id | tojson }},
       defaultSectionId: {{ default_section_id | tojson }}
     };
   </script>
-  <script src="/assets/app.js"></script>
+  <script src="/assets/dashboard.js?v={{ cache_bust }}"></script>
+  <script src="/assets/app.js?v={{ cache_bust }}"></script>
+  <script>
+    // Edit functionality for plans, runs, and cases
+    (function() {
+      // Helper function to show toast messages (reuse from app.js)
+      function showToast(message, type) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        
+        const div = document.createElement('div');
+        const variant = type === 'error' ? 'bg-danger text-white' : 
+                       type === 'success' ? 'bg-success text-white' : 'bg-info text-white';
+        div.className = `toast align-items-center ${variant}`;
+        div.setAttribute('role', 'alert');
+        div.setAttribute('aria-live', 'assertive');
+        div.setAttribute('aria-atomic', 'true');
+        
+        const safeMessage = String(message || '').replace(/[&<>"]/g, (c) => 
+          ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
+        );
+        
+        div.innerHTML = `<div class="d-flex">
+          <div class="toast-body">${safeMessage}</div>
+        </div>`;
+        
+        container.appendChild(div);
+        const toastObj = new bootstrap.Toast(div, { delay: 4000 });
+        toastObj.show();
+        
+        div.addEventListener('hidden.bs.toast', () => {
+          if (div.parentNode === container) {
+            container.removeChild(div);
+          }
+        });
+      }
+
+      // Helper function for API requests
+      async function requestJson(url, options) {
+        const resp = await fetch(url, options);
+        const text = await resp.text();
+        let data = null;
+        if (text) {
+          try {
+            data = JSON.parse(text);
+          } catch (err) {
+            data = null;
+          }
+        }
+        if (!resp.ok) {
+          const detail = (data && typeof data === 'object') ? (data.detail || data.error) : '';
+          throw new Error(detail || text || `Request to ${url} failed (${resp.status})`);
+        }
+        return data || {};
+      }
+
+      // Modal management functions
+      function openModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.classList.remove('hidden');
+        }
+      }
+
+      function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+          modal.classList.add('hidden');
+        }
+      }
+
+      // Edit Plan functionality
+      window.openEditPlanModal = function(planId, planName, planDesc, planMilestone) {
+        document.getElementById('editPlanId').value = planId || '';
+        document.getElementById('editPlanName').value = planName || '';
+        document.getElementById('editPlanDesc').value = planDesc || '';
+        document.getElementById('editPlanMilestone').value = planMilestone || '';
+        openModal('editPlanModal');
+      };
+
+      async function saveEditPlan() {
+        const planId = document.getElementById('editPlanId').value;
+        const name = document.getElementById('editPlanName').value.trim();
+        const description = document.getElementById('editPlanDesc').value.trim() || null;
+        const milestoneId = document.getElementById('editPlanMilestone').value.trim();
+
+        if (!planId) {
+          showToast('Plan ID is missing', 'error');
+          return;
+        }
+
+        if (!name) {
+          showToast('Plan name is required', 'error');
+          return;
+        }
+
+        const payload = {
+          name: name,
+          description: description,
+          milestone_id: milestoneId ? parseInt(milestoneId, 10) : null
+        };
+
+        try {
+          const data = await requestJson(`/api/manage/plan/${planId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          showToast(`Plan #${planId} updated successfully`, 'success');
+          closeModal('editPlanModal');
+          
+          // Refresh plans list if available
+          if (typeof window.loadPlans === 'function') {
+            window.loadPlans(true);
+          }
+          if (typeof window.loadManagePlans === 'function') {
+            window.loadManagePlans(true);
+          }
+        } catch (err) {
+          showToast(err.message || 'Failed to update plan', 'error');
+        }
+      }
+
+      // Edit Run functionality
+      window.openEditRunModal = function(runId, runName, runDesc, runRefs) {
+        document.getElementById('editRunId').value = runId || '';
+        document.getElementById('editRunName').value = runName || '';
+        document.getElementById('editRunDesc').value = runDesc || '';
+        document.getElementById('editRunRefs').value = runRefs || '';
+        openModal('editRunModal');
+      };
+
+      async function saveEditRun() {
+        const runId = document.getElementById('editRunId').value;
+        const name = document.getElementById('editRunName').value.trim();
+        const description = document.getElementById('editRunDesc').value.trim() || null;
+        const refs = document.getElementById('editRunRefs').value.trim() || null;
+
+        if (!runId) {
+          showToast('Run ID is missing', 'error');
+          return;
+        }
+
+        if (!name) {
+          showToast('Run name is required', 'error');
+          return;
+        }
+
+        const payload = {
+          name: name,
+          description: description,
+          refs: refs
+        };
+
+        try {
+          const data = await requestJson(`/api/manage/run/${runId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          showToast(`Run #${runId} updated successfully`, 'success');
+          closeModal('editRunModal');
+          
+          // Refresh runs list if available
+          if (typeof window.loadRuns === 'function') {
+            window.loadRuns();
+          }
+        } catch (err) {
+          showToast(err.message || 'Failed to update run', 'error');
+        }
+      }
+
+      // Edit Case functionality
+      window.openEditCaseModal = function(caseId, caseTitle, caseBdd, caseRefs) {
+        document.getElementById('editCaseId').value = caseId || '';
+        document.getElementById('editCaseTitle').value = caseTitle || '';
+        document.getElementById('editCaseBdd').value = caseBdd || '';
+        document.getElementById('editCaseRefs').value = caseRefs || '';
+        openModal('editCaseModal');
+      };
+
+      async function saveEditCase() {
+        const caseId = document.getElementById('editCaseId').value;
+        const title = document.getElementById('editCaseTitle').value.trim();
+        const bddScenarios = document.getElementById('editCaseBdd').value.trim() || null;
+        const refs = document.getElementById('editCaseRefs').value.trim() || null;
+
+        if (!caseId) {
+          showToast('Case ID is missing', 'error');
+          return;
+        }
+
+        if (!title) {
+          showToast('Case title is required', 'error');
+          return;
+        }
+
+        const payload = {
+          title: title,
+          bdd_scenarios: bddScenarios,
+          refs: refs
+        };
+
+        try {
+          const data = await requestJson(`/api/manage/case/${caseId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          showToast(`Case #${caseId} updated successfully`, 'success');
+          closeModal('editCaseModal');
+          
+          // Refresh cases list if available
+          if (typeof window.loadCases === 'function') {
+            window.loadCases(true);
+          }
+        } catch (err) {
+          showToast(err.message || 'Failed to update case', 'error');
+        }
+      }
+
+      // Event listeners for modal controls
+      document.addEventListener('DOMContentLoaded', function() {
+        // Plan modal
+        const editPlanClose = document.getElementById('editPlanClose');
+        const editPlanCancel = document.getElementById('editPlanCancel');
+        const editPlanSave = document.getElementById('editPlanSave');
+        
+        if (editPlanClose) editPlanClose.addEventListener('click', () => closeModal('editPlanModal'));
+        if (editPlanCancel) editPlanCancel.addEventListener('click', () => closeModal('editPlanModal'));
+        if (editPlanSave) editPlanSave.addEventListener('click', saveEditPlan);
+
+        // Run modal
+        const editRunClose = document.getElementById('editRunClose');
+        const editRunCancel = document.getElementById('editRunCancel');
+        const editRunSave = document.getElementById('editRunSave');
+        
+        if (editRunClose) editRunClose.addEventListener('click', () => closeModal('editRunModal'));
+        if (editRunCancel) editRunCancel.addEventListener('click', () => closeModal('editRunModal'));
+        if (editRunSave) editRunSave.addEventListener('click', saveEditRun);
+
+        // Case modal
+        const editCaseClose = document.getElementById('editCaseClose');
+        const editCaseCancel = document.getElementById('editCaseCancel');
+        const editCaseSave = document.getElementById('editCaseSave');
+        
+        if (editCaseClose) editCaseClose.addEventListener('click', () => closeModal('editCaseModal'));
+        if (editCaseCancel) editCaseCancel.addEventListener('click', () => closeModal('editCaseModal'));
+        if (editCaseSave) editCaseSave.addEventListener('click', saveEditCase);
+
+        // Close modals when clicking outside
+        document.getElementById('editPlanModal')?.addEventListener('click', function(e) {
+          if (e.target.id === 'editPlanModal') closeModal('editPlanModal');
+        });
+        document.getElementById('editRunModal')?.addEventListener('click', function(e) {
+          if (e.target.id === 'editRunModal') closeModal('editRunModal');
+        });
+        document.getElementById('editCaseModal')?.addEventListener('click', function(e) {
+          if (e.target.id === 'editCaseModal') closeModal('editCaseModal');
+        });
+
+        // Load lists functionality
+        const refreshPlanListBtn = document.getElementById('refreshPlanListBtn');
+        const refreshRunListBtn = document.getElementById('refreshRunListBtn');
+        const refreshCaseListBtn = document.getElementById('refreshCaseListBtn');
+
+        if (refreshPlanListBtn) {
+          refreshPlanListBtn.addEventListener('click', loadPlanList);
+        }
+        if (refreshRunListBtn) {
+          refreshRunListBtn.addEventListener('click', loadRunList);
+        }
+        if (refreshCaseListBtn) {
+          refreshCaseListBtn.addEventListener('click', loadCaseList);
+        }
+      });
+
+      // Load plan list with edit buttons
+      async function loadPlanList() {
+        const container = document.getElementById('planListContainer');
+        const projectInput = document.getElementById('planProject');
+        const project = projectInput ? projectInput.value || '1' : '1';
+
+        if (!container) return;
+
+        container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Loading plans...</p>';
+
+        try {
+          const data = await requestJson(`/api/plans?project=${encodeURIComponent(project)}&is_completed=0`);
+          const plans = Array.isArray(data.plans) ? data.plans : [];
+
+          if (plans.length === 0) {
+            container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">No plans found</p>';
+            return;
+          }
+
+          // Sort by creation date (newest first)
+          plans.sort((a, b) => (b.created_on || 0) - (a.created_on || 0));
+
+          // Take only first 10 plans
+          const displayPlans = plans.slice(0, 10);
+
+          container.innerHTML = displayPlans.map(plan => {
+            const name = String(plan.name || `Plan ${plan.id}`).replace(/[&<>"]/g, (c) => 
+              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
+            );
+            const status = plan.is_completed ? 'Completed' : 'Active';
+            const statusColor = plan.is_completed ? 'var(--muted)' : 'var(--primary)';
+            
+            return `
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${name}</div>
+                  <div style="font-size: 12px; color: var(--muted);">
+                    ID: ${plan.id} • <span style="color: ${statusColor};">${status}</span>
+                  </div>
+                </div>
+                <button type="button" class="refresh-btn" onclick="openEditPlanModal(${plan.id}, '${name.replace(/'/g, "\\'")}', '', null)" style="font-size: 12px; padding: 4px 10px; flex-shrink: 0; margin-left: 8px;">
+                  Edit
+                </button>
+              </div>
+            `;
+          }).join('');
+        } catch (err) {
+          container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Failed to load plans</p>';
+          showToast(err.message || 'Failed to load plans', 'error');
+        }
+      }
+
+      // Load run list with edit buttons
+      async function loadRunList() {
+        const container = document.getElementById('runListContainer');
+        const planSelect = document.getElementById('runPlanSelect');
+        const projectInput = document.getElementById('runProject');
+        
+        if (!container || !planSelect) return;
+
+        const planId = planSelect.value;
+        const project = projectInput ? projectInput.value || '1' : '1';
+
+        if (!planId) {
+          container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Please select a plan first</p>';
+          return;
+        }
+
+        container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Loading runs...</p>';
+
+        try {
+          const data = await requestJson(`/api/runs?project=${encodeURIComponent(project)}&plan=${encodeURIComponent(planId)}`);
+          const runs = Array.isArray(data.runs) ? data.runs : [];
+
+          if (runs.length === 0) {
+            container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">No runs found in this plan</p>';
+            return;
+          }
+
+          container.innerHTML = runs.map(run => {
+            const name = String(run.name || `Run ${run.id}`).replace(/[&<>"]/g, (c) => 
+              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
+            );
+            const suite = run.suite_name ? String(run.suite_name).replace(/[&<>"]/g, (c) => 
+              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
+            ) : '';
+            const status = run.is_completed ? 'Completed' : 'Active';
+            const statusColor = run.is_completed ? 'var(--muted)' : 'var(--primary)';
+            
+            return `
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${name}</div>
+                  <div style="font-size: 12px; color: var(--muted);">
+                    ID: ${run.id}${suite ? ` • ${suite}` : ''} • <span style="color: ${statusColor};">${status}</span>
+                  </div>
+                </div>
+                <button type="button" class="refresh-btn" onclick="openEditRunModal(${run.id}, '${name.replace(/'/g, "\\'")}', '', '')" style="font-size: 12px; padding: 4px 10px; flex-shrink: 0; margin-left: 8px;">
+                  Edit
+                </button>
+              </div>
+            `;
+          }).join('');
+        } catch (err) {
+          container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Failed to load runs</p>';
+          showToast(err.message || 'Failed to load runs', 'error');
+        }
+      }
+
+      // Load case list with edit buttons
+      async function loadCaseList() {
+        const container = document.getElementById('caseListManageContainer');
+        const projectInput = document.getElementById('caseProject');
+        const project = projectInput ? projectInput.value || '1' : '1';
+
+        if (!container) return;
+
+        container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Loading cases...</p>';
+
+        try {
+          // Use the same parameters as the case picker
+          const config = window.__APP_CONFIG__ || {};
+          const params = new URLSearchParams({ project: project });
+          
+          if (config.defaultSuiteId !== null && config.defaultSuiteId !== undefined) {
+            params.append('suite_id', String(config.defaultSuiteId));
+          }
+          if (config.defaultSectionId !== null && config.defaultSectionId !== undefined) {
+            params.append('section_id', String(config.defaultSectionId));
+          }
+
+          const data = await requestJson(`/api/cases?${params.toString()}`);
+          const cases = Array.isArray(data.cases) ? data.cases : [];
+
+          if (cases.length === 0) {
+            container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">No cases found</p>';
+            return;
+          }
+
+          // Sort by updated date (newest first) and take first 10
+          cases.sort((a, b) => (b.updated_on || 0) - (a.updated_on || 0));
+          const displayCases = cases.slice(0, 10);
+
+          container.innerHTML = displayCases.map(testCase => {
+            const title = String(testCase.title || `Case ${testCase.id}`).replace(/[&<>"]/g, (c) => 
+              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
+            );
+            const refs = testCase.refs ? String(testCase.refs).replace(/[&<>"]/g, (c) => 
+              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
+            ) : '';
+            
+            return `
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
+                  <div style="font-size: 12px; color: var(--muted);">
+                    ID: ${testCase.id}${refs ? ` • Refs: ${refs}` : ''}
+                  </div>
+                </div>
+                <button type="button" class="refresh-btn" onclick="openEditCaseModal(${testCase.id}, '${title.replace(/'/g, "\\'")}', '', '${refs.replace(/'/g, "\\'")}' )" style="font-size: 12px; padding: 4px 10px; flex-shrink: 0; margin-left: 8px;">
+                  Edit
+                </button>
+              </div>
+            `;
+          }).join('');
+        } catch (err) {
+          container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Failed to load cases</p>';
+          showToast(err.message || 'Failed to load cases', 'error');
+        }
+      }
+
+      // Make load functions globally available
+      window.loadPlanList = loadPlanList;
+      window.loadRunList = loadRunList;
+      window.loadCaseList = loadCaseList;
+    })();
+
+    // Create Section Toggle Functionality
+    (function() {
+      /**
+       * Toggle the Create section expand/collapse state
+       * Implements Requirements: 1.4, 6.1, 6.2, 11.3, 11.4
+       */
+      function toggleCreateSection() {
+        const toggleButton = document.querySelector('.create-section-toggle');
+        const content = document.getElementById('createSectionContent');
+        
+        if (!toggleButton || !content) {
+          console.warn('Create section elements not found');
+          return;
+        }
+        
+        const isExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
+        
+        if (isExpanded) {
+          // Collapse the section
+          content.classList.add('hidden');
+          toggleButton.setAttribute('aria-expanded', 'false');
+        } else {
+          // Expand the section
+          content.classList.remove('hidden');
+          toggleButton.setAttribute('aria-expanded', 'true');
+        }
+      }
+      
+      /**
+       * Collapse the Create section (used for Escape key)
+       */
+      function collapseCreateSection() {
+        const toggleButton = document.querySelector('.create-section-toggle');
+        const content = document.getElementById('createSectionContent');
+        
+        if (!toggleButton || !content) return;
+        
+        const isExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
+        
+        if (isExpanded) {
+          content.classList.add('hidden');
+          toggleButton.setAttribute('aria-expanded', 'false');
+        }
+      }
+      
+      /**
+       * Expand the Create section (used by empty state buttons)
+       */
+      function expandCreateSection() {
+        const toggleButton = document.querySelector('.create-section-toggle');
+        const content = document.getElementById('createSectionContent');
+        
+        if (!toggleButton || !content) return;
+        
+        content.classList.remove('hidden');
+        toggleButton.setAttribute('aria-expanded', 'true');
+        
+        // Focus the toggle button for accessibility
+        toggleButton.focus();
+      }
+      
+      // Initialize on DOM ready
+      document.addEventListener('DOMContentLoaded', function() {
+        const toggleButton = document.querySelector('.create-section-toggle');
+        
+        if (toggleButton) {
+          // Add click event listener
+          toggleButton.addEventListener('click', toggleCreateSection);
+          
+          // Add keyboard support for Enter and Space
+          toggleButton.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleCreateSection();
+            }
+          });
+        }
+        
+        // Add global Escape key handler to collapse Create section
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape') {
+            const content = document.getElementById('createSectionContent');
+            if (content && !content.classList.contains('hidden')) {
+              // Only collapse if Create section is expanded and no modal is open
+              const modals = document.querySelectorAll('.modal-backdrop:not(.hidden)');
+              if (modals.length === 0) {
+                collapseCreateSection();
+              }
+            }
+          }
+        });
+        
+        // Ensure Create section starts collapsed (default state)
+        const content = document.getElementById('createSectionContent');
+        const toggleButton = document.querySelector('.create-section-toggle');
+        
+        if (content && toggleButton) {
+          content.classList.add('hidden');
+          toggleButton.setAttribute('aria-expanded', 'false');
+        }
+      });
+      
+      // Make functions globally available for empty state buttons
+      window.expandCreateSection = expandCreateSection;
+      window.toggleCreateSection = toggleCreateSection;
+    })();
+  </script>
 </body>
 </html>

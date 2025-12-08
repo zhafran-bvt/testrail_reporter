@@ -82,6 +82,12 @@ export async function loadPlans(force = false) {
   }
   if (force) {
     cachedPlanOptionsHtml = "";
+    // Clear server-side cache when forcing refresh
+    try {
+      await fetch("/api/cache/clear", { method: "POST" });
+    } catch (e) {
+      console.warn("Failed to clear server cache:", e);
+    }
   }
   planSel.innerHTML = '<option value="" disabled selected>Loading plans…</option>';
   planSel.disabled = true;

@@ -1,6 +1,23 @@
 (() => {
   var __defProp = Object.defineProperty;
+  var __defProps = Object.defineProperties;
+  var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
+  var __getOwnPropSymbols = Object.getOwnPropertySymbols;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __propIsEnum = Object.prototype.propertyIsEnumerable;
   var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __spreadValues = (a, b) => {
+    for (var prop in b || (b = {}))
+      if (__hasOwnProp.call(b, prop))
+        __defNormalProp(a, prop, b[prop]);
+    if (__getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(b)) {
+        if (__propIsEnum.call(b, prop))
+          __defNormalProp(a, prop, b[prop]);
+      }
+    return a;
+  };
+  var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
   // src/theme.ts
@@ -44,21 +61,34 @@
     const reporter = document.getElementById("reporterView");
     const manage = document.getElementById("manageView");
     const howto = document.getElementById("howToView");
+    const dashboard = document.getElementById("dashboardView");
     const linkReporter = document.getElementById("linkReporter");
     const linkManage = document.getElementById("linkManage");
     const linkHowto = document.getElementById("linkHowTo");
+    const linkDashboard = document.getElementById("linkDashboard");
     reporter == null ? void 0 : reporter.classList.add("hidden");
     manage == null ? void 0 : manage.classList.add("hidden");
     howto == null ? void 0 : howto.classList.add("hidden");
+    dashboard == null ? void 0 : dashboard.classList.add("hidden");
     linkReporter == null ? void 0 : linkReporter.classList.remove("active");
     linkManage == null ? void 0 : linkManage.classList.remove("active");
     linkHowto == null ? void 0 : linkHowto.classList.remove("active");
+    linkDashboard == null ? void 0 : linkDashboard.classList.remove("active");
     if (target === "manage") {
       manage == null ? void 0 : manage.classList.remove("hidden");
       linkManage == null ? void 0 : linkManage.classList.add("active");
+      if (typeof window.initManageView === "function") {
+        window.initManageView();
+      }
     } else if (target === "howto") {
       howto == null ? void 0 : howto.classList.remove("hidden");
       linkHowto == null ? void 0 : linkHowto.classList.add("active");
+    } else if (target === "dashboard") {
+      dashboard == null ? void 0 : dashboard.classList.remove("hidden");
+      linkDashboard == null ? void 0 : linkDashboard.classList.add("active");
+      if (typeof window.dashboardModule !== "undefined") {
+        window.dashboardModule.init();
+      }
     } else {
       reporter == null ? void 0 : reporter.classList.remove("hidden");
       linkReporter == null ? void 0 : linkReporter.classList.add("active");
@@ -313,6 +343,11 @@
     }
     if (force) {
       cachedPlanOptionsHtml = "";
+      try {
+        await fetch("/api/cache/clear", { method: "POST" });
+      } catch (e) {
+        console.warn("Failed to clear server cache:", e);
+      }
     }
     planSel.innerHTML = '<option value="" disabled selected>Loading plans\u2026</option>';
     planSel.disabled = true;
@@ -623,6 +658,1975 @@
     syncCaseIdsInput();
   }
 
+  // src/manage.ts
+  var currentEditRunId = null;
+  function getFocusableElements(container) {
+    const focusableSelectors = [
+      "a[href]",
+      "button:not([disabled])",
+      "textarea:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      '[tabindex]:not([tabindex="-1"])'
+    ].join(", ");
+    return Array.from(container.querySelectorAll(focusableSelectors));
+  }
+  function setupFocusTrap(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return () => {
+    };
+    const handleTabKey = (e) => {
+      if (e.key !== "Tab") return;
+      const focusableElements = getFocusableElements(modal);
+      if (focusableElements.length === 0) return;
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (e.shiftKey && document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement.focus();
+      } else if (!e.shiftKey && document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement.focus();
+      }
+    };
+    modal.addEventListener("keydown", handleTabKey);
+    return () => {
+      modal.removeEventListener("keydown", handleTabKey);
+    };
+  }
+  var focusTrapCleanups = /* @__PURE__ */ new Map();
+  var modalTriggerElements = /* @__PURE__ */ new Map();
+  function activateFocusTrap(modalId) {
+    deactivateFocusTrap(modalId);
+    const cleanup = setupFocusTrap(modalId);
+    focusTrapCleanups.set(modalId, cleanup);
+  }
+  function deactivateFocusTrap(modalId) {
+    const cleanup = focusTrapCleanups.get(modalId);
+    if (cleanup) {
+      cleanup();
+      focusTrapCleanups.delete(modalId);
+    }
+  }
+  function storeTriggerElement(modalId, element) {
+    modalTriggerElements.set(modalId, element);
+  }
+  function restoreFocus(modalId) {
+    const triggerElement = modalTriggerElements.get(modalId);
+    if (triggerElement && document.contains(triggerElement)) {
+      setTimeout(() => {
+        triggerElement.focus();
+      }, 100);
+    }
+    modalTriggerElements.delete(modalId);
+  }
+  function navigateToBreadcrumbLevel(level, context) {
+    switch (level) {
+      case "plans":
+        hideCaseEditModal();
+        hideRunDetailsModal();
+        hidePlanRunsModal();
+        announceStatus("Navigated to plans list");
+        break;
+      case "runs":
+        hideCaseEditModal();
+        hideRunDetailsModal();
+        if (context.planId && context.planName) {
+          showPlanRunsModal(context.planId, context.planName, currentPlanEditButton || void 0);
+          announceStatus(`Navigated to runs for ${context.planName}`);
+        }
+        break;
+      case "cases":
+        hideCaseEditModal();
+        if (context.runId) {
+          showRunDetailsModal(context.runId);
+          announceStatus(`Navigated to cases for ${context.runName || "run"}`);
+        }
+        break;
+    }
+  }
+  function announceStatus(message) {
+    const announcer = document.getElementById("manageStatusAnnouncer");
+    if (announcer) {
+      announcer.textContent = message;
+      setTimeout(() => {
+        announcer.textContent = "";
+      }, 1e3);
+    }
+  }
+  function setSubsectionBusy(subsection, busy) {
+    const subsectionName = subsection.charAt(0).toUpperCase() + subsection.slice(1);
+    const content = document.querySelector(`#manage${subsectionName}Subsection .subsection-content`);
+    if (content) {
+      content.setAttribute("aria-busy", busy ? "true" : "false");
+    }
+  }
+  var deleteConfirmCallback = null;
+  var deleteConfirmRequireTyping = false;
+  var deleteConfirmExpectedName = "";
+  function showDeleteConfirmation(entityType, entityName, entityId, onConfirm, options) {
+    const modal = document.getElementById("deleteConfirmModal");
+    const nameEl = document.getElementById("deleteConfirmEntityName");
+    const typeEl = document.getElementById("deleteConfirmEntityType");
+    const cascadeWarningEl = document.getElementById("deleteConfirmCascadeWarning");
+    const cascadeMessageEl = document.getElementById("deleteConfirmCascadeMessage");
+    const typeSectionEl = document.getElementById("deleteConfirmTypeSection");
+    const typeNameEl = document.getElementById("deleteConfirmTypeName");
+    const typeInputEl = document.getElementById("deleteConfirmTypeInput");
+    const typeErrorEl = document.getElementById("deleteConfirmTypeError");
+    const deleteBtn = document.getElementById("deleteConfirmDelete");
+    if (!modal || !nameEl || !typeEl) return;
+    nameEl.textContent = entityName;
+    const entityTypeCapitalized = entityType.charAt(0).toUpperCase() + entityType.slice(1);
+    typeEl.textContent = `${entityTypeCapitalized} ID: ${entityId}`;
+    if (cascadeWarningEl && cascadeMessageEl) {
+      if (options == null ? void 0 : options.cascadeWarning) {
+        cascadeWarningEl.classList.remove("hidden");
+        cascadeMessageEl.textContent = options.cascadeWarning;
+      } else {
+        cascadeWarningEl.classList.add("hidden");
+      }
+    }
+    deleteConfirmRequireTyping = (options == null ? void 0 : options.requireTyping) || false;
+    deleteConfirmExpectedName = entityName;
+    if (typeSectionEl && typeNameEl && typeInputEl && typeErrorEl) {
+      if (deleteConfirmRequireTyping) {
+        typeSectionEl.classList.remove("hidden");
+        typeNameEl.textContent = entityName;
+        typeInputEl.value = "";
+        typeErrorEl.classList.add("hidden");
+        if (deleteBtn) {
+          deleteBtn.disabled = true;
+          deleteBtn.style.opacity = "0.5";
+          deleteBtn.style.cursor = "not-allowed";
+        }
+      } else {
+        typeSectionEl.classList.add("hidden");
+        if (deleteBtn) {
+          deleteBtn.disabled = false;
+          deleteBtn.style.opacity = "1";
+          deleteBtn.style.cursor = "pointer";
+        }
+      }
+    }
+    deleteConfirmCallback = onConfirm;
+    const activeElement = document.activeElement;
+    storeTriggerElement("deleteConfirmModal", activeElement);
+    modal.classList.remove("hidden");
+    modal.style.zIndex = "13000";
+    activateFocusTrap("deleteConfirmModal");
+    setTimeout(() => {
+      if (deleteConfirmRequireTyping && typeInputEl) {
+        typeInputEl.focus();
+      } else {
+        const cancelBtn = document.getElementById("deleteConfirmCancel");
+        if (cancelBtn) cancelBtn.focus();
+      }
+    }, 100);
+  }
+  function hideDeleteConfirmation() {
+    const modal = document.getElementById("deleteConfirmModal");
+    const typeInputEl = document.getElementById("deleteConfirmTypeInput");
+    const typeErrorEl = document.getElementById("deleteConfirmTypeError");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.style.zIndex = "";
+    deactivateFocusTrap("deleteConfirmModal");
+    restoreFocus("deleteConfirmModal");
+    deleteConfirmCallback = null;
+    deleteConfirmRequireTyping = false;
+    deleteConfirmExpectedName = "";
+    if (typeInputEl) {
+      typeInputEl.value = "";
+    }
+    if (typeErrorEl) {
+      typeErrorEl.classList.add("hidden");
+    }
+  }
+  function executeDeleteConfirmation() {
+    if (deleteConfirmRequireTyping) {
+      const typeInputEl = document.getElementById("deleteConfirmTypeInput");
+      const typeErrorEl = document.getElementById("deleteConfirmTypeError");
+      if (typeInputEl && typeErrorEl) {
+        const typedValue = typeInputEl.value.trim();
+        if (typedValue !== deleteConfirmExpectedName) {
+          typeErrorEl.classList.remove("hidden");
+          typeInputEl.style.borderColor = "#ef4444";
+          typeInputEl.focus();
+          return;
+        }
+      }
+    }
+    if (deleteConfirmCallback) {
+      deleteConfirmCallback();
+    }
+    hideDeleteConfirmation();
+  }
+  function hideRunEditModal() {
+    const modal = document.getElementById("runEditModal");
+    const nameInput = document.getElementById("runEditName");
+    const descInput = document.getElementById("runEditDescription");
+    const refsInput = document.getElementById("runEditRefs");
+    const nameError = document.getElementById("runEditNameError");
+    const loadingOverlay = document.getElementById("runEditLoadingOverlay");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    deactivateFocusTrap("runEditModal");
+    restoreFocus("runEditModal");
+    currentEditRunId = null;
+    if (nameInput) nameInput.value = "";
+    if (descInput) descInput.value = "";
+    if (refsInput) refsInput.value = "";
+    if (nameError) {
+      nameError.classList.add("hidden");
+    }
+    if (nameInput) {
+      nameInput.style.borderColor = "var(--border)";
+    }
+    if (loadingOverlay) {
+      loadingOverlay.classList.add("hidden");
+    }
+  }
+  function validateRunName(name) {
+    return name.trim().length > 0;
+  }
+  function showRunNameValidationError() {
+    const nameInput = document.getElementById("runEditName");
+    const nameError = document.getElementById("runEditNameError");
+    if (nameInput) {
+      nameInput.style.borderColor = "#ef4444";
+    }
+    if (nameError) {
+      nameError.classList.remove("hidden");
+    }
+  }
+  function clearRunNameValidationError() {
+    const nameInput = document.getElementById("runEditName");
+    const nameError = document.getElementById("runEditNameError");
+    if (nameInput) {
+      nameInput.style.borderColor = "var(--border)";
+    }
+    if (nameError) {
+      nameError.classList.add("hidden");
+    }
+  }
+  async function saveRunEdit() {
+    const nameInput = document.getElementById("runEditName");
+    const descInput = document.getElementById("runEditDescription");
+    const refsInput = document.getElementById("runEditRefs");
+    const loadingOverlay = document.getElementById("runEditLoadingOverlay");
+    const saveBtn = document.getElementById("runEditSave");
+    if (!nameInput || !descInput || !refsInput || currentEditRunId === null) {
+      console.error("Run edit form elements not found or no run selected");
+      return;
+    }
+    const name = nameInput.value;
+    const description = descInput.value;
+    const refs = refsInput.value;
+    if (!validateRunName(name)) {
+      showRunNameValidationError();
+      nameInput.focus();
+      return;
+    }
+    clearRunNameValidationError();
+    if (loadingOverlay) {
+      loadingOverlay.classList.remove("hidden");
+    }
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+    try {
+      const response = await requestJson(`/api/manage/run/${currentEditRunId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description || null,
+          refs: refs || null
+        })
+      });
+      if (response.success) {
+        showToast(`Run "${name.trim()}" updated successfully`, "success");
+        hideRunEditModal();
+      } else {
+        throw new Error(response.message || "Failed to update run");
+      }
+    } catch (err) {
+      showToast((err == null ? void 0 : err.message) || "Failed to update run", "error");
+    } finally {
+      if (loadingOverlay) {
+        loadingOverlay.classList.add("hidden");
+      }
+      if (saveBtn) {
+        saveBtn.disabled = false;
+      }
+    }
+  }
+  async function deletePlan(planId, planName) {
+    try {
+      const response = await requestJson(`/api/manage/plan/${planId}`, {
+        method: "DELETE"
+      });
+      if (response.success) {
+        showToast(`Plan "${planName}" deleted successfully`, "success");
+        refreshPlanList();
+        return true;
+      } else {
+        throw new Error(response.message || "Failed to delete plan");
+      }
+    } catch (err) {
+      showToast((err == null ? void 0 : err.message) || "Failed to delete plan", "error");
+      return false;
+    }
+  }
+  async function deleteRun(runId, runName) {
+    try {
+      const response = await requestJson(`/api/manage/run/${runId}`, {
+        method: "DELETE"
+      });
+      if (response.success) {
+        showToast(`Run "${runName}" deleted successfully`, "success");
+        return true;
+      } else {
+        throw new Error(response.message || "Failed to delete run");
+      }
+    } catch (err) {
+      showToast((err == null ? void 0 : err.message) || "Failed to delete run", "error");
+      return false;
+    }
+  }
+  async function deleteCase(caseId, caseTitle) {
+    try {
+      const response = await requestJson(`/api/manage/case/${caseId}`, {
+        method: "DELETE"
+      });
+      if (response.success) {
+        showToast(`Case "${caseTitle}" deleted successfully`, "success");
+        return true;
+      } else {
+        throw new Error(response.message || "Failed to delete case");
+      }
+    } catch (err) {
+      showToast((err == null ? void 0 : err.message) || "Failed to delete case", "error");
+      return false;
+    }
+  }
+  function disableEntityButtons(entityType) {
+    const editButtons = document.querySelectorAll(`.edit-${entityType}-btn`);
+    const deleteButtons = document.querySelectorAll(`.delete-${entityType}-btn`);
+    editButtons.forEach((btn) => btn.disabled = true);
+    deleteButtons.forEach((btn) => btn.disabled = true);
+  }
+  function showErrorState(subsection, errorMessage, retryCallback) {
+    const container = document.getElementById(`${subsection}ListContainer`);
+    const loadingState = document.getElementById(`${subsection}LoadingState`);
+    const emptyState = document.getElementById(`${subsection}EmptyState`);
+    if (!container || !loadingState || !emptyState) return;
+    loadingState.classList.add("hidden");
+    emptyState.classList.add("hidden");
+    container.classList.remove("hidden");
+    container.innerHTML = `
+    <div class="error-state" role="alert" aria-live="assertive" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.5; line-height: 1;" aria-hidden="true">\u26A0\uFE0F</div>
+      <h4 style="margin: 0 0 8px; font-size: 16px; font-weight: 500; color: var(--text);">Failed to load ${subsection}</h4>
+      <p style="margin: 0 0 16px; font-size: 14px; color: var(--muted); max-width: 400px;">${escapeHtml(errorMessage)}</p>
+      <button type="button" class="refresh-btn" style="padding: 8px 16px; font-size: 13px;" aria-label="Retry loading ${subsection}">
+        <span class="icon" aria-hidden="true">\u{1F504}</span> Retry
+      </button>
+    </div>
+  `;
+    const retryBtn = container.querySelector(".refresh-btn");
+    if (retryBtn) {
+      retryBtn.addEventListener("click", retryCallback);
+    }
+  }
+  async function refreshPlanList() {
+    const container = document.getElementById("plansListContainer");
+    const scrollPosition = (container == null ? void 0 : container.scrollTop) || 0;
+    await loadManagePlans2();
+    if (container) {
+      requestAnimationFrame(() => {
+        container.scrollTop = scrollPosition;
+      });
+    }
+  }
+  var currentPlanId = null;
+  var currentPlanName = "";
+  var currentPlanEditButton = null;
+  var savedPlansScrollPosition = 0;
+  async function showPlanRunsModal(planId, planName, triggerElement) {
+    const plansListContainer = document.getElementById("plansListContainer");
+    if (plansListContainer) {
+      savedPlansScrollPosition = plansListContainer.scrollTop;
+    }
+    currentPlanId = planId;
+    currentPlanName = planName;
+    currentPlanEditButton = triggerElement || null;
+    storeTriggerElement("planRunsModal", triggerElement || null);
+    const modal = document.getElementById("planRunsModal");
+    const planNameDisplay = document.getElementById("planRunsModalPlanName");
+    const breadcrumbPlanName = document.getElementById("planRunsBreadcrumbPlanName");
+    const loadingOverlay = document.getElementById("planRunsLoadingOverlay");
+    const loadingState = document.getElementById("planRunsLoadingState");
+    const errorState = document.getElementById("planRunsErrorState");
+    const emptyState = document.getElementById("planRunsEmptyState");
+    const runsList = document.getElementById("planRunsList");
+    if (!modal) {
+      console.error("Plan runs modal not found");
+      return;
+    }
+    if (planNameDisplay) {
+      planNameDisplay.textContent = planName;
+    }
+    if (breadcrumbPlanName) {
+      breadcrumbPlanName.textContent = planName;
+    }
+    modal.classList.remove("hidden");
+    activateFocusTrap("planRunsModal");
+    if (loadingOverlay) {
+      loadingOverlay.classList.remove("hidden");
+    }
+    if (loadingState) {
+      loadingState.classList.remove("hidden");
+    }
+    if (errorState) {
+      errorState.classList.add("hidden");
+    }
+    if (emptyState) {
+      emptyState.classList.add("hidden");
+    }
+    if (runsList) {
+      runsList.classList.add("hidden");
+    }
+    announceStatus(`Loading runs for ${planName}...`);
+    try {
+      const data = await requestJson(`/api/runs?plan=${planId}&project=1`);
+      const runs = Array.isArray(data.runs) ? data.runs : [];
+      if (loadingOverlay) {
+        loadingOverlay.classList.add("hidden");
+      }
+      if (loadingState) {
+        loadingState.classList.add("hidden");
+      }
+      if (runs.length === 0) {
+        if (emptyState) {
+          emptyState.classList.remove("hidden");
+        }
+        announceStatus("No runs found");
+      } else {
+        renderPlanRunsList(runs);
+        announceStatus(`Loaded ${runs.length} run${runs.length !== 1 ? "s" : ""}`);
+      }
+    } catch (err) {
+      if (loadingOverlay) {
+        loadingOverlay.classList.add("hidden");
+      }
+      if (loadingState) {
+        loadingState.classList.add("hidden");
+      }
+      if (errorState) {
+        errorState.classList.remove("hidden");
+        const errorMessage = document.getElementById("planRunsErrorMessage");
+        if (errorMessage) {
+          errorMessage.textContent = (err == null ? void 0 : err.message) || "An error occurred while loading runs.";
+        }
+      }
+      showToast((err == null ? void 0 : err.message) || "Failed to load runs", "error");
+      announceStatus("Failed to load runs");
+    }
+  }
+  function renderPlanRunsList(runs) {
+    const runsList = document.getElementById("planRunsList");
+    const emptyState = document.getElementById("planRunsEmptyState");
+    const errorState = document.getElementById("planRunsErrorState");
+    if (!runsList) return;
+    if (emptyState) emptyState.classList.add("hidden");
+    if (errorState) errorState.classList.add("hidden");
+    runsList.innerHTML = runs.map((run) => {
+      const runName = escapeHtml(run.name || `Run ${run.id}`);
+      const runId = run.id;
+      const isCompleted = run.is_completed === true || run.is_completed === 1;
+      const badgeClass = isCompleted ? "badge-completed" : "badge-active";
+      const badgeText = isCompleted ? "Completed" : "Active";
+      const suiteName = run.suite_name ? escapeHtml(String(run.suite_name)) : "";
+      return `
+        <div class="entity-card" role="listitem" data-entity-type="run" data-entity-id="${runId}" aria-label="Run: ${runName}, Status: ${badgeText}">
+          <div class="entity-card-header">
+            <div class="entity-card-title" id="run-title-${runId}">${runName}</div>
+            <div class="entity-card-badges">
+              <span class="badge ${badgeClass}" role="status" aria-label="Status: ${badgeText}">${badgeText}</span>
+            </div>
+          </div>
+          <div class="entity-card-meta">
+            <span class="meta-item">
+              <span class="icon" aria-hidden="true">\u{1F194}</span> Run ID: ${runId}
+            </span>
+            ${suiteName ? `<span class="meta-item"><span class="icon" aria-hidden="true">\u{1F4E6}</span> Suite: ${suiteName}</span>` : ""}
+          </div>
+          <div class="entity-card-actions" role="group" aria-label="Actions for ${runName}">
+            <button type="button" class="btn-edit edit-run-btn-modal" data-run-id="${runId}" data-run-name="${escapeHtml(run.name || "")}" aria-label="Edit run ${runName}" aria-describedby="run-title-${runId}">
+              <span class="icon" aria-hidden="true">\u270F\uFE0F</span> Edit
+            </button>
+            <button type="button" class="btn-delete delete-run-btn-modal" data-run-id="${runId}" data-run-name="${escapeHtml(run.name || "")}" aria-label="Delete run ${runName}" aria-describedby="run-title-${runId}">
+              <span class="icon" aria-hidden="true">\u{1F5D1}\uFE0F</span> Delete
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+    runsList.classList.remove("hidden");
+    attachPlanRunsModalEventListeners();
+  }
+  function attachPlanRunsModalEventListeners() {
+    document.querySelectorAll(".edit-run-btn-modal").forEach((btn) => {
+      const handleEdit = (e) => {
+        e.stopPropagation();
+        const target = e.currentTarget;
+        const runId = parseInt(target.dataset.runId || "0", 10);
+        showRunDetailsModal(runId);
+      };
+      btn.addEventListener("click", handleEdit);
+      btn.addEventListener("keydown", (e) => {
+        const keyEvent = e;
+        if (keyEvent.key === "Enter") {
+          keyEvent.preventDefault();
+          handleEdit(keyEvent);
+        }
+      });
+    });
+    document.querySelectorAll(".delete-run-btn-modal").forEach((btn) => {
+      const handleDelete = (e) => {
+        e.stopPropagation();
+        const target = e.currentTarget;
+        const runId = parseInt(target.dataset.runId || "0", 10);
+        const runName = target.dataset.runName || `Run ${runId}`;
+        showDeleteConfirmation("run", runName, runId, async () => {
+          const success = await deleteRun(runId, runName);
+          if (success && currentPlanId !== null) {
+            showPlanRunsModal(currentPlanId, currentPlanName, currentPlanEditButton || void 0);
+          }
+        });
+      };
+      btn.addEventListener("click", handleDelete);
+      btn.addEventListener("keydown", (e) => {
+        const keyEvent = e;
+        if (keyEvent.key === "Enter") {
+          keyEvent.preventDefault();
+          handleDelete(keyEvent);
+        }
+      });
+    });
+  }
+  function hidePlanRunsModal() {
+    const modal = document.getElementById("planRunsModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    deactivateFocusTrap("planRunsModal");
+    restoreFocus("planRunsModal");
+    const plansListContainer = document.getElementById("plansListContainer");
+    if (plansListContainer) {
+      requestAnimationFrame(() => {
+        plansListContainer.scrollTop = savedPlansScrollPosition;
+      });
+    }
+    currentPlanId = null;
+    currentPlanName = "";
+    currentPlanEditButton = null;
+    announceStatus("Returned to plans list");
+  }
+  var currentRunId = null;
+  var currentRunName = "";
+  var currentRunIsDirty = false;
+  async function showRunDetailsModal(runId) {
+    currentRunId = runId;
+    currentRunIsDirty = false;
+    const activeElement = document.activeElement;
+    storeTriggerElement("runDetailsModal", activeElement);
+    const modal = document.getElementById("runDetailsModal");
+    const runNameDisplay = document.getElementById("runDetailsModalRunName");
+    const breadcrumbPlanName = document.getElementById("runDetailsBreadcrumbPlanName");
+    const breadcrumbRunName = document.getElementById("runDetailsBreadcrumbRunName");
+    const loadingOverlay = document.getElementById("runDetailsLoadingOverlay");
+    const formContainer = document.getElementById("runDetailsFormContainer");
+    const casesContainer = document.getElementById("runDetailsCasesContainer");
+    if (!modal) {
+      console.error("Run details modal not found");
+      return;
+    }
+    modal.classList.remove("hidden");
+    activateFocusTrap("runDetailsModal");
+    if (loadingOverlay) {
+      loadingOverlay.classList.remove("hidden");
+    }
+    if (formContainer) {
+      formContainer.classList.add("hidden");
+    }
+    if (casesContainer) {
+      casesContainer.classList.add("hidden");
+    }
+    if (breadcrumbPlanName) {
+      breadcrumbPlanName.textContent = currentPlanName;
+    }
+    announceStatus("Loading run details...");
+    try {
+      const runData = await requestJson(`/api/run/${runId}`);
+      const run = runData.run;
+      if (!run) {
+        throw new Error("Run not found");
+      }
+      currentRunName = run.name || `Run ${runId}`;
+      if (runNameDisplay) {
+        runNameDisplay.textContent = currentRunName;
+      }
+      if (breadcrumbRunName) {
+        breadcrumbRunName.textContent = currentRunName;
+      }
+      const nameInput = document.getElementById("runDetailsName");
+      const descInput = document.getElementById("runDetailsDescription");
+      const refsInput = document.getElementById("runDetailsRefs");
+      if (nameInput) {
+        nameInput.value = run.name || "";
+      }
+      if (descInput) {
+        descInput.value = run.description || "";
+      }
+      if (refsInput) {
+        refsInput.value = run.refs || "";
+      }
+      if (formContainer) {
+        formContainer.classList.remove("hidden");
+      }
+      await loadRunDetailsCases(runId);
+      if (loadingOverlay) {
+        loadingOverlay.classList.add("hidden");
+      }
+      if (casesContainer) {
+        casesContainer.classList.remove("hidden");
+      }
+      announceStatus(`Loaded run details for ${currentRunName}`);
+    } catch (err) {
+      if (loadingOverlay) {
+        loadingOverlay.classList.add("hidden");
+      }
+      showToast((err == null ? void 0 : err.message) || "Failed to load run details", "error");
+      announceStatus("Failed to load run details");
+      hideRunDetailsModal();
+    }
+  }
+  async function loadRunDetailsCases(runId) {
+    const loadingState = document.getElementById("runDetailsCasesLoadingState");
+    const errorState = document.getElementById("runDetailsCasesErrorState");
+    const emptyState = document.getElementById("runDetailsCasesEmptyState");
+    const casesList = document.getElementById("runDetailsCasesList");
+    if (!loadingState || !errorState || !emptyState || !casesList) return;
+    loadingState.classList.remove("hidden");
+    errorState.classList.add("hidden");
+    emptyState.classList.add("hidden");
+    casesList.classList.add("hidden");
+    try {
+      const data = await requestJson(`/api/tests/${runId}`);
+      const tests = Array.isArray(data.tests) ? data.tests : [];
+      loadingState.classList.add("hidden");
+      if (tests.length === 0) {
+        emptyState.classList.remove("hidden");
+      } else {
+        renderRunDetailsCases(tests);
+      }
+    } catch (err) {
+      loadingState.classList.add("hidden");
+      errorState.classList.remove("hidden");
+      const errorMessage = document.getElementById("runDetailsCasesErrorMessage");
+      if (errorMessage) {
+        errorMessage.textContent = (err == null ? void 0 : err.message) || "An error occurred while loading test cases.";
+      }
+      showToast((err == null ? void 0 : err.message) || "Failed to load test cases", "error");
+    }
+  }
+  function renderRunDetailsCases(tests) {
+    const casesList = document.getElementById("runDetailsCasesList");
+    const emptyState = document.getElementById("runDetailsCasesEmptyState");
+    const errorState = document.getElementById("runDetailsCasesErrorState");
+    if (!casesList) return;
+    if (emptyState) emptyState.classList.add("hidden");
+    if (errorState) errorState.classList.add("hidden");
+    casesList.innerHTML = tests.map((test) => {
+      const testTitle = escapeHtml(test.title || `Test ${test.id}`);
+      const testId = test.id;
+      const caseId = test.case_id;
+      const statusId = test.status_id || 3;
+      const statusName = escapeHtml(test.status_name || "Untested");
+      const refs = test.refs ? escapeHtml(String(test.refs)) : "";
+      const badgeClass = getStatusBadgeClass(statusId);
+      return `
+        <div class="entity-card" role="listitem" data-entity-type="test" data-entity-id="${testId}" data-case-id="${caseId}" aria-label="Test: ${testTitle}, Status: ${statusName}">
+          <div class="entity-card-header">
+            <div class="entity-card-title" id="test-title-${testId}">${testTitle}</div>
+            <div class="entity-card-badges">
+              <span class="badge ${badgeClass}" role="status" aria-label="Status: ${statusName}">${statusName}</span>
+            </div>
+          </div>
+          <div class="entity-card-meta">
+            <span class="meta-item">
+              <span class="icon" aria-hidden="true">\u{1F194}</span> Test ID: ${testId}
+            </span>
+            <span class="meta-item">
+              <span class="icon" aria-hidden="true">\u{1F4CB}</span> Case ID: ${caseId}
+            </span>
+            ${refs ? `<span class="meta-item"><span class="icon" aria-hidden="true">\u{1F517}</span> Refs: ${refs}</span>` : ""}
+          </div>
+          <div class="entity-card-actions" role="group" aria-label="Actions for ${testTitle}">
+            <button type="button" class="btn-edit edit-case-btn-modal" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || "")}" data-case-refs="${escapeHtml(test.refs || "")}" aria-label="Edit case ${testTitle}" aria-describedby="test-title-${testId}">
+              <span class="icon" aria-hidden="true">\u270F\uFE0F</span> Edit
+            </button>
+            <button type="button" class="btn-delete delete-case-btn-modal" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || "")}" aria-label="Delete case ${testTitle}" aria-describedby="test-title-${testId}">
+              <span class="icon" aria-hidden="true">\u{1F5D1}\uFE0F</span> Delete
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+    casesList.classList.remove("hidden");
+  }
+  async function saveRunDetails() {
+    const nameInput = document.getElementById("runDetailsName");
+    const descInput = document.getElementById("runDetailsDescription");
+    const refsInput = document.getElementById("runDetailsRefs");
+    const saveBtn = document.getElementById("runDetailsSaveBtn");
+    if (!nameInput || !descInput || !refsInput || currentRunId === null) {
+      console.error("Run details form elements not found or no run selected");
+      return;
+    }
+    const name = nameInput.value;
+    const description = descInput.value;
+    const refs = refsInput.value;
+    if (!name.trim()) {
+      showToast("Run name cannot be empty", "error");
+      nameInput.focus();
+      return;
+    }
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+    try {
+      const response = await requestJson(`/api/manage/run/${currentRunId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          description: description || null,
+          refs: refs || null
+        })
+      });
+      if (response.success) {
+        showToast(`Run "${name.trim()}" updated successfully`, "success");
+        currentRunName = name.trim();
+        const runNameDisplay = document.getElementById("runDetailsModalRunName");
+        const breadcrumbRunName = document.getElementById("runDetailsBreadcrumbRunName");
+        if (runNameDisplay) {
+          runNameDisplay.textContent = currentRunName;
+        }
+        if (breadcrumbRunName) {
+          breadcrumbRunName.textContent = currentRunName;
+        }
+        currentRunIsDirty = false;
+        await loadRunDetailsCases(currentRunId);
+      } else {
+        throw new Error(response.message || "Failed to update run");
+      }
+    } catch (err) {
+      showToast((err == null ? void 0 : err.message) || "Failed to update run", "error");
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+      }
+    }
+  }
+  async function handleRunDetailsBack() {
+    if (currentRunIsDirty) {
+      await saveRunDetails();
+    }
+    hideRunDetailsModal();
+    if (currentPlanId !== null) {
+      showPlanRunsModal(currentPlanId, currentPlanName, currentPlanEditButton || void 0);
+    }
+  }
+  function hideRunDetailsModal() {
+    const modal = document.getElementById("runDetailsModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    deactivateFocusTrap("runDetailsModal");
+    restoreFocus("runDetailsModal");
+    currentRunId = null;
+    currentRunName = "";
+    currentRunIsDirty = false;
+    announceStatus("Closed run details");
+  }
+  function attachPlanEventListeners() {
+    document.querySelectorAll(".delete-plan-btn").forEach((btn) => {
+      const handleDelete = (e) => {
+        const target = e.currentTarget;
+        const planId = parseInt(target.dataset.planId || "0", 10);
+        const planName = target.dataset.planName || `Plan ${planId}`;
+        showDeleteConfirmation("plan", planName, planId, () => {
+          deletePlan(planId, planName);
+        }, {
+          cascadeWarning: "\u26A0\uFE0F Warning: Deleting this plan will also permanently delete all associated test runs."
+        });
+      };
+      btn.addEventListener("click", handleDelete);
+      btn.addEventListener("keydown", (e) => {
+        const keyEvent = e;
+        if (keyEvent.key === "Enter") {
+          keyEvent.preventDefault();
+          handleDelete(keyEvent);
+        }
+      });
+    });
+    document.querySelectorAll(".edit-plan-btn").forEach((btn) => {
+      const handleEdit = (e) => {
+        const target = e.currentTarget;
+        const planId = parseInt(target.dataset.planId || "0", 10);
+        const planName = target.dataset.planName || `Plan ${planId}`;
+        showPlanRunsModal(planId, planName, target);
+      };
+      btn.addEventListener("click", handleEdit);
+      btn.addEventListener("keydown", (e) => {
+        const keyEvent = e;
+        if (keyEvent.key === "Enter") {
+          keyEvent.preventDefault();
+          handleEdit(keyEvent);
+        }
+      });
+    });
+  }
+  function debounce(func, wait) {
+    let timeout = null;
+    return () => {
+      if (timeout !== null) {
+        clearTimeout(timeout);
+      }
+      timeout = window.setTimeout(() => {
+        func();
+      }, wait);
+    };
+  }
+  function initManagement() {
+    var _a, _b, _c, _d, _e;
+    (_a = document.getElementById("deleteConfirmCancel")) == null ? void 0 : _a.addEventListener("click", hideDeleteConfirmation);
+    (_b = document.getElementById("deleteConfirmClose")) == null ? void 0 : _b.addEventListener("click", hideDeleteConfirmation);
+    (_c = document.getElementById("deleteConfirmDelete")) == null ? void 0 : _c.addEventListener("click", executeDeleteConfirmation);
+    (_d = document.getElementById("deleteConfirmModal")) == null ? void 0 : _d.addEventListener("click", (e) => {
+      var _a2;
+      if (((_a2 = e.target) == null ? void 0 : _a2.id) === "deleteConfirmModal") {
+        hideDeleteConfirmation();
+      }
+    });
+    const typeInputEl = document.getElementById("deleteConfirmTypeInput");
+    const deleteBtn = document.getElementById("deleteConfirmDelete");
+    const typeErrorEl = document.getElementById("deleteConfirmTypeError");
+    if (typeInputEl && deleteBtn) {
+      typeInputEl.addEventListener("input", () => {
+        const typedValue = typeInputEl.value.trim();
+        if (deleteConfirmRequireTyping) {
+          if (typedValue === deleteConfirmExpectedName) {
+            deleteBtn.disabled = false;
+            deleteBtn.style.opacity = "1";
+            deleteBtn.style.cursor = "pointer";
+            typeInputEl.style.borderColor = "#10b981";
+            if (typeErrorEl) {
+              typeErrorEl.classList.add("hidden");
+            }
+          } else {
+            deleteBtn.disabled = true;
+            deleteBtn.style.opacity = "0.5";
+            deleteBtn.style.cursor = "not-allowed";
+            typeInputEl.style.borderColor = "var(--border)";
+          }
+        }
+      });
+      typeInputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !deleteBtn.disabled) {
+          e.preventDefault();
+          executeDeleteConfirmation();
+        }
+      });
+    }
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        const modal = document.getElementById("deleteConfirmModal");
+        if (modal && !modal.classList.contains("hidden")) {
+          hideDeleteConfirmation();
+        }
+      }
+    });
+    const createSectionToggle = document.querySelector(".create-section-toggle");
+    const createSectionContent = document.getElementById("createSectionContent");
+    if (createSectionToggle && createSectionContent) {
+      createSectionToggle.addEventListener("click", () => {
+        const isExpanded = createSectionToggle.getAttribute("aria-expanded") === "true";
+        createSectionToggle.setAttribute("aria-expanded", isExpanded ? "false" : "true");
+        if (isExpanded) {
+          createSectionContent.classList.add("hidden");
+        } else {
+          createSectionContent.classList.remove("hidden");
+        }
+        const indicator = createSectionToggle.querySelector(".toggle-indicator");
+        if (indicator) {
+          indicator.textContent = isExpanded ? "\u25BC" : "\u25B2";
+        }
+      });
+    }
+    (_e = document.getElementById("refreshPlansBtn")) == null ? void 0 : _e.addEventListener("click", refreshPlanList);
+    const plansSearchInput = document.getElementById("plansSearch");
+    if (plansSearchInput) {
+      const debouncedPlansFilter = debounce(() => {
+        filterPlans(plansSearchInput.value);
+      }, 300);
+      plansSearchInput.addEventListener("input", debouncedPlansFilter);
+    }
+    initRunEditModal();
+    initCaseEditModal();
+    initTestCasesView();
+    initPlanRunsModal();
+    initRunDetailsModal();
+    document.addEventListener("keydown", (e) => {
+      const caseModal = document.getElementById("caseEditModal");
+      if (!caseModal || caseModal.classList.contains("hidden")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        hideCaseEditModal();
+      }
+      if (e.key === "Enter") {
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.tagName === "INPUT" && activeElement.type === "text") {
+          e.preventDefault();
+          saveCaseEdit();
+        }
+      }
+    });
+  }
+  function initPlanRunsModal() {
+    var _a, _b, _c, _d, _e;
+    (_a = document.getElementById("planRunsModalClose")) == null ? void 0 : _a.addEventListener("click", hidePlanRunsModal);
+    (_b = document.getElementById("planRunsCloseBtn")) == null ? void 0 : _b.addEventListener("click", hidePlanRunsModal);
+    (_c = document.getElementById("planRunsModal")) == null ? void 0 : _c.addEventListener("click", (e) => {
+      var _a2;
+      if (((_a2 = e.target) == null ? void 0 : _a2.id) === "planRunsModal") {
+        hidePlanRunsModal();
+      }
+    });
+    (_d = document.getElementById("planRunsBreadcrumbPlans")) == null ? void 0 : _d.addEventListener("click", (e) => {
+      e.preventDefault();
+      const context = {
+        level: "runs",
+        planId: currentPlanId || void 0,
+        planName: currentPlanName || void 0
+      };
+      navigateToBreadcrumbLevel("plans", context);
+    });
+    (_e = document.getElementById("planRunsRetryBtn")) == null ? void 0 : _e.addEventListener("click", () => {
+      if (currentPlanId !== null) {
+        showPlanRunsModal(currentPlanId, currentPlanName, currentPlanEditButton || void 0);
+      }
+    });
+    document.addEventListener("keydown", (e) => {
+      const modal = document.getElementById("planRunsModal");
+      if (!modal || modal.classList.contains("hidden")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        hidePlanRunsModal();
+      }
+    });
+  }
+  function initRunDetailsModal() {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    (_a = document.getElementById("runDetailsModalClose")) == null ? void 0 : _a.addEventListener("click", () => {
+      handleRunDetailsBack();
+    });
+    (_b = document.getElementById("runDetailsBackBtn")) == null ? void 0 : _b.addEventListener("click", () => {
+      handleRunDetailsBack();
+    });
+    (_c = document.getElementById("runDetailsBackFooterBtn")) == null ? void 0 : _c.addEventListener("click", () => {
+      handleRunDetailsBack();
+    });
+    (_d = document.getElementById("runDetailsSaveBtn")) == null ? void 0 : _d.addEventListener("click", saveRunDetails);
+    (_e = document.getElementById("runDetailsModal")) == null ? void 0 : _e.addEventListener("click", (e) => {
+      var _a2;
+      if (((_a2 = e.target) == null ? void 0 : _a2.id) === "runDetailsModal") {
+        handleRunDetailsBack();
+      }
+    });
+    (_f = document.getElementById("runDetailsBreadcrumbPlans")) == null ? void 0 : _f.addEventListener("click", (e) => {
+      e.preventDefault();
+      const context = {
+        level: "cases",
+        planId: currentPlanId || void 0,
+        planName: currentPlanName || void 0,
+        runId: currentRunId || void 0,
+        runName: currentRunName || void 0
+      };
+      navigateToBreadcrumbLevel("plans", context);
+    });
+    (_g = document.getElementById("runDetailsBreadcrumbPlanName")) == null ? void 0 : _g.addEventListener("click", (e) => {
+      e.preventDefault();
+      const context = {
+        level: "cases",
+        planId: currentPlanId || void 0,
+        planName: currentPlanName || void 0,
+        runId: currentRunId || void 0,
+        runName: currentRunName || void 0
+      };
+      navigateToBreadcrumbLevel("runs", context);
+    });
+    (_h = document.getElementById("runDetailsCasesRetryBtn")) == null ? void 0 : _h.addEventListener("click", () => {
+      if (currentRunId !== null) {
+        loadRunDetailsCases(currentRunId);
+      }
+    });
+    const nameInput = document.getElementById("runDetailsName");
+    const descInput = document.getElementById("runDetailsDescription");
+    const refsInput = document.getElementById("runDetailsRefs");
+    const markDirty = () => {
+      currentRunIsDirty = true;
+    };
+    if (nameInput) {
+      nameInput.addEventListener("input", markDirty);
+    }
+    if (descInput) {
+      descInput.addEventListener("input", markDirty);
+    }
+    if (refsInput) {
+      refsInput.addEventListener("input", markDirty);
+    }
+    document.addEventListener("keydown", (e) => {
+      const modal = document.getElementById("runDetailsModal");
+      if (!modal || modal.classList.contains("hidden")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        handleRunDetailsBack();
+      }
+    });
+    const casesList = document.getElementById("runDetailsCasesList");
+    if (casesList) {
+      casesList.addEventListener("click", async (e) => {
+        const target = e.target;
+        if (target.closest(".edit-case-btn-modal")) {
+          e.stopPropagation();
+          const btn = target.closest(".edit-case-btn-modal");
+          const caseId = parseInt(btn.dataset.caseId || "0", 10);
+          const caseTitle = btn.dataset.caseTitle || "";
+          const refs = btn.dataset.caseRefs || null;
+          const btnElement = btn;
+          const originalText = btnElement.innerHTML;
+          btnElement.disabled = true;
+          btnElement.innerHTML = '<span class="icon" aria-hidden="true">\u23F3</span> Loading...';
+          try {
+            const response = await requestJson(`/api/manage/case/${caseId}`);
+            const caseData = response.case;
+            if (caseData) {
+              showCaseEditModal(
+                caseId,
+                caseData.title || caseTitle,
+                caseData.refs || refs,
+                caseData.custom_bdd_scenario || null
+              );
+            } else {
+              showCaseEditModal(caseId, caseTitle, refs, null);
+            }
+          } catch (err) {
+            console.error("Failed to fetch case details:", err);
+            showToast((err == null ? void 0 : err.message) || "Failed to load case details", "error");
+            showCaseEditModal(caseId, caseTitle, refs, null);
+          } finally {
+            btnElement.disabled = false;
+            btnElement.innerHTML = originalText;
+          }
+        }
+        if (target.closest(".delete-case-btn-modal")) {
+          e.stopPropagation();
+          const btn = target.closest(".delete-case-btn-modal");
+          const caseId = parseInt(btn.dataset.caseId || "0", 10);
+          const caseTitle = btn.dataset.caseTitle || `Case ${caseId}`;
+          showDeleteConfirmation("case", caseTitle, caseId, async () => {
+            const success = await deleteCase(caseId, caseTitle);
+            if (success && currentRunId !== null) {
+              await loadRunDetailsCases(currentRunId);
+            }
+          });
+        }
+      });
+    }
+  }
+  function initRunEditModal() {
+    var _a, _b, _c;
+    (_a = document.getElementById("runEditCancel")) == null ? void 0 : _a.addEventListener("click", hideRunEditModal);
+    (_b = document.getElementById("runEditModalClose")) == null ? void 0 : _b.addEventListener("click", hideRunEditModal);
+    (_c = document.getElementById("runEditModal")) == null ? void 0 : _c.addEventListener("click", (e) => {
+      var _a2;
+      if (((_a2 = e.target) == null ? void 0 : _a2.id) === "runEditModal") {
+        hideRunEditModal();
+      }
+    });
+    const runEditForm = document.getElementById("runEditForm");
+    if (runEditForm) {
+      runEditForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        saveRunEdit();
+      });
+    }
+    const nameInput = document.getElementById("runEditName");
+    if (nameInput) {
+      nameInput.addEventListener("input", () => {
+        const nameError = document.getElementById("runEditNameError");
+        if (nameError && !nameError.classList.contains("hidden")) {
+          if (nameInput.value.trim().length > 0) {
+            nameError.classList.add("hidden");
+            nameInput.style.borderColor = "var(--border)";
+          }
+        }
+      });
+    }
+    document.addEventListener("keydown", (e) => {
+      const modal = document.getElementById("runEditModal");
+      if (!modal || modal.classList.contains("hidden")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        hideRunEditModal();
+      }
+      if (e.key === "Enter") {
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.tagName === "INPUT" && activeElement.type === "text") {
+          e.preventDefault();
+          saveRunEdit();
+        }
+      }
+    });
+  }
+  var currentEditCaseId = null;
+  var currentEditCaseAttachments = [];
+  var ALLOWED_FILE_TYPES = [
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "video/mp4",
+    "video/webm",
+    "application/pdf"
+  ];
+  var MAX_FILE_SIZE_MB = 25;
+  var MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+  function showCaseEditModal(caseId, title, refs = null, bddScenarios = null) {
+    const modal = document.getElementById("caseEditModal");
+    const idInput = document.getElementById("caseEditId");
+    const titleInput = document.getElementById("caseEditTitle");
+    const refsInput = document.getElementById("caseEditRefs");
+    const bddInput = document.getElementById("caseEditBddScenarios");
+    const titleError = document.getElementById("caseEditTitleError");
+    const fileError = document.getElementById("caseEditFileError");
+    const loadingOverlay = document.getElementById("caseEditLoadingOverlay");
+    const attachmentsList = document.getElementById("caseEditAttachmentsList");
+    if (!modal || !idInput || !titleInput || !refsInput || !bddInput) {
+      console.error("Case edit modal elements not found");
+      return;
+    }
+    currentEditCaseId = caseId;
+    currentEditCaseAttachments = [];
+    const activeElement = document.activeElement;
+    storeTriggerElement("caseEditModal", activeElement);
+    idInput.value = String(caseId);
+    titleInput.value = title || "";
+    refsInput.value = refs || "";
+    bddInput.value = bddScenarios || "";
+    const breadcrumbPlanName = document.getElementById("caseEditBreadcrumbPlanName");
+    const breadcrumbRunName = document.getElementById("caseEditBreadcrumbRunName");
+    const breadcrumbCaseTitle = document.getElementById("caseEditBreadcrumbCaseTitle");
+    if (breadcrumbPlanName) {
+      breadcrumbPlanName.textContent = currentPlanName || "Test Plan";
+    }
+    if (breadcrumbRunName) {
+      breadcrumbRunName.textContent = currentRunName || "Test Run";
+    }
+    if (breadcrumbCaseTitle) {
+      breadcrumbCaseTitle.textContent = title || "Test Case";
+    }
+    if (titleError) {
+      titleError.classList.add("hidden");
+    }
+    if (fileError) {
+      fileError.classList.add("hidden");
+    }
+    titleInput.style.borderColor = "var(--border)";
+    if (loadingOverlay) {
+      loadingOverlay.classList.add("hidden");
+    }
+    if (attachmentsList) {
+      attachmentsList.innerHTML = "";
+    }
+    modal.classList.remove("hidden");
+    modal.style.zIndex = "12000";
+    activateFocusTrap("caseEditModal");
+    setTimeout(() => {
+      titleInput.focus();
+      titleInput.select();
+    }, 100);
+    loadCaseAttachments(caseId);
+  }
+  function hideCaseEditModal() {
+    const modal = document.getElementById("caseEditModal");
+    const titleInput = document.getElementById("caseEditTitle");
+    const refsInput = document.getElementById("caseEditRefs");
+    const bddInput = document.getElementById("caseEditBddScenarios");
+    const titleError = document.getElementById("caseEditTitleError");
+    const fileError = document.getElementById("caseEditFileError");
+    const loadingOverlay = document.getElementById("caseEditLoadingOverlay");
+    const attachmentsList = document.getElementById("caseEditAttachmentsList");
+    const uploadProgress = document.getElementById("caseEditUploadProgress");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.style.zIndex = "";
+    deactivateFocusTrap("caseEditModal");
+    restoreFocus("caseEditModal");
+    currentEditCaseId = null;
+    currentEditCaseAttachments = [];
+    if (titleInput) titleInput.value = "";
+    if (refsInput) refsInput.value = "";
+    if (bddInput) bddInput.value = "";
+    if (titleError) {
+      titleError.classList.add("hidden");
+    }
+    if (fileError) {
+      fileError.classList.add("hidden");
+    }
+    if (titleInput) {
+      titleInput.style.borderColor = "var(--border)";
+    }
+    if (loadingOverlay) {
+      loadingOverlay.classList.add("hidden");
+    }
+    if (uploadProgress) {
+      uploadProgress.classList.add("hidden");
+    }
+    if (attachmentsList) {
+      attachmentsList.innerHTML = "";
+    }
+    if (currentRunId !== null) {
+      const runDetailsModal = document.getElementById("runDetailsModal");
+      if (runDetailsModal && runDetailsModal.classList.contains("hidden")) {
+        showRunDetailsModal(currentRunId);
+      } else {
+        loadRunDetailsCases(currentRunId);
+      }
+    }
+  }
+  async function loadCaseAttachments(caseId) {
+    const attachmentsList = document.getElementById("caseEditAttachmentsList");
+    if (!attachmentsList) return;
+    attachmentsList.innerHTML = `
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
+      <div class="spinner" style="width: 24px; height: 24px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;" aria-hidden="true"></div>
+      <span style="margin-top: 8px; font-size: 12px; color: var(--muted);">Loading attachments...</span>
+    </div>
+  `;
+    try {
+      const response = await requestJson(`/api/manage/case/${caseId}/attachments`);
+      const attachments = response.attachments || [];
+      currentEditCaseAttachments = attachments;
+      renderAttachmentsList(attachments);
+    } catch (err) {
+      console.error("Failed to load attachments:", err);
+      attachmentsList.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center;">
+        <div style="font-size: 32px; margin-bottom: 8px; opacity: 0.5;" aria-hidden="true">\u26A0\uFE0F</div>
+        <p style="margin: 0 0 8px; font-size: 13px; color: var(--text);">Failed to load attachments</p>
+        <p style="margin: 0 0 12px; font-size: 12px; color: var(--muted);">${escapeHtml((err == null ? void 0 : err.message) || "An error occurred")}</p>
+        <button type="button" class="btn-secondary" onclick="window.retryLoadAttachments(${caseId})" style="padding: 6px 12px; font-size: 12px;">
+          <span class="icon" aria-hidden="true">\u{1F504}</span> Retry
+        </button>
+      </div>
+    `;
+    }
+  }
+  window.retryLoadAttachments = (caseId) => {
+    loadCaseAttachments(caseId);
+  };
+  function renderAttachmentsList(attachments) {
+    const attachmentsList = document.getElementById("caseEditAttachmentsList");
+    if (!attachmentsList) return;
+    if (attachments.length === 0) {
+      attachmentsList.innerHTML = `
+      <p style="margin: 0; font-size: 13px; color: var(--muted); text-align: center; padding: 12px;">
+        No attachments yet
+      </p>
+    `;
+      return;
+    }
+    attachmentsList.innerHTML = attachments.map((attachment) => {
+      var _a;
+      const isImage = (_a = attachment.content_type) == null ? void 0 : _a.startsWith("image/");
+      const fileName = escapeHtml(attachment.filename || attachment.name || "Attachment");
+      const fileSize = formatFileSize(attachment.size || 0);
+      return `
+        <div class="attachment-item" style="display: flex; align-items: center; gap: 12px; padding: 10px; background: rgba(0,0,0,0.02); border: 1px solid var(--border); border-radius: 8px;">
+          ${isImage ? `
+            <div style="width: 48px; height: 48px; border-radius: 6px; overflow: hidden; flex-shrink: 0; background: var(--border);">
+              <img src="/api/manage/attachment/${attachment.id}/thumbnail" alt="${fileName}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'"/>
+            </div>
+          ` : `
+            <div style="width: 48px; height: 48px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: rgba(26, 138, 133, 0.1); flex-shrink: 0;">
+              <span style="font-size: 20px;" aria-hidden="true">${getFileIcon(attachment.content_type)}</span>
+            </div>
+          `}
+          <div style="flex: 1; min-width: 0;">
+            <p style="margin: 0 0 2px; font-size: 13px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              ${fileName}
+            </p>
+            <p style="margin: 0; font-size: 11px; color: var(--muted);">
+              ${fileSize}
+            </p>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+  function getFileIcon(contentType) {
+    if (!contentType) return "\u{1F4C4}";
+    if (contentType.startsWith("image/")) return "\u{1F5BC}\uFE0F";
+    if (contentType.startsWith("video/")) return "\u{1F3AC}";
+    if (contentType === "application/pdf") return "\u{1F4D5}";
+    return "\u{1F4C4}";
+  }
+  function formatFileSize(bytes) {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+  }
+  function initCaseEditModal() {
+    var _a, _b, _c, _d, _e, _f;
+    (_a = document.getElementById("caseEditCancel")) == null ? void 0 : _a.addEventListener("click", hideCaseEditModal);
+    (_b = document.getElementById("caseEditModalClose")) == null ? void 0 : _b.addEventListener("click", hideCaseEditModal);
+    (_c = document.getElementById("caseEditModal")) == null ? void 0 : _c.addEventListener("click", (e) => {
+      var _a2;
+      if (((_a2 = e.target) == null ? void 0 : _a2.id) === "caseEditModal") {
+        hideCaseEditModal();
+      }
+    });
+    (_d = document.getElementById("caseEditBreadcrumbPlans")) == null ? void 0 : _d.addEventListener("click", (e) => {
+      e.preventDefault();
+      const titleInput2 = document.getElementById("caseEditTitle");
+      const context = {
+        level: "case-edit",
+        planId: currentPlanId || void 0,
+        planName: currentPlanName || void 0,
+        runId: currentRunId || void 0,
+        runName: currentRunName || void 0,
+        caseId: currentEditCaseId || void 0,
+        caseTitle: (titleInput2 == null ? void 0 : titleInput2.value) || void 0
+      };
+      navigateToBreadcrumbLevel("plans", context);
+    });
+    (_e = document.getElementById("caseEditBreadcrumbPlanName")) == null ? void 0 : _e.addEventListener("click", (e) => {
+      e.preventDefault();
+      const titleInput2 = document.getElementById("caseEditTitle");
+      const context = {
+        level: "case-edit",
+        planId: currentPlanId || void 0,
+        planName: currentPlanName || void 0,
+        runId: currentRunId || void 0,
+        runName: currentRunName || void 0,
+        caseId: currentEditCaseId || void 0,
+        caseTitle: (titleInput2 == null ? void 0 : titleInput2.value) || void 0
+      };
+      navigateToBreadcrumbLevel("runs", context);
+    });
+    (_f = document.getElementById("caseEditBreadcrumbRunName")) == null ? void 0 : _f.addEventListener("click", (e) => {
+      e.preventDefault();
+      const titleInput2 = document.getElementById("caseEditTitle");
+      const context = {
+        level: "case-edit",
+        planId: currentPlanId || void 0,
+        planName: currentPlanName || void 0,
+        runId: currentRunId || void 0,
+        runName: currentRunName || void 0,
+        caseId: currentEditCaseId || void 0,
+        caseTitle: (titleInput2 == null ? void 0 : titleInput2.value) || void 0
+      };
+      navigateToBreadcrumbLevel("cases", context);
+    });
+    const caseEditForm = document.getElementById("caseEditForm");
+    if (caseEditForm) {
+      caseEditForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        saveCaseEdit();
+      });
+    }
+    const titleInput = document.getElementById("caseEditTitle");
+    if (titleInput) {
+      titleInput.addEventListener("input", () => {
+        const titleError = document.getElementById("caseEditTitleError");
+        if (titleError && !titleError.classList.contains("hidden")) {
+          if (titleInput.value.trim().length > 0) {
+            titleError.classList.add("hidden");
+            titleInput.style.borderColor = "var(--border)";
+          }
+        }
+      });
+    }
+    initFileUploadHandlers();
+  }
+  function initFileUploadHandlers() {
+    const dropZone = document.getElementById("caseEditDropZone");
+    const fileInput = document.getElementById("caseEditFileInput");
+    if (!dropZone || !fileInput) return;
+    dropZone.addEventListener("click", () => {
+      fileInput.click();
+    });
+    dropZone.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+    fileInput.addEventListener("change", () => {
+      var _a;
+      const file = (_a = fileInput.files) == null ? void 0 : _a[0];
+      if (file) {
+        handleFileUpload(file);
+      }
+      fileInput.value = "";
+    });
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.style.borderColor = "var(--primary)";
+      dropZone.style.background = "rgba(26, 138, 133, 0.06)";
+    });
+    dropZone.addEventListener("dragleave", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.style.borderColor = "var(--border)";
+      dropZone.style.background = "transparent";
+    });
+    dropZone.addEventListener("drop", (e) => {
+      var _a, _b;
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.style.borderColor = "var(--border)";
+      dropZone.style.background = "transparent";
+      const file = (_b = (_a = e.dataTransfer) == null ? void 0 : _a.files) == null ? void 0 : _b[0];
+      if (file) {
+        handleFileUpload(file);
+      }
+    });
+  }
+  function validateCaseTitle(title) {
+    return title.trim().length > 0;
+  }
+  function showCaseTitleValidationError() {
+    const titleInput = document.getElementById("caseEditTitle");
+    const titleError = document.getElementById("caseEditTitleError");
+    if (titleInput) {
+      titleInput.style.borderColor = "#ef4444";
+    }
+    if (titleError) {
+      titleError.classList.remove("hidden");
+    }
+  }
+  function clearCaseTitleValidationError() {
+    const titleInput = document.getElementById("caseEditTitle");
+    const titleError = document.getElementById("caseEditTitleError");
+    if (titleInput) {
+      titleInput.style.borderColor = "var(--border)";
+    }
+    if (titleError) {
+      titleError.classList.add("hidden");
+    }
+  }
+  async function saveCaseEdit() {
+    const titleInput = document.getElementById("caseEditTitle");
+    const refsInput = document.getElementById("caseEditRefs");
+    const bddInput = document.getElementById("caseEditBddScenarios");
+    const loadingOverlay = document.getElementById("caseEditLoadingOverlay");
+    const saveBtn = document.getElementById("caseEditSave");
+    if (!titleInput || !refsInput || !bddInput || currentEditCaseId === null) {
+      console.error("Case edit form elements not found or no case selected");
+      return;
+    }
+    const title = titleInput.value;
+    const refs = refsInput.value;
+    const bddScenarios = bddInput.value;
+    if (!validateCaseTitle(title)) {
+      showCaseTitleValidationError();
+      titleInput.focus();
+      return;
+    }
+    clearCaseTitleValidationError();
+    if (loadingOverlay) {
+      loadingOverlay.classList.remove("hidden");
+    }
+    if (saveBtn) {
+      saveBtn.disabled = true;
+    }
+    try {
+      const response = await requestJson(`/api/manage/case/${currentEditCaseId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          refs: refs || null,
+          custom_bdd_scenario: bddScenarios || null
+        })
+      });
+      if (response.success) {
+        showToast(`Case "${title.trim()}" updated successfully`, "success");
+        hideCaseEditModal();
+      } else {
+        throw new Error(response.message || "Failed to update case");
+      }
+    } catch (err) {
+      showToast((err == null ? void 0 : err.message) || "Failed to update case", "error");
+    } finally {
+      if (loadingOverlay) {
+        loadingOverlay.classList.add("hidden");
+      }
+      if (saveBtn) {
+        saveBtn.disabled = false;
+      }
+    }
+  }
+  function validateFileType(file) {
+    return ALLOWED_FILE_TYPES.includes(file.type);
+  }
+  function validateFileSize(file) {
+    return file.size <= MAX_FILE_SIZE_BYTES;
+  }
+  function showFileValidationError(message) {
+    const fileError = document.getElementById("caseEditFileError");
+    if (fileError) {
+      fileError.textContent = message;
+      fileError.classList.remove("hidden");
+    }
+  }
+  function clearFileValidationError() {
+    const fileError = document.getElementById("caseEditFileError");
+    if (fileError) {
+      fileError.classList.add("hidden");
+    }
+  }
+  async function handleFileUpload(file) {
+    if (currentEditCaseId === null) {
+      showToast("No case selected for attachment", "error");
+      return;
+    }
+    clearFileValidationError();
+    if (!validateFileType(file)) {
+      showFileValidationError("File type not allowed. Accepted types: PNG, JPG, GIF, MP4, WebM, PDF");
+      return;
+    }
+    if (!validateFileSize(file)) {
+      showFileValidationError(`File size exceeds ${MAX_FILE_SIZE_MB}MB limit`);
+      return;
+    }
+    const uploadProgress = document.getElementById("caseEditUploadProgress");
+    const uploadFileName = document.getElementById("caseEditUploadFileName");
+    if (uploadProgress) {
+      uploadProgress.classList.remove("hidden");
+    }
+    if (uploadFileName) {
+      uploadFileName.textContent = `Uploading ${file.name}...`;
+    }
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`/api/manage/case/${currentEditCaseId}/attachment`, {
+        method: "POST",
+        body: formData
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Upload failed with status ${response.status}`);
+      }
+      const result = await response.json();
+      if (result.attachment) {
+        currentEditCaseAttachments.push(result.attachment);
+        renderAttachmentsList(currentEditCaseAttachments);
+      }
+      showToast(`File "${file.name}" uploaded successfully`, "success");
+    } catch (err) {
+      showToast((err == null ? void 0 : err.message) || "Failed to upload file", "error");
+    } finally {
+      if (uploadProgress) {
+        uploadProgress.classList.add("hidden");
+      }
+    }
+  }
+  async function initManageView() {
+    try {
+      plansCurrentPage = 0;
+      await loadManagePlans2();
+    } catch (err) {
+      console.error("Error initializing manage view:", err);
+      showToast("Failed to load management data", "error");
+    }
+  }
+  var allPlans = [];
+  var plansCurrentPage = 0;
+  var PLANS_PAGE_SIZE = 10;
+  async function loadManagePlans2() {
+    const container = document.getElementById("plansListContainer");
+    const loadingState = document.getElementById("plansLoadingState");
+    const emptyState = document.getElementById("plansEmptyState");
+    const countBadge = document.getElementById("plansCount");
+    const refreshBtn = document.getElementById("refreshPlansBtn");
+    const searchInput = document.getElementById("plansSearch");
+    if (!container || !loadingState || !emptyState) return;
+    const currentSearchValue = (searchInput == null ? void 0 : searchInput.value) || "";
+    loadingState.classList.remove("hidden");
+    emptyState.classList.add("hidden");
+    container.classList.add("hidden");
+    setSubsectionBusy("plans", true);
+    announceStatus("Loading plans...");
+    if (refreshBtn) refreshBtn.disabled = true;
+    if (searchInput) searchInput.disabled = true;
+    disableEntityButtons("plan");
+    try {
+      const projectInput = document.getElementById("planProject");
+      const project = (projectInput == null ? void 0 : projectInput.value) || "1";
+      const data = await requestJson(`/api/plans?project=${encodeURIComponent(project)}&is_completed=0`);
+      const plans = Array.isArray(data.plans) ? data.plans : [];
+      const plansWithRunData = await Promise.all(
+        plans.map(async (plan) => {
+          try {
+            const runsData = await requestJson(`/api/runs?plan=${plan.id}&project=${encodeURIComponent(project)}`);
+            const runs = Array.isArray(runsData.runs) ? runsData.runs : [];
+            let latestRunUpdate = 0;
+            runs.forEach((run) => {
+              const runTime = run.updated_on || run.created_on || 0;
+              if (runTime > latestRunUpdate) {
+                latestRunUpdate = runTime;
+              }
+            });
+            const effectiveUpdateTime = latestRunUpdate || plan.updated_on || plan.created_on || 0;
+            return __spreadProps(__spreadValues({}, plan), {
+              effective_updated_on: effectiveUpdateTime,
+              latest_run_update: latestRunUpdate
+            });
+          } catch (err) {
+            return __spreadProps(__spreadValues({}, plan), {
+              effective_updated_on: plan.updated_on || plan.created_on || 0,
+              latest_run_update: 0
+            });
+          }
+        })
+      );
+      plansWithRunData.sort((a, b) => {
+        return b.effective_updated_on - a.effective_updated_on;
+      });
+      allPlans = plansWithRunData;
+      if (countBadge) {
+        countBadge.textContent = String(plans.length);
+      }
+      if (currentSearchValue.trim()) {
+        filterPlans(currentSearchValue);
+      } else {
+        renderPlansSubsection(plans);
+      }
+      setSubsectionBusy("plans", false);
+      announceStatus(`Loaded ${plans.length} plan${plans.length !== 1 ? "s" : ""}`);
+    } catch (err) {
+      setSubsectionBusy("plans", false);
+      announceStatus("Failed to load plans");
+      showErrorState("plans", (err == null ? void 0 : err.message) || "Failed to load plans", refreshPlanList);
+      showToast((err == null ? void 0 : err.message) || "Failed to load plans", "error");
+    } finally {
+      if (refreshBtn) refreshBtn.disabled = false;
+      if (searchInput) searchInput.disabled = false;
+    }
+  }
+  function renderPlansSubsection(plans) {
+    var _a, _b;
+    const container = document.getElementById("plansListContainer");
+    const loadingState = document.getElementById("plansLoadingState");
+    const emptyState = document.getElementById("plansEmptyState");
+    if (!container || !loadingState || !emptyState) return;
+    if (plans.length === 0) {
+      loadingState.classList.add("hidden");
+      emptyState.classList.remove("hidden");
+      container.classList.add("hidden");
+      return;
+    }
+    const startIndex = plansCurrentPage * PLANS_PAGE_SIZE;
+    const endIndex = startIndex + PLANS_PAGE_SIZE;
+    const displayPlans = plans.slice(startIndex, endIndex);
+    const totalPages = Math.ceil(plans.length / PLANS_PAGE_SIZE);
+    const hasPrev = plansCurrentPage > 0;
+    const hasNext = plansCurrentPage < totalPages - 1;
+    container.innerHTML = displayPlans.map((plan) => {
+      const planName = escapeHtml(plan.name || `Plan ${plan.id}`);
+      const planId = plan.id;
+      const isCompleted = plan.is_completed === true || plan.is_completed === 1;
+      const badgeClass = isCompleted ? "badge-completed" : "badge-active";
+      const badgeText = isCompleted ? "Completed" : "Active";
+      const updatedOn = plan.effective_updated_on || plan.updated_on || plan.created_on;
+      let lastUpdatedText = "";
+      if (updatedOn) {
+        const date = new Date(updatedOn * 1e3);
+        const now = /* @__PURE__ */ new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffDays = Math.floor(diffMs / (1e3 * 60 * 60 * 24));
+        if (diffDays === 0) {
+          lastUpdatedText = "Today";
+        } else if (diffDays === 1) {
+          lastUpdatedText = "Yesterday";
+        } else if (diffDays < 7) {
+          lastUpdatedText = `${diffDays} days ago`;
+        } else if (diffDays < 30) {
+          const weeks = Math.floor(diffDays / 7);
+          lastUpdatedText = `${weeks} week${weeks > 1 ? "s" : ""} ago`;
+        } else if (diffDays < 365) {
+          const months = Math.floor(diffDays / 30);
+          lastUpdatedText = `${months} month${months > 1 ? "s" : ""} ago`;
+        } else {
+          const years = Math.floor(diffDays / 365);
+          lastUpdatedText = `${years} year${years > 1 ? "s" : ""} ago`;
+        }
+      }
+      return `
+        <div class="entity-card" role="listitem" data-entity-type="plan" data-entity-id="${planId}" data-plan-name="${escapeHtml(plan.name || "").toLowerCase()}" aria-label="Plan: ${planName}, Status: ${badgeText}">
+          <div class="entity-card-header">
+            <div class="entity-card-title" id="plan-title-${planId}">${planName}</div>
+            <div class="entity-card-badges">
+              <span class="badge ${badgeClass}" role="status">${badgeText}</span>
+            </div>
+          </div>
+          <div class="entity-card-meta">
+            <span class="meta-item">
+              <span class="icon" aria-hidden="true">\u{1F194}</span> Plan ID: ${planId}
+            </span>
+            ${lastUpdatedText ? `<span class="meta-item">
+              <span class="icon" aria-hidden="true">\u{1F552}</span> Updated: ${lastUpdatedText}
+            </span>` : ""}
+          </div>
+          <div class="entity-card-actions" role="group" aria-label="Actions for ${planName}">
+            <button type="button" class="btn-edit edit-plan-btn" data-plan-id="${planId}" data-plan-name="${escapeHtml(plan.name || "")}" aria-label="Edit plan ${planName}" aria-describedby="plan-title-${planId}">
+              <span class="icon" aria-hidden="true">\u270F\uFE0F</span> Edit
+            </button>
+            <button type="button" class="btn-delete delete-plan-btn" data-plan-id="${planId}" data-plan-name="${escapeHtml(plan.name || "")}" aria-label="Delete plan ${planName}" aria-describedby="plan-title-${planId}">
+              <span class="icon" aria-hidden="true">\u{1F5D1}\uFE0F</span> Delete
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+    container.innerHTML += `
+    <div class="pagination-controls" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-top: 1px solid var(--border); margin-top: 8px;">
+      <span style="font-size: 13px; color: var(--muted);">
+        Showing ${startIndex + 1}-${Math.min(endIndex, plans.length)} of ${plans.length} plans
+      </span>
+      <div style="display: flex; gap: 8px;">
+        <button type="button" class="refresh-btn plans-prev-btn" ${!hasPrev ? "disabled" : ""} aria-label="Previous page">
+          \u2190 Prev
+        </button>
+        <span style="font-size: 13px; color: var(--muted); padding: 6px 12px;">
+          Page ${plansCurrentPage + 1} of ${totalPages}
+        </span>
+        <button type="button" class="refresh-btn plans-next-btn" ${!hasNext ? "disabled" : ""} aria-label="Next page">
+          Next \u2192
+        </button>
+      </div>
+    </div>
+  `;
+    loadingState.classList.add("hidden");
+    emptyState.classList.add("hidden");
+    container.classList.remove("hidden");
+    attachPlanEventListeners();
+    (_a = container.querySelector(".plans-prev-btn")) == null ? void 0 : _a.addEventListener("click", () => {
+      if (plansCurrentPage > 0) {
+        plansCurrentPage--;
+        renderPlansSubsection(plans);
+      }
+    });
+    (_b = container.querySelector(".plans-next-btn")) == null ? void 0 : _b.addEventListener("click", () => {
+      if (plansCurrentPage < totalPages - 1) {
+        plansCurrentPage++;
+        renderPlansSubsection(plans);
+      }
+    });
+  }
+  function filterPlans(searchQuery) {
+    const query = searchQuery.toLowerCase().trim();
+    plansCurrentPage = 0;
+    if (!query) {
+      renderPlansSubsection(allPlans);
+      return;
+    }
+    const filteredPlans = allPlans.filter((plan) => {
+      const planName = (plan.name || `Plan ${plan.id}`).toLowerCase();
+      return planName.includes(query);
+    });
+    renderPlansSubsection(filteredPlans);
+  }
+  var currentTestCasesRunId = null;
+  var currentTestCasesRunName = "";
+  function getStatusBadgeClass(statusId) {
+    switch (statusId) {
+      case 1:
+        return "badge-passed";
+      // Green for Passed
+      case 2:
+        return "badge-blocked";
+      // Orange for Blocked
+      case 3:
+        return "badge-untested";
+      // Gray for Untested
+      case 4:
+        return "badge-retest";
+      // Yellow for Retest
+      case 5:
+        return "badge-failed";
+      // Red for Failed
+      default:
+        return "badge-untested";
+    }
+  }
+  function hideTestCasesView() {
+    const testCasesView = document.getElementById("testCasesView");
+    if (testCasesView) {
+      testCasesView.classList.add("hidden");
+    }
+    const container = document.getElementById("testCasesListContainer");
+    if (container) {
+      container.innerHTML = "";
+      container.classList.add("hidden");
+    }
+    if (currentPlanId !== null && currentPlanName) {
+      showPlanRunsModal(currentPlanId, currentPlanName, currentPlanEditButton || void 0);
+      announceStatus(`Returned to runs for ${currentPlanName}`);
+    } else {
+      announceStatus("Returned to plans list");
+    }
+    currentTestCasesRunId = null;
+    currentTestCasesRunName = "";
+  }
+  async function loadTestCases(runId) {
+    const container = document.getElementById("testCasesListContainer");
+    const loadingState = document.getElementById("testCasesLoadingState");
+    const emptyState = document.getElementById("testCasesEmptyState");
+    const errorState = document.getElementById("testCasesErrorState");
+    const countBadge = document.getElementById("testCasesCount");
+    const refreshBtn = document.getElementById("refreshTestCasesBtn");
+    if (!container || !loadingState || !emptyState || !errorState) return;
+    loadingState.classList.remove("hidden");
+    emptyState.classList.add("hidden");
+    errorState.classList.add("hidden");
+    container.classList.add("hidden");
+    if (refreshBtn) refreshBtn.disabled = true;
+    announceStatus("Loading test cases...");
+    try {
+      const data = await requestJson(`/api/tests/${runId}`);
+      const tests = Array.isArray(data.tests) ? data.tests : [];
+      if (countBadge) {
+        countBadge.textContent = String(tests.length);
+      }
+      loadingState.classList.add("hidden");
+      if (tests.length === 0) {
+        emptyState.classList.remove("hidden");
+        container.classList.add("hidden");
+        announceStatus("No test cases found");
+      } else {
+        renderTestCases(tests);
+        announceStatus(`Loaded ${tests.length} test case${tests.length !== 1 ? "s" : ""}`);
+      }
+    } catch (err) {
+      loadingState.classList.add("hidden");
+      errorState.classList.remove("hidden");
+      container.classList.add("hidden");
+      const errorMessage = document.getElementById("testCasesErrorMessage");
+      if (errorMessage) {
+        errorMessage.textContent = (err == null ? void 0 : err.message) || "An error occurred while loading test cases.";
+      }
+      showToast((err == null ? void 0 : err.message) || "Failed to load test cases", "error");
+      announceStatus("Failed to load test cases");
+    } finally {
+      if (refreshBtn) refreshBtn.disabled = false;
+    }
+  }
+  function renderTestCases(tests) {
+    const container = document.getElementById("testCasesListContainer");
+    const emptyState = document.getElementById("testCasesEmptyState");
+    const errorState = document.getElementById("testCasesErrorState");
+    if (!container) return;
+    if (emptyState) emptyState.classList.add("hidden");
+    if (errorState) errorState.classList.add("hidden");
+    container.innerHTML = tests.map((test) => {
+      const testTitle = escapeHtml(test.title || `Test ${test.id}`);
+      const testId = test.id;
+      const caseId = test.case_id;
+      const statusId = test.status_id || 3;
+      const statusName = escapeHtml(test.status_name || "Untested");
+      const refs = test.refs ? escapeHtml(String(test.refs)) : "";
+      const badgeClass = getStatusBadgeClass(statusId);
+      return `
+        <div class="entity-card" role="listitem" data-entity-type="test" data-entity-id="${testId}" data-case-id="${caseId}" aria-label="Test: ${testTitle}, Status: ${statusName}">
+          <div class="entity-card-header">
+            <div class="entity-card-title" id="test-title-${testId}">${testTitle}</div>
+            <div class="entity-card-badges">
+              <span class="badge ${badgeClass}" role="status" aria-label="Status: ${statusName}">${statusName}</span>
+            </div>
+          </div>
+          <div class="entity-card-meta">
+            <span class="meta-item">
+              <span class="icon" aria-hidden="true">\u{1F194}</span> Test ID: ${testId}
+            </span>
+            <span class="meta-item">
+              <span class="icon" aria-hidden="true">\u{1F4CB}</span> Case ID: ${caseId}
+            </span>
+            ${refs ? `<span class="meta-item"><span class="icon" aria-hidden="true">\u{1F517}</span> Refs: ${refs}</span>` : ""}
+          </div>
+          <div class="entity-card-actions" role="group" aria-label="Actions for ${testTitle}">
+            <button type="button" class="btn-edit edit-test-case-btn" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || "")}" data-case-refs="${escapeHtml(test.refs || "")}" aria-label="Edit case ${testTitle}" aria-describedby="test-title-${testId}">
+              <span class="icon" aria-hidden="true">\u270F\uFE0F</span> Edit Case
+            </button>
+          </div>
+        </div>
+      `;
+    }).join("");
+    container.classList.remove("hidden");
+    attachTestCaseEventListeners();
+  }
+  function attachTestCaseEventListeners() {
+    document.querySelectorAll(".edit-test-case-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const target = e.currentTarget;
+        const caseId = parseInt(target.dataset.caseId || "0", 10);
+        const caseTitle = target.dataset.caseTitle || "";
+        const refs = target.dataset.caseRefs || null;
+        showCaseEditModal(caseId, caseTitle, refs, null);
+      });
+    });
+  }
+  function initTestCasesView() {
+    var _a, _b, _c;
+    (_a = document.getElementById("testCasesBackBtn")) == null ? void 0 : _a.addEventListener("click", hideTestCasesView);
+    (_b = document.getElementById("refreshTestCasesBtn")) == null ? void 0 : _b.addEventListener("click", () => {
+      if (currentTestCasesRunId !== null) {
+        loadTestCases(currentTestCasesRunId);
+      }
+    });
+    (_c = document.getElementById("testCasesRetryBtn")) == null ? void 0 : _c.addEventListener("click", () => {
+      if (currentTestCasesRunId !== null) {
+        loadTestCases(currentTestCasesRunId);
+      }
+    });
+  }
+
   // src/app.ts
   function updateReportMeta(meta, params) {
     const container = document.getElementById("reportMeta");
@@ -828,13 +2832,15 @@
         body: JSON.stringify(payload)
       });
       const planId = (_e = data == null ? void 0 : data.plan) == null ? void 0 : _e.id;
-      showToast(planId ? `Plan created: #${planId}` : "Plan created", "success");
+      const planName = payload.name;
+      showToast(`Plan "${planName}" created successfully`, "success");
       const nameEl = document.getElementById("planName");
       const descEl = document.getElementById("planDesc");
       const milestoneEl = document.getElementById("planMilestone");
       if (nameEl) nameEl.value = "";
       if (descEl) descEl.value = "";
       if (milestoneEl) milestoneEl.value = "";
+      await refreshPlanList();
     } catch (err) {
       showToast((err == null ? void 0 : err.message) || "Failed to create plan", "error");
     }
@@ -874,12 +2880,13 @@
         body: JSON.stringify(payload)
       });
       const runId = (_i = data == null ? void 0 : data.run) == null ? void 0 : _i.id;
-      showToast(runId ? `Run created: #${runId}` : "Run created", "success");
-      const runName = document.getElementById("runName");
+      const runName = payload.name;
+      showToast(`Run "${runName}" created successfully`, "success");
+      const runNameEl = document.getElementById("runName");
       const runDesc = document.getElementById("runDesc");
       const runRefs = document.getElementById("runRefs");
       const runCaseIds = document.getElementById("runCaseIds");
-      if (runName) runName.value = "";
+      if (runNameEl) runNameEl.value = "";
       if (runDesc) runDesc.value = "";
       if (runRefs) runRefs.value = "";
       if (runCaseIds) runCaseIds.value = "";
@@ -910,13 +2917,12 @@
         body: JSON.stringify(payload)
       });
       const caseId = (_e = data == null ? void 0 : data.case) == null ? void 0 : _e.id;
-      const msg = caseId ? `Case created: #${caseId}` : "Case created";
-      showToast(msg, "success");
-      togglePanel("casePanel", "close");
-      const caseTitle = document.getElementById("caseTitle");
+      const caseTitle = payload.title;
+      showToast(`Case "${caseTitle}" created successfully`, "success");
+      const caseTitleEl = document.getElementById("caseTitle");
       const caseRefs = document.getElementById("caseRefs");
       const caseBdd = document.getElementById("caseBdd");
-      if (caseTitle) caseTitle.value = "";
+      if (caseTitleEl) caseTitleEl.value = "";
       if (caseRefs) caseRefs.value = "";
       if (caseBdd) caseBdd.value = "";
     } catch (err) {
@@ -986,11 +2992,13 @@
     }
   };
   function init() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
     setupThemeToggle();
     updateReportMeta(void 0);
     loadPlans().catch((err) => console.error("loadPlans error", err));
     loadManagePlans().catch((err) => console.error("loadManagePlans error", err));
+    initManagement();
+    window.initManageView = initManageView;
     const runSearch = document.getElementById("runSearch");
     if (runSearch) {
       runSearch.addEventListener("input", filterRuns);
@@ -1009,8 +3017,8 @@
       setRunSelections(false);
       filterRuns();
     });
-    const refreshPlansBtn = document.getElementById("refreshPlansBtn");
-    refreshPlansBtn == null ? void 0 : refreshPlansBtn.addEventListener("click", () => loadPlans(true));
+    const refreshReportPlansBtn = document.getElementById("refreshReportPlansBtn");
+    refreshReportPlansBtn == null ? void 0 : refreshReportPlansBtn.addEventListener("click", () => loadPlans(true));
     const refreshManagePlansBtn = document.getElementById("refreshManagePlansBtn");
     refreshManagePlansBtn == null ? void 0 : refreshManagePlansBtn.addEventListener("click", () => loadManagePlans(true));
     (_a = document.getElementById("casePickerToggle")) == null ? void 0 : _a.addEventListener("click", openCasePicker);
@@ -1042,18 +3050,22 @@
       e.preventDefault();
       switchView("reporter");
     });
-    (_o = document.getElementById("linkManage")) == null ? void 0 : _o.addEventListener("click", (e) => {
+    (_o = document.getElementById("linkDashboard")) == null ? void 0 : _o.addEventListener("click", (e) => {
+      e.preventDefault();
+      switchView("dashboard");
+    });
+    (_p = document.getElementById("linkManage")) == null ? void 0 : _p.addEventListener("click", (e) => {
       e.preventDefault();
       switchView("manage");
     });
-    (_p = document.getElementById("linkHowTo")) == null ? void 0 : _p.addEventListener("click", (e) => {
+    (_q = document.getElementById("linkHowTo")) == null ? void 0 : _q.addEventListener("click", (e) => {
       e.preventDefault();
       switchView("howto");
     });
-    (_q = document.getElementById("runProject")) == null ? void 0 : _q.addEventListener("change", () => {
+    (_r = document.getElementById("runProject")) == null ? void 0 : _r.addEventListener("change", () => {
       loadManagePlans();
     });
-    (_r = document.getElementById("caseProject")) == null ? void 0 : _r.addEventListener("change", () => {
+    (_s = document.getElementById("caseProject")) == null ? void 0 : _s.addEventListener("change", () => {
       loadManagePlans();
     });
     document.querySelectorAll(".panel-toggle").forEach((btn) => {

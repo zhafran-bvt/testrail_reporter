@@ -15,6 +15,7 @@ Generate and serve clean HTML summaries for TestRail plans or runs. The report i
 - Streaming renderer keeps memory stable by writing run data to NDJSON and only snapshotting a few preview cards for tests
 - Download button saves the rendered HTML directly (attachments are already inlined for offline use)
 - Robust API handling (pagination, mixed payload shapes)
+- **Dashboard view** for monitoring test plans and runs with real-time statistics, filtering, and visual indicators
 
 ## Requirements
 - Python 3.9+
@@ -78,6 +79,78 @@ API endpoints:
 - `GET /reports/<file.html>` → serves previously generated HTML
 - `GET /healthz` → health check
 
+### Management & CRUD Operations
+
+The application provides full CRUD (Create, Read, Update, Delete) operations for test plans, runs, and cases:
+
+**Management API endpoints:**
+- `POST /api/manage/plan` → create a new test plan
+- `PUT /api/manage/plan/{plan_id}` → update an existing plan
+- `DELETE /api/manage/plan/{plan_id}` → delete a plan (with cascade)
+- `POST /api/manage/run` → create a new test run
+- `PUT /api/manage/run/{run_id}` → update an existing run
+- `DELETE /api/manage/run/{run_id}` → delete a run
+- `POST /api/manage/case` → create a new test case
+- `PUT /api/manage/case/{case_id}` → update an existing case
+- `DELETE /api/manage/case/{case_id}` → delete a case
+
+**CRUD features:**
+- Update operations support partial updates (only specified fields are changed)
+- Delete operations support dry_run mode for safe preview
+- Cascade deletion: deleting a plan deletes all its runs
+- Automatic cache invalidation after updates/deletes
+- UI provides edit and delete buttons with confirmation dialogs
+- Form validation ensures data integrity
+
+For detailed CRUD operation documentation, see [CRUD Operations Guide](CRUD_OPERATIONS_GUIDE.md).
+
+### Dashboard
+
+The dashboard provides a real-time overview of test plans and runs with statistics, filtering, and visual indicators:
+
+**Dashboard API endpoints:**
+- `GET /api/dashboard/plans` → paginated list of plans with statistics
+  - Query params: `project`, `is_completed`, `limit`, `offset`, `created_after`, `created_before`, `search`
+- `GET /api/dashboard/plan/{plan_id}` → detailed plan info with all runs
+- `GET /api/dashboard/runs/{plan_id}` → list of runs for a plan with statistics
+- `GET /api/dashboard/config` → dashboard configuration values (thresholds, pagination)
+- `POST /api/dashboard/cache/clear` → clear all dashboard caches for fresh data
+
+**Dashboard features:**
+- Paginated plan lists with search and filtering
+- Real-time statistics (pass rate, completion rate, status distribution)
+- Color-coded visual indicators based on pass rates
+- Critical issue highlighting for high failure/block rates
+- Sortable columns (name, date, pass rate, test count)
+- Expandable plan details showing all runs
+- Integrated report generation from dashboard
+- Responsive design for mobile/tablet/desktop
+- Configurable caching for performance
+
+**Dashboard configuration:**
+
+The dashboard behavior can be customized via environment variables:
+
+```bash
+# Cache TTL (seconds) - how long to cache dashboard data
+DASHBOARD_PLANS_CACHE_TTL=300          # Plan list cache (5 minutes)
+DASHBOARD_PLAN_DETAIL_CACHE_TTL=180   # Plan detail cache (3 minutes)
+DASHBOARD_STATS_CACHE_TTL=120         # Statistics cache (2 minutes)
+DASHBOARD_RUN_STATS_CACHE_TTL=120     # Run statistics cache (2 minutes)
+
+# Pagination
+DASHBOARD_DEFAULT_PAGE_SIZE=50        # Default number of plans per page
+DASHBOARD_MAX_PAGE_SIZE=200           # Maximum allowed page size
+
+# Visual thresholds (percentages)
+DASHBOARD_PASS_RATE_HIGH=80           # Green color threshold (>= 80%)
+DASHBOARD_PASS_RATE_MEDIUM=50         # Yellow color threshold (>= 50%)
+DASHBOARD_CRITICAL_FAIL_THRESHOLD=20  # Highlight if failed > 20%
+DASHBOARD_CRITICAL_BLOCK_THRESHOLD=10 # Highlight if blocked > 10%
+```
+
+All dashboard configuration values have sensible defaults and can be adjusted based on your needs.
+
 Notes:
 - Provide exactly one of `plan` or `run`.
 - Project defaults to `1` in most flows, but can be passed explicitly.
@@ -110,6 +183,10 @@ Notes:
 | `REPORT_JOB_HISTORY` | number of completed jobs retained in memory | Default 60; keep modest to avoid unbounded metadata. |
 | `MEM_LOG_INTERVAL` | seconds between `[mem-log]` heartbeat lines | Helps observe allocator behavior in production. |
 | `TESTRAIL_HTTP_TIMEOUT`, `TESTRAIL_HTTP_RETRIES`, `TESTRAIL_HTTP_BACKOFF` | request timeout/retry/backoff for all TestRail calls (including attachments) | Retries on 429, 5xx, timeouts, and connection errors; backoff grows each attempt. |
+| `DASHBOARD_PLANS_CACHE_TTL`, `DASHBOARD_PLAN_DETAIL_CACHE_TTL`, `DASHBOARD_STATS_CACHE_TTL`, `DASHBOARD_RUN_STATS_CACHE_TTL` | cache TTL in seconds for dashboard data | Controls how long dashboard data is cached before refreshing. Defaults: 300, 180, 120, 120. |
+| `DASHBOARD_DEFAULT_PAGE_SIZE`, `DASHBOARD_MAX_PAGE_SIZE` | pagination limits for dashboard plan lists | Default page size is 50, maximum is 200. |
+| `DASHBOARD_PASS_RATE_HIGH`, `DASHBOARD_PASS_RATE_MEDIUM` | pass rate thresholds for color coding (percentages) | Green for >= high (80), yellow for >= medium (50), red for < medium. |
+| `DASHBOARD_CRITICAL_FAIL_THRESHOLD`, `DASHBOARD_CRITICAL_BLOCK_THRESHOLD` | thresholds for highlighting critical issues (percentages) | Plans/runs with failed > 20% or blocked > 10% get prominent highlighting. |
 
 All env variables can live in `.env` for local work; deployments (Railway, Render, etc.) can override them per environment.
 
@@ -178,6 +255,39 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 - Slow generation or high memory: tune the worker env vars listed above, lower `ATTACHMENT_MAX_BYTES`, or raise `ATTACHMENT_BATCH_SIZE` to reduce concurrent files.
 - Missing attachments: confirm `ATTACHMENT_INLINE_MAX_BYTES` and video/image limits are high enough for your evidence. Oversized files are marked as skipped instead of being written next to the HTML.
 - Memory stuck high in Docker: the Dockerfile now ships with `libjemalloc` and `MALLOC_CONF="background_thread:true,dirty_decay_ms:600,muzzy_decay_ms:600"` so RSS drops after jobs. If you fork the image, keep those settings or expect glibc to hold the high-water mark.
+
+## Documentation
+
+Comprehensive documentation is available for all features:
+
+- **[API Documentation](API_DOCUMENTATION.md)** - Complete API reference with examples
+  - Dashboard endpoints
+  - Report generation endpoints
+  - Management/CRUD endpoints
+  - Error handling and status codes
+  - Caching strategy
+
+- **[CRUD Operations Guide](CRUD_OPERATIONS_GUIDE.md)** - Detailed guide for managing TestRail entities
+  - Update operations (plans, runs, cases)
+  - Delete operations with cascade rules
+  - Dry run mode usage
+  - UI workflow instructions
+  - Best practices and common workflows
+  - Error handling and troubleshooting
+
+- **[Dashboard Guide](DASHBOARD_GUIDE.md)** - Dashboard usage instructions
+  - Features overview
+  - Filtering and sorting
+  - Visual indicators
+  - Report generation
+  - Responsive design
+  - Configuration options
+
+- **[Configuration Guide](CONFIGURATION.md)** - Environment variable reference
+  - TestRail connection settings
+  - Performance tuning
+  - Cache configuration
+  - Dashboard thresholds
 
 ## Roadmap ideas
 - Optional per-run donut charts

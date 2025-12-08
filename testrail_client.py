@@ -965,3 +965,81 @@ class TestRailClient:
                 max_attempts=self.max_attempts,
                 backoff=self.backoff,
             )
+
+    def update_plan(self, plan_id: int, payload: dict[str, Any]):
+        """Update an existing test plan."""
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"update_plan/{plan_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def update_run(self, run_id: int, payload: dict[str, Any]):
+        """Update an existing test run."""
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"update_run/{run_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def update_case(self, case_id: int, payload: dict[str, Any]):
+        """Update an existing test case."""
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"update_case/{case_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def delete_plan(self, plan_id: int):
+        """Delete a test plan."""
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"delete_plan/{plan_id}",
+                {},
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def delete_run(self, run_id: int):
+        """Delete a test run."""
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"delete_run/{run_id}",
+                {},
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def delete_case(self, case_id: int):
+        """Delete a test case."""
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"delete_case/{case_id}",
+                {},
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
