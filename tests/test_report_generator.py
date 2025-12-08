@@ -94,9 +94,7 @@ class TestReportGenerator(unittest.TestCase):
         mock_render_html.return_value = "/path/to/report.html"
 
         # Run the report generator
-        report_path = generate_report(
-            project=1, plan=241, run_ids=[101], api_client=fake_client
-        )
+        report_path = generate_report(project=1, plan=241, run_ids=[101], api_client=fake_client)
 
         # Assertions
         self.assertEqual(report_path, "/path/to/report.html")
@@ -124,15 +122,11 @@ class TestReportGenerator(unittest.TestCase):
         self.assertEqual(first_row.get("comment"), "Needs fix")
         attachments = first_row.get("attachments", [])
         self.assertEqual(len(attachments), 2)
-        self.assertTrue(
-            all(att.get("data_url", "").startswith("data:") for att in attachments)
-        )
+        self.assertTrue(all(att.get("data_url", "").startswith("data:") for att in attachments))
 
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.render_html")
-    def test_generate_report_attachments_failure(
-        self, mock_render_html, mock_download_attachment
-    ):
+    def test_generate_report_attachments_failure(self, mock_render_html, mock_download_attachment):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"
         fake_client.timeout = 5.0
@@ -215,9 +209,7 @@ class TestReportGenerator(unittest.TestCase):
         fake_client.get_statuses_map.return_value = {1: "Passed"}
         mock_render_html.return_value = "/tmp/video-report.html"
 
-        path = generate_report(
-            project=1, plan=77, run_ids=[301], api_client=fake_client
-        )
+        path = generate_report(project=1, plan=77, run_ids=[301], api_client=fake_client)
 
         self.assertEqual(path, "/tmp/video-report.html")
         context = mock_render_html.call_args[0][0]
@@ -234,9 +226,7 @@ class TestReportGenerator(unittest.TestCase):
 
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.render_html")
-    def test_generate_report_multiple_runs_snapshot(
-        self, mock_render_html, mock_download_attachment
-    ):
+    def test_generate_report_multiple_runs_snapshot(self, mock_render_html, mock_download_attachment):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"
         fake_client.timeout = 5.0
@@ -245,9 +235,7 @@ class TestReportGenerator(unittest.TestCase):
         fake_client.get_project.return_value = {"name": "Project"}
         fake_client.get_plan.return_value = {
             "name": "Plan",
-            "entries": [
-                {"runs": [{"id": 10, "name": "Alpha"}, {"id": 20, "name": "Beta"}]}
-            ],
+            "entries": [{"runs": [{"id": 10, "name": "Alpha"}, {"id": 20, "name": "Beta"}]}],
         }
         fake_client.get_plan_runs.return_value = [10, 20]
 
@@ -273,9 +261,7 @@ class TestReportGenerator(unittest.TestCase):
             ]
 
         fake_client.get_tests_for_run.side_effect = tests_side_effect
-        fake_client.get_results_for_run.side_effect = lambda rid: [
-            {"id": 100, "test_id": 1, "status_id": 1}
-        ]
+        fake_client.get_results_for_run.side_effect = lambda rid: [{"id": 100, "test_id": 1, "status_id": 1}]
         fake_client.get_attachments_for_test.return_value = []
         mock_download_attachment.return_value = (b"", "image/png")
         fake_client.get_users_map.return_value = {1: "U1", 2: "U2"}
@@ -283,9 +269,7 @@ class TestReportGenerator(unittest.TestCase):
         fake_client.get_statuses_map.return_value = {1: "Passed", 5: "Failed"}
         mock_render_html.return_value = "/tmp/multi.html"
 
-        path = generate_report(
-            project=1, plan=77, run_ids=[10, 20], api_client=fake_client
-        )
+        path = generate_report(project=1, plan=77, run_ids=[10, 20], api_client=fake_client)
         self.assertEqual(path, "/tmp/multi.html")
         context = mock_render_html.call_args[0][0]
         self.assertEqual(len(context["tables"]), 2)
@@ -294,9 +278,7 @@ class TestReportGenerator(unittest.TestCase):
 
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.render_html")
-    def test_generate_report_mixed_attachment_runs(
-        self, mock_render_html, mock_download_attachment
-    ):
+    def test_generate_report_mixed_attachment_runs(self, mock_render_html, mock_download_attachment):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"
         fake_client.timeout = 5.0
@@ -337,9 +319,7 @@ class TestReportGenerator(unittest.TestCase):
         def attachments_side_effect(test_id):
             if test_id == 30:
                 return []
-            return [
-                {"id": 400, "name": "pic.png", "result_id": 200 + test_id, "size": 10}
-            ]
+            return [{"id": 400, "name": "pic.png", "result_id": 200 + test_id, "size": 10}]
 
         fake_client.get_attachments_for_test.side_effect = attachments_side_effect
         mock_download_attachment.return_value = (b"bytes", "image/png")
@@ -348,9 +328,7 @@ class TestReportGenerator(unittest.TestCase):
         fake_client.get_statuses_map.return_value = {1: "Passed"}
         mock_render_html.return_value = "/tmp/mixed.html"
 
-        path = generate_report(
-            project=1, plan=88, run_ids=[30, 40], api_client=fake_client
-        )
+        path = generate_report(project=1, plan=88, run_ids=[30, 40], api_client=fake_client)
         self.assertEqual(path, "/tmp/mixed.html")
         context = mock_render_html.call_args[0][0]
         self.assertEqual(len(context["tables"]), 2)
@@ -369,9 +347,7 @@ class TestReportGenerator(unittest.TestCase):
         fake_client.get_project.return_value = {"name": "Project"}
         fake_client.get_plan.return_value = {
             "name": "Plan",
-            "entries": [
-                {"runs": [{"id": 50, "name": "First"}, {"id": 60, "name": "Second"}]}
-            ],
+            "entries": [{"runs": [{"id": 50, "name": "First"}, {"id": 60, "name": "Second"}]}],
         }
         fake_client.get_plan_runs.return_value = [50, 60]
 
@@ -387,18 +363,14 @@ class TestReportGenerator(unittest.TestCase):
             ]
 
         fake_client.get_tests_for_run.side_effect = tests_side_effect
-        fake_client.get_results_for_run.return_value = [
-            {"id": 300, "test_id": 50, "status_id": 1}
-        ]
+        fake_client.get_results_for_run.return_value = [{"id": 300, "test_id": 50, "status_id": 1}]
         fake_client.get_attachments_for_test.return_value = []
         mock_download_attachment.return_value = (b"bytes", "image/png")
         fake_client.get_users_map.return_value = {1: "Solo"}
         fake_client.get_priorities_map.return_value = {1: "P1"}
         fake_client.get_statuses_map.return_value = {1: "Passed"}
 
-        path = generate_report(
-            project=1, plan=200, run_ids=[50, 60], api_client=fake_client
-        )
+        path = generate_report(project=1, plan=200, run_ids=[50, 60], api_client=fake_client)
         html_path = Path(path)
         self.assertTrue(html_path.exists())
         html = html_path.read_text(encoding="utf-8")
@@ -412,9 +384,7 @@ class TestReportGenerator(unittest.TestCase):
     @patch("testrail_daily_report.transcode_video_file")
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.render_html")
-    def test_video_transcode_disabled(
-        self, mock_render_html, mock_download_attachment, mock_transcode_video
-    ):
+    def test_video_transcode_disabled(self, mock_render_html, mock_download_attachment, mock_transcode_video):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"
         fake_client.timeout = 5.0
@@ -435,9 +405,7 @@ class TestReportGenerator(unittest.TestCase):
                 "assignedto_id": 1,
             },
         ]
-        fake_client.get_results_for_run.return_value = [
-            {"id": 900, "test_id": 9, "status_id": 1}
-        ]
+        fake_client.get_results_for_run.return_value = [{"id": 900, "test_id": 9, "status_id": 1}]
         fake_client.get_attachments_for_test.return_value = [
             {"id": 700, "name": "clip.mov", "result_id": 900, "size": 1000}
         ]
@@ -448,18 +416,14 @@ class TestReportGenerator(unittest.TestCase):
         mock_render_html.return_value = "/tmp/video-disabled.html"
 
         with patch.dict(os.environ, {"ATTACHMENT_VIDEO_TRANSCODE": "0"}):
-            path = generate_report(
-                project=1, plan=900, run_ids=[401], api_client=fake_client
-            )
+            path = generate_report(project=1, plan=900, run_ids=[401], api_client=fake_client)
 
         self.assertEqual(path, "/tmp/video-disabled.html")
         self.assertFalse(mock_transcode_video.called)
 
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.render_html")
-    def test_keep_attachment_files_flag(
-        self, mock_render_html, mock_download_attachment
-    ):
+    def test_keep_attachment_files_flag(self, mock_render_html, mock_download_attachment):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"
         fake_client.timeout = 5.0
@@ -480,9 +444,7 @@ class TestReportGenerator(unittest.TestCase):
                 "assignedto_id": 1,
             }
         ]
-        fake_client.get_results_for_run.return_value = [
-            {"id": 42, "test_id": 42, "status_id": 1}
-        ]
+        fake_client.get_results_for_run.return_value = [{"id": 42, "test_id": 42, "status_id": 1}]
         fake_client.get_attachments_for_test.return_value = [
             {"id": 600, "name": "pic.png", "result_id": 42, "size": 512}
         ]
@@ -492,9 +454,7 @@ class TestReportGenerator(unittest.TestCase):
         fake_client.get_statuses_map.return_value = {1: "Passed"}
         mock_render_html.return_value = "/tmp/no-files.html"
 
-        path = generate_report(
-            project=1, plan=777, run_ids=[501], api_client=fake_client
-        )
+        path = generate_report(project=1, plan=777, run_ids=[501], api_client=fake_client)
 
         self.assertEqual(path, "/tmp/no-files.html")
         self.assertFalse((Path("out") / "attachments").exists())
@@ -504,9 +464,7 @@ class TestReportGenerator(unittest.TestCase):
 
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.render_html")
-    def test_generate_report_snapshot_disabled(
-        self, mock_render_html, mock_download_attachment
-    ):
+    def test_generate_report_snapshot_disabled(self, mock_render_html, mock_download_attachment):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"
         fake_client.timeout = 5.0
@@ -546,9 +504,7 @@ class TestReportGenerator(unittest.TestCase):
 
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.render_html")
-    def test_generate_report_snapshot_limit(
-        self, mock_render_html, mock_download_attachment
-    ):
+    def test_generate_report_snapshot_limit(self, mock_render_html, mock_download_attachment):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"
         fake_client.timeout = 5.0
@@ -557,9 +513,7 @@ class TestReportGenerator(unittest.TestCase):
         fake_client.get_project.return_value = {"name": "Project"}
         fake_client.get_plan.return_value = {
             "name": "Plan",
-            "entries": [
-                {"runs": [{"id": 500, "name": "One"}, {"id": 600, "name": "Two"}]}
-            ],
+            "entries": [{"runs": [{"id": 500, "name": "One"}, {"id": 600, "name": "Two"}]}],
         }
         fake_client.get_plan_runs.return_value = [500, 600]
 
@@ -575,9 +529,7 @@ class TestReportGenerator(unittest.TestCase):
             ]
 
         fake_client.get_tests_for_run.side_effect = _tests_for_run
-        fake_client.get_results_for_run.return_value = [
-            {"id": 21, "test_id": 500, "status_id": 1}
-        ]
+        fake_client.get_results_for_run.return_value = [{"id": 21, "test_id": 500, "status_id": 1}]
         fake_client.get_users_map.return_value = {7: "User Seven"}
         fake_client.get_priorities_map.return_value = {1: "P1"}
         fake_client.get_statuses_map.return_value = {1: "Passed"}
@@ -585,9 +537,7 @@ class TestReportGenerator(unittest.TestCase):
         mock_download_attachment.return_value = (b"", "image/png")
         mock_render_html.return_value = "/tmp/report-snapshot-limit.html"
 
-        with patch.dict(
-            os.environ, {"REPORT_TABLE_SNAPSHOT": "1", "TABLE_SNAPSHOT_LIMIT": "1"}
-        ):
+        with patch.dict(os.environ, {"REPORT_TABLE_SNAPSHOT": "1", "TABLE_SNAPSHOT_LIMIT": "1"}):
             path = generate_report(project=1, plan=55, api_client=fake_client)
 
         self.assertEqual(path, "/tmp/report-snapshot-limit.html")
@@ -597,9 +547,7 @@ class TestReportGenerator(unittest.TestCase):
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.compress_image_data")
     @patch("testrail_daily_report.render_html")
-    def test_attachment_batching_respects_env(
-        self, mock_render_html, mock_compress_image, mock_download_attachment
-    ):
+    def test_attachment_batching_respects_env(self, mock_render_html, mock_compress_image, mock_download_attachment):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"
         fake_client.timeout = 5.0
@@ -624,8 +572,7 @@ class TestReportGenerator(unittest.TestCase):
             {"id": 501, "test_id": 77, "status_id": 1, "comment": "ok"},
         ]
         attachments_payload = [
-            {"id": 1000 + i, "name": f"pic_{i}.png", "result_id": 501, "size": 1234}
-            for i in range(5)
+            {"id": 1000 + i, "name": f"pic_{i}.png", "result_id": 501, "size": 1234} for i in range(5)
         ]
         fake_client.get_attachments_for_test.return_value = attachments_payload
         mock_download_attachment.return_value = (b"bytes", "image/png")
@@ -668,9 +615,9 @@ class TestReportGenerator(unittest.TestCase):
             for fut in iterable:
                 yield fut
 
-        with patch(
-            "testrail_daily_report.ThreadPoolExecutor", RecordingExecutor
-        ), patch("testrail_daily_report.as_completed", fake_as_completed):
+        with patch("testrail_daily_report.ThreadPoolExecutor", RecordingExecutor), patch(
+            "testrail_daily_report.as_completed", fake_as_completed
+        ):
             with patch.dict(
                 os.environ,
                 {
@@ -734,9 +681,7 @@ class TestReportGenerator(unittest.TestCase):
         priorities_map = {1: "High", 2: "Medium"}
         status_map = {1: "Passed", 5: "Failed"}
 
-        table = build_test_table(
-            tests_df, results_df, status_map, users_map, priorities_map
-        )
+        table = build_test_table(tests_df, results_df, status_map, users_map, priorities_map)
 
         self.assertEqual(len(table), 2)
         self.assertEqual(table.iloc[0]["title"], "Test B")  # Failed tests first

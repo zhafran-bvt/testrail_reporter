@@ -39,9 +39,7 @@ def test_api_get_retries_on_429(monkeypatch):
     session = FakeSession([resp_429, resp_ok])
 
     with capture_telemetry() as telemetry:
-        data = api_get(
-            session, "http://x", "get_stuff", timeout=1, max_attempts=2, backoff=0
-        )
+        data = api_get(session, "http://x", "get_stuff", timeout=1, max_attempts=2, backoff=0)
 
     assert data == {"ok": True}
     assert calls == [1, 1]

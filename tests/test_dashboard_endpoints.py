@@ -16,6 +16,7 @@ from app.dashboard_stats import PlanStatistics, RunStatistics
 
 DASHBOARD_MAX_LIMIT = 25
 
+
 # Hypothesis strategies for generating test data
 @st.composite
 def gen_plan_data(draw):
@@ -77,12 +78,13 @@ class TestPlanListCompleteness(unittest.TestCase):
 
             # Mock calculate_plan_statistics to return minimal stats
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     # Find the plan with this ID
                     plan = next((p for p in plans if p["id"] == plan_id), None)
                     if not plan:
                         raise ValueError(f"Plan {plan_id} not found")
-                    
+
                     return PlanStatistics(
                         plan_id=plan_id,
                         plan_name=plan.get("name", f"Plan {plan_id}"),
@@ -100,6 +102,7 @@ class TestPlanListCompleteness(unittest.TestCase):
                     )
 
                 mock_calc_stats.side_effect = create_mock_stats
+
                 def _mock_fetch(project, **kwargs):
                     start = int(kwargs.get("start_offset") or 0)
                     max_items = kwargs.get("max_plans")
@@ -111,9 +114,7 @@ class TestPlanListCompleteness(unittest.TestCase):
                 mock_tr_client.get_plans_for_project.side_effect = _mock_fetch
 
                 # Make API request
-                response = client.get(
-                    f"/api/dashboard/plans?project={project_id}&limit={limit}&offset={offset}"
-                )
+                response = client.get(f"/api/dashboard/plans?project={project_id}&limit={limit}&offset={offset}")
 
                 # Verify response
                 self.assertEqual(response.status_code, 200)
@@ -126,7 +127,7 @@ class TestPlanListCompleteness(unittest.TestCase):
                 self.assertGreaterEqual(data["total_count"], offset)
 
                 # Verify returned plans are from the expected slice
-                expected_plans = plans[offset:offset + min(limit, DASHBOARD_MAX_LIMIT)]
+                expected_plans = plans[offset : offset + min(limit, DASHBOARD_MAX_LIMIT)]
                 returned_plan_ids = [p["plan_id"] for p in data["plans"]]
                 expected_plan_ids = [p["id"] for p in expected_plans]
 
@@ -173,9 +174,7 @@ class TestRunListCompleteness(unittest.TestCase):
         for i in range(num_runs):
             run_id = i + 1
             run_ids.append(run_id)
-            entry = {
-                "runs": [{"id": run_id, "name": f"Run {run_id}"}]
-            }
+            entry = {"runs": [{"id": run_id, "name": f"Run {run_id}"}]}
             plan_data["entries"].append(entry)
 
         # Mock the TestRail client
@@ -188,6 +187,7 @@ class TestRunListCompleteness(unittest.TestCase):
 
             # Mock calculate_run_statistics
             with patch("app.dashboard_stats.calculate_run_statistics") as mock_calc_stats:
+
                 def create_mock_run_stats(run_id, client):
                     return RunStatistics(
                         run_id=run_id,
@@ -245,12 +245,14 @@ class TestPaginationLimitEnforcement(unittest.TestCase):
         # Create mock plans
         plans = []
         for i in range(num_plans):
-            plans.append({
-                "id": i + 1,
-                "name": f"Plan {i + 1}",
-                "created_on": 1234567890,
-                "is_completed": False,
-            })
+            plans.append(
+                {
+                    "id": i + 1,
+                    "name": f"Plan {i + 1}",
+                    "created_on": 1234567890,
+                    "is_completed": False,
+                }
+            )
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -262,6 +264,7 @@ class TestPaginationLimitEnforcement(unittest.TestCase):
 
             # Mock calculate_plan_statistics
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     return PlanStatistics(
                         plan_id=plan_id,
@@ -282,9 +285,7 @@ class TestPaginationLimitEnforcement(unittest.TestCase):
                 mock_calc_stats.side_effect = create_mock_stats
 
                 # Make API request
-                response = client.get(
-                    f"/api/dashboard/plans?project={project_id}&limit={requested_limit}"
-                )
+                response = client.get(f"/api/dashboard/plans?project={project_id}&limit={requested_limit}")
 
                 # Verify response
                 self.assertEqual(response.status_code, 200)
@@ -538,12 +539,14 @@ class TestCacheHitBehavior(unittest.TestCase):
         # Create mock plans
         plans = []
         for i in range(num_plans):
-            plans.append({
-                "id": i + 1,
-                "name": f"Plan {i + 1}",
-                "created_on": 1234567890,
-                "is_completed": False,
-            })
+            plans.append(
+                {
+                    "id": i + 1,
+                    "name": f"Plan {i + 1}",
+                    "created_on": 1234567890,
+                    "is_completed": False,
+                }
+            )
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -555,6 +558,7 @@ class TestCacheHitBehavior(unittest.TestCase):
 
             # Mock calculate_plan_statistics
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     return PlanStatistics(
                         plan_id=plan_id,
@@ -578,10 +582,10 @@ class TestCacheHitBehavior(unittest.TestCase):
                 response1 = client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response1.status_code, 200)
                 data1 = response1.json()
-                
+
                 # Verify cache miss
                 self.assertFalse(data1["meta"]["cache"]["hit"])
-                
+
                 # Get the call count after first request
                 first_call_count = mock_tr_client.get_plans_for_project.call_count
                 first_stats_call_count = mock_calc_stats.call_count
@@ -590,14 +594,14 @@ class TestCacheHitBehavior(unittest.TestCase):
                 response2 = client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response2.status_code, 200)
                 data2 = response2.json()
-                
+
                 # Verify cache hit
                 self.assertTrue(data2["meta"]["cache"]["hit"])
-                
+
                 # Verify no additional API calls were made
                 self.assertEqual(mock_tr_client.get_plans_for_project.call_count, first_call_count)
                 self.assertEqual(mock_calc_stats.call_count, first_stats_call_count)
-                
+
                 # Verify data is the same
                 self.assertEqual(data1["plans"], data2["plans"])
                 self.assertEqual(data1["total_count"], data2["total_count"])
@@ -628,12 +632,14 @@ class TestCacheInvalidation(unittest.TestCase):
         # Create mock plans
         plans = []
         for i in range(num_plans):
-            plans.append({
-                "id": i + 1,
-                "name": f"Plan {i + 1}",
-                "created_on": 1234567890,
-                "is_completed": False,
-            })
+            plans.append(
+                {
+                    "id": i + 1,
+                    "name": f"Plan {i + 1}",
+                    "created_on": 1234567890,
+                    "is_completed": False,
+                }
+            )
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -645,6 +651,7 @@ class TestCacheInvalidation(unittest.TestCase):
 
             # Mock calculate_plan_statistics
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     return PlanStatistics(
                         plan_id=plan_id,
@@ -689,15 +696,12 @@ class TestCacheInvalidation(unittest.TestCase):
                 response3 = client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response3.status_code, 200)
                 data3 = response3.json()
-                
+
                 # Verify cache miss (fresh fetch)
                 self.assertFalse(data3["meta"]["cache"]["hit"])
-                
+
                 # Verify API was called again
-                self.assertEqual(
-                    mock_tr_client.get_plans_for_project.call_count,
-                    call_count_before + 1
-                )
+                self.assertEqual(mock_tr_client.get_plans_for_project.call_count, call_count_before + 1)
 
 
 class TestDataUpdateAfterRefresh(unittest.TestCase):
@@ -726,22 +730,26 @@ class TestDataUpdateAfterRefresh(unittest.TestCase):
         # Create initial mock plans
         plans_v1 = []
         for i in range(initial_plans):
-            plans_v1.append({
-                "id": i + 1,
-                "name": f"Initial Plan {i + 1}",
-                "created_on": 1234567890,
-                "is_completed": False,
-            })
+            plans_v1.append(
+                {
+                    "id": i + 1,
+                    "name": f"Initial Plan {i + 1}",
+                    "created_on": 1234567890,
+                    "is_completed": False,
+                }
+            )
 
         # Create updated mock plans (different data)
         plans_v2 = []
         for i in range(updated_plans):
-            plans_v2.append({
-                "id": i + 100,
-                "name": f"Updated Plan {i + 100}",
-                "created_on": 1234567900,
-                "is_completed": True,
-            })
+            plans_v2.append(
+                {
+                    "id": i + 100,
+                    "name": f"Updated Plan {i + 100}",
+                    "created_on": 1234567900,
+                    "is_completed": True,
+                }
+            )
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -753,6 +761,7 @@ class TestDataUpdateAfterRefresh(unittest.TestCase):
 
             # Mock calculate_plan_statistics
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     # Find the plan in either v1 or v2
                     plan_name = f"Plan {plan_id}"
@@ -760,7 +769,7 @@ class TestDataUpdateAfterRefresh(unittest.TestCase):
                         if p["id"] == plan_id:
                             plan_name = p["name"]
                             break
-                    
+
                     return PlanStatistics(
                         plan_id=plan_id,
                         plan_name=plan_name,
@@ -783,7 +792,7 @@ class TestDataUpdateAfterRefresh(unittest.TestCase):
                 response1 = client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response1.status_code, 200)
                 data1 = response1.json()
-                
+
                 # Verify initial data
                 self.assertEqual(len(data1["plans"]), initial_plans)
                 initial_plan_ids = {plan["plan_id"] for plan in data1["plans"]}
@@ -798,13 +807,13 @@ class TestDataUpdateAfterRefresh(unittest.TestCase):
                 response2 = client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response2.status_code, 200)
                 data2 = response2.json()
-                
+
                 # Verify updated data is different from initial data
                 self.assertEqual(len(data2["plans"]), updated_plans)
                 updated_plan_ids = {plan["plan_id"] for plan in data2["plans"]}
                 for i in range(updated_plans):
                     self.assertIn(i + 100, updated_plan_ids)
-                
+
                 # Verify the data changed (unless both have same count and IDs by chance)
                 if initial_plans != updated_plans or initial_plan_ids != updated_plan_ids:
                     self.assertNotEqual(initial_plan_ids, updated_plan_ids)
@@ -821,8 +830,7 @@ class TestSearchFilterCorrectness(unittest.TestCase):
         project_id=st.integers(min_value=1, max_value=100),
         plans=gen_plans_list(),
         search_term=st.one_of(
-            st.none(),
-            st.text(min_size=0, max_size=20, alphabet=st.characters(min_codepoint=32, max_codepoint=126))
+            st.none(), st.text(min_size=0, max_size=20, alphabet=st.characters(min_codepoint=32, max_codepoint=126))
         ),
     )
     def test_search_filter_only_includes_matching_plans(self, project_id, plans, search_term):
@@ -846,11 +854,12 @@ class TestSearchFilterCorrectness(unittest.TestCase):
 
             # Mock calculate_plan_statistics
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     plan = next((p for p in plans if p["id"] == plan_id), None)
                     if not plan:
                         raise ValueError(f"Plan {plan_id} not found")
-                    
+
                     return PlanStatistics(
                         plan_id=plan_id,
                         plan_name=plan.get("name", f"Plan {plan_id}"),
@@ -873,6 +882,7 @@ class TestSearchFilterCorrectness(unittest.TestCase):
                 url = f"/api/dashboard/plans?project={project_id}&limit=25"
                 if search_term is not None:
                     from urllib.parse import quote
+
                     url += f"&search={quote(search_term)}"
 
                 response = client.get(url)
@@ -890,19 +900,16 @@ class TestSearchFilterCorrectness(unittest.TestCase):
                     # Search filter applied - verify all returned plans match
                     search_lower = search_term.strip().lower()
                     returned_plan_names = [p["plan_name"] for p in data["plans"]]
-                    
+
                     for plan_name in returned_plan_names:
                         self.assertIn(
                             search_lower,
                             plan_name.lower(),
-                            f"Plan '{plan_name}' does not contain search term '{search_term}'"
+                            f"Plan '{plan_name}' does not contain search term '{search_term}'",
                         )
-                    
+
                     # Verify no matching plans were excluded
-                    expected_matching_plans = [
-                        p for p in plans
-                        if search_lower in p.get("name", "").lower()
-                    ]
+                    expected_matching_plans = [p for p in plans if search_lower in p.get("name", "").lower()]
                     expected_count = min(len(expected_matching_plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
 
@@ -938,10 +945,7 @@ class TestCompletionFilterCorrectness(unittest.TestCase):
             # Mock get_plans_for_project to return filtered plans
             # The TestRail API itself filters by is_completed, so we simulate that
             if is_completed_filter is not None:
-                filtered_plans = [
-                    p for p in plans
-                    if p.get("is_completed", False) == bool(is_completed_filter)
-                ]
+                filtered_plans = [p for p in plans if p.get("is_completed", False) == bool(is_completed_filter)]
             else:
                 filtered_plans = plans
 
@@ -949,11 +953,12 @@ class TestCompletionFilterCorrectness(unittest.TestCase):
 
             # Mock calculate_plan_statistics
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     plan = next((p for p in filtered_plans if p["id"] == plan_id), None)
                     if not plan:
                         raise ValueError(f"Plan {plan_id} not found")
-                    
+
                     return PlanStatistics(
                         plan_id=plan_id,
                         plan_name=plan.get("name", f"Plan {plan_id}"),
@@ -990,16 +995,16 @@ class TestCompletionFilterCorrectness(unittest.TestCase):
                         self.assertEqual(
                             plan["is_completed"],
                             expected_status,
-                            f"Plan {plan['plan_id']} has is_completed={plan['is_completed']}, expected {expected_status}"
+                            f"Plan {plan['plan_id']} has is_completed={plan['is_completed']}, expected {expected_status}",
                         )
-                
+
                 # Verify count is within requested limit
                 expected_count = min(len(filtered_plans), DASHBOARD_MAX_LIMIT)
                 self.assertEqual(len(data["plans"]), expected_count)
-                
+
                 # total_count should be at least the number of returned items
                 self.assertGreaterEqual(data["total_count"], len(data["plans"]))
-                
+
                 # Verify the API was called with correct project/filter
                 args, kwargs = mock_tr_client.get_plans_for_project.call_args
                 self.assertEqual(args[0], project_id)
@@ -1020,8 +1025,8 @@ class TestDateRangeFilterCorrectness(unittest.TestCase):
             st.none(),
             st.tuples(
                 st.integers(min_value=1000000000, max_value=1900000000),
-                st.integers(min_value=1000000000, max_value=2000000000)
-            ).map(lambda t: (min(t), max(t)))  # Ensure start <= end
+                st.integers(min_value=1000000000, max_value=2000000000),
+            ).map(lambda t: (min(t), max(t))),  # Ensure start <= end
         ),
     )
     def test_date_range_filter_only_includes_plans_in_range(self, project_id, plans, date_range):
@@ -1045,11 +1050,12 @@ class TestDateRangeFilterCorrectness(unittest.TestCase):
 
             # Mock calculate_plan_statistics
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     plan = next((p for p in plans if p["id"] == plan_id), None)
                     if not plan:
                         raise ValueError(f"Plan {plan_id} not found")
-                    
+
                     return PlanStatistics(
                         plan_id=plan_id,
                         plan_name=plan.get("name", f"Plan {plan_id}"),
@@ -1088,18 +1094,17 @@ class TestDateRangeFilterCorrectness(unittest.TestCase):
                         self.assertGreaterEqual(
                             created_on,
                             created_after,
-                            f"Plan {plan['plan_id']} created_on={created_on} is before {created_after}"
+                            f"Plan {plan['plan_id']} created_on={created_on} is before {created_after}",
                         )
                         self.assertLessEqual(
                             created_on,
                             created_before,
-                            f"Plan {plan['plan_id']} created_on={created_on} is after {created_before}"
+                            f"Plan {plan['plan_id']} created_on={created_on} is after {created_before}",
                         )
-                    
+
                     # Verify no matching plans were excluded
                     expected_matching_plans = [
-                        p for p in plans
-                        if created_after <= p.get("created_on", 0) <= created_before
+                        p for p in plans if created_after <= p.get("created_on", 0) <= created_before
                     ]
                     expected_count = min(len(expected_matching_plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
@@ -1135,6 +1140,7 @@ class TestFilterEdgeCases(unittest.TestCase):
             mock_tr_client.get_plans_for_project.return_value = plans
 
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     plan = next((p for p in plans if p["id"] == plan_id), None)
                     return PlanStatistics(
@@ -1281,11 +1287,10 @@ class TestFilterEdgeCases(unittest.TestCase):
             mock_make_client.return_value = mock_tr_client
 
             # Mock to return only non-completed plans (simulating is_completed filter)
-            mock_tr_client.get_plans_for_project.return_value = [
-                p for p in plans if not p["is_completed"]
-            ]
+            mock_tr_client.get_plans_for_project.return_value = [p for p in plans if not p["is_completed"]]
 
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+
                 def create_mock_stats(plan_id, client):
                     plan = next((p for p in plans if p["id"] == plan_id), None)
                     return PlanStatistics(
@@ -1356,7 +1361,7 @@ class TestRefreshErrorHandling(unittest.TestCase):
             # First call succeeds, second call fails
             mock_tr_client.get_plans_for_project.side_effect = [
                 initial_plans,
-                requests.exceptions.RequestException("API connection failed")
+                requests.exceptions.RequestException("API connection failed"),
             ]
 
             # Mock calculate_plan_statistics
@@ -1390,7 +1395,7 @@ class TestRefreshErrorHandling(unittest.TestCase):
 
                 # Second request after cache clear - API fails
                 response2 = client.get("/api/dashboard/plans?project=1")
-                
+
                 # Should return error status
                 self.assertEqual(response2.status_code, 502)
                 error_data = response2.json()
@@ -1418,7 +1423,7 @@ class TestRefreshErrorHandling(unittest.TestCase):
 
             # Request should fail with timeout error
             response = client.get("/api/dashboard/plans?project=1")
-            
+
             # Should return 504 for timeout (not 502)
             self.assertEqual(response.status_code, 504)
             error_data = response.json()
@@ -1450,7 +1455,7 @@ class TestRefreshErrorHandling(unittest.TestCase):
 
                 # Request should fail
                 response = client.get("/api/dashboard/plans?project=1")
-                
+
                 # Should return error status
                 self.assertEqual(response.status_code, 500)
                 error_data = response.json()

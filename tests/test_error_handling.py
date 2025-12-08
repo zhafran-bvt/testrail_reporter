@@ -37,9 +37,7 @@ class TestAPIFailureHandling(unittest.TestCase):
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
-            mock_tr_client.get_plans_for_project.side_effect = requests.exceptions.Timeout(
-                "Request timed out"
-            )
+            mock_tr_client.get_plans_for_project.side_effect = requests.exceptions.Timeout("Request timed out")
 
             response = client.get("/api/dashboard/plans?project=1")
             self.assertEqual(response.status_code, 504)
@@ -55,9 +53,7 @@ class TestAPIFailureHandling(unittest.TestCase):
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
-            mock_tr_client.get_plans_for_project.side_effect = (
-                requests.exceptions.ConnectionError("Connection failed")
-            )
+            mock_tr_client.get_plans_for_project.side_effect = requests.exceptions.ConnectionError("Connection failed")
 
             response = client.get("/api/dashboard/plans?project=1")
             self.assertEqual(response.status_code, 502)
@@ -74,12 +70,8 @@ class TestAPIFailureHandling(unittest.TestCase):
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
 
-            with patch(
-                "app.dashboard_stats.calculate_plan_statistics"
-            ) as mock_calc_stats:
-                mock_calc_stats.side_effect = requests.exceptions.Timeout(
-                    "Request timed out"
-                )
+            with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
+                mock_calc_stats.side_effect = requests.exceptions.Timeout("Request timed out")
 
                 response = client.get("/api/dashboard/plan/1")
                 self.assertEqual(response.status_code, 504)
@@ -95,9 +87,7 @@ class TestAPIFailureHandling(unittest.TestCase):
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
-            mock_tr_client.get_plan.side_effect = requests.exceptions.ConnectionError(
-                "Connection failed"
-            )
+            mock_tr_client.get_plan.side_effect = requests.exceptions.ConnectionError("Connection failed")
 
             response = client.get("/api/dashboard/runs/1")
             self.assertEqual(response.status_code, 502)
@@ -155,9 +145,7 @@ class TestInvalidParameterHandling(unittest.TestCase):
     def test_plans_endpoint_rejects_invalid_date_range(self):
         """Plans endpoint should reject invalid date ranges."""
         client = TestClient(app)
-        response = client.get(
-            "/api/dashboard/plans?project=1&created_after=2000000000&created_before=1000000000"
-        )
+        response = client.get("/api/dashboard/plans?project=1&created_after=2000000000&created_before=1000000000")
         self.assertEqual(response.status_code, 400)
         self.assertIn("less than or equal", response.json()["detail"])
 
@@ -314,7 +302,7 @@ class TestMissingFieldHandling(unittest.TestCase):
         result = calculate_pass_rate(distribution)
         # String values are converted to int: 5 passed out of 8 executed = 62.5%
         self.assertAlmostEqual(result, 62.5, places=1)
-    
+
     def test_pass_rate_with_invalid_string_counts(self):
         """Pass rate should handle invalid string values gracefully."""
         distribution = {"Passed": "invalid", "Failed": 3, "Untested": 2}
@@ -390,9 +378,7 @@ class TestMissingFieldHandling(unittest.TestCase):
                 {"name": "No ID"},  # Missing ID
             ]
 
-            with patch(
-                "app.dashboard_stats.calculate_plan_statistics"
-            ) as mock_calc_stats:
+            with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
                 from app.dashboard_stats import PlanStatistics
 
                 def create_stats(plan_id, client):

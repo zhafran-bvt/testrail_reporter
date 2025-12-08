@@ -35,9 +35,7 @@ class TestReportGenerationIntegration(unittest.TestCase):
             mock_generate.return_value = f"out/report_{plan_id}.html"
 
             # Call the synchronous report endpoint (which dashboard uses)
-            response = client.get(
-                f"/api/report?project={project_id}&plan={plan_id}"
-            )
+            response = client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
             # Verify response
             self.assertEqual(response.status_code, 200)
@@ -48,7 +46,7 @@ class TestReportGenerationIntegration(unittest.TestCase):
             # Verify generate_report was called with correct parameters
             mock_generate.assert_called_once()
             call_args = mock_generate.call_args
-            
+
             # Verify parameters
             self.assertEqual(call_args.kwargs.get("project"), project_id)
             self.assertEqual(call_args.kwargs.get("plan"), plan_id)
@@ -72,9 +70,7 @@ class TestReportGenerationIntegration(unittest.TestCase):
             mock_generate.return_value = f"out/report_{run_id}.html"
 
             # Call the synchronous report endpoint (which dashboard uses)
-            response = client.get(
-                f"/api/report?project={project_id}&run={run_id}"
-            )
+            response = client.get(f"/api/report?project={project_id}&run={run_id}")
 
             # Verify response
             self.assertEqual(response.status_code, 200)
@@ -85,7 +81,7 @@ class TestReportGenerationIntegration(unittest.TestCase):
             # Verify generate_report was called with correct parameters
             mock_generate.assert_called_once()
             call_args = mock_generate.call_args
-            
+
             # Verify parameters
             self.assertEqual(call_args.kwargs.get("project"), project_id)
             self.assertEqual(call_args.kwargs.get("run"), run_id)
@@ -121,12 +117,12 @@ class TestReportGenerationIntegration(unittest.TestCase):
             # Verify response
             self.assertEqual(response.status_code, 200)
             data = response.json()
-            
+
             # Verify URL format
             self.assertIn("url", data)
             self.assertTrue(data["url"].startswith("/reports/"))
             self.assertTrue(data["url"].endswith(".html"))
-            
+
             # Verify path is returned
             self.assertIn("path", data)
             self.assertTrue(data["path"].startswith("out/"))
@@ -134,7 +130,6 @@ class TestReportGenerationIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
 
 
 class TestReportGenerationFlow(unittest.TestCase):
@@ -156,21 +151,19 @@ class TestReportGenerationFlow(unittest.TestCase):
             mock_generate.return_value = f"out/report_plan_{plan_id}.html"
 
             # Simulate clicking the plan report button (calls /api/report)
-            response = client.get(
-                f"/api/report?project={project_id}&plan={plan_id}"
-            )
+            response = client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
             # Verify response
             self.assertEqual(response.status_code, 200)
             data = response.json()
-            
+
             # Verify report was generated for the correct plan
             mock_generate.assert_called_once()
             call_kwargs = mock_generate.call_args.kwargs
             self.assertEqual(call_kwargs["project"], project_id)
             self.assertEqual(call_kwargs["plan"], plan_id)
             self.assertIsNone(call_kwargs.get("run"))
-            
+
             # Verify URL is returned
             self.assertIn("url", data)
             self.assertTrue(data["url"].startswith("/reports/"))
@@ -191,21 +184,19 @@ class TestReportGenerationFlow(unittest.TestCase):
             mock_generate.return_value = f"out/report_run_{run_id}.html"
 
             # Simulate clicking the run report button (calls /api/report)
-            response = client.get(
-                f"/api/report?project={project_id}&run={run_id}"
-            )
+            response = client.get(f"/api/report?project={project_id}&run={run_id}")
 
             # Verify response
             self.assertEqual(response.status_code, 200)
             data = response.json()
-            
+
             # Verify report was generated for the correct run
             mock_generate.assert_called_once()
             call_kwargs = mock_generate.call_args.kwargs
             self.assertEqual(call_kwargs["project"], project_id)
             self.assertEqual(call_kwargs["run"], run_id)
             self.assertIsNone(call_kwargs.get("plan"))
-            
+
             # Verify URL is returned
             self.assertIn("url", data)
             self.assertTrue(data["url"].startswith("/reports/"))
@@ -228,18 +219,16 @@ class TestReportGenerationFlow(unittest.TestCase):
             mock_generate.return_value = f"out/{report_filename}"
 
             # Generate report
-            response = client.get(
-                f"/api/report?project={project_id}&plan={plan_id}"
-            )
+            response = client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
             self.assertEqual(response.status_code, 200)
             data = response.json()
-            
+
             # Verify URL format is correct for opening in new tab
             report_url = data["url"]
             self.assertTrue(report_url.startswith("/reports/"))
             self.assertTrue(report_url.endswith(".html"))
-            
+
             # The URL should be accessible (in real scenario, browser would open this)
             # We verify the URL format is valid
             self.assertIn(report_filename, report_url)
@@ -301,9 +290,7 @@ class TestReportGenerationFlow(unittest.TestCase):
                 mock_generate.return_value = f"out/report_plan_{plan_id}.html"
 
                 # Generate report for each plan
-                response = client.get(
-                    f"/api/report?project={project_id}&plan={plan_id}"
-                )
+                response = client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
                 # Verify each response
                 self.assertEqual(response.status_code, 200)

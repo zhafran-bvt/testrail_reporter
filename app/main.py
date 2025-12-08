@@ -59,9 +59,7 @@ class NoCacheStaticFiles(StaticFiles):
     async def get_response(self, path, scope):
         response = await super().get_response(path, scope)
         if response.status_code == 200:
-            response.headers["Cache-Control"] = (
-                "no-store, no-cache, must-revalidate, max-age=0"
-            )
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         return response
@@ -231,9 +229,7 @@ class ReportJob:
             "status": self.status,
             "created_at": self.created_at.isoformat(),
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "path": self.path,
             "url": self.url,
             "error": self.error,
@@ -306,9 +302,7 @@ class ReportJobManager:
             "running": running,
             "queued": queued,
             "history_limit": self.max_history,
-            "latest_job": {"id": recent_id, "status": recent_status}
-            if recent_id
-            else None,
+            "latest_job": {"id": recent_id, "status": recent_status} if recent_id else None,
         }
 
     def _trim_history(self):
@@ -360,9 +354,7 @@ class ReportJobManager:
             job.completed_at = completed_at
             job.path = str(path)
             job.url = "/reports/" + Path(path).name
-            api_calls = (
-                telemetry.get("api_calls", []) if isinstance(telemetry, dict) else []
-            )
+            api_calls = telemetry.get("api_calls", []) if isinstance(telemetry, dict) else []
             job.meta = {
                 "generated_at": completed_at.isoformat(),
                 "duration_ms": round(duration_ms, 2),
@@ -395,20 +387,15 @@ def _report_worker_config() -> tuple[int, int, int]:
     resolved = max(1, min(requested, configured_max))
     if resolved != requested:
         print(
-            f"INFO: REPORT_WORKERS limited to {resolved} "
-            f"(requested {requested}, max {configured_max}).",
+            f"INFO: REPORT_WORKERS limited to {resolved} " f"(requested {requested}, max {configured_max}).",
             flush=True,
         )
     return resolved, requested, configured_max
 
 
-report_worker_count, report_worker_requested, report_worker_max = (
-    _report_worker_config()
-)
+report_worker_count, report_worker_requested, report_worker_max = _report_worker_config()
 job_history_limit = max(10, int(os.getenv("REPORT_JOB_HISTORY", "60")))
-_job_manager = ReportJobManager(
-    max_workers=report_worker_count, max_history=job_history_limit
-)
+_job_manager = ReportJobManager(max_workers=report_worker_count, max_history=job_history_limit)
 
 
 class ReportRequest(BaseModel):
@@ -438,9 +425,7 @@ class ReportRequest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_constraints(self):
-        if (self.plan is None and self.run is None) or (
-            self.plan is not None and self.run is not None
-        ):
+        if (self.plan is None and self.run is None) or (self.plan is not None and self.run is not None):
             raise ValueError("Provide exactly one of plan or run")
         if self.run_ids and self.plan is None:
             raise ValueError("Run selection requires a plan")
@@ -572,9 +557,7 @@ def _start_keepalive():
     global _keepalive_thread
     if _keepalive_thread and _keepalive_thread.is_alive():
         return
-    _keepalive_thread = threading.Thread(
-        target=_loop, name="keepalive-thread", daemon=True
-    )
+    _keepalive_thread = threading.Thread(target=_loop, name="keepalive-thread", daemon=True)
     _keepalive_thread.start()
 
 
@@ -721,24 +704,16 @@ def generate(
     if selected_run_ids and plan is None:
         raise HTTPException(status_code=400, detail="Run selection requires a plan")
     if (plan is None and run is None) or (plan is not None and run is not None):
-        raise HTTPException(
-            status_code=400, detail="Provide exactly one of plan or run"
-        )
+        raise HTTPException(status_code=400, detail="Provide exactly one of plan or run")
     try:
-        path = generate_report(
-            project=project, plan=plan, run=run, run_ids=selected_run_ids
-        )
+        path = generate_report(project=project, plan=plan, run=run, run_ids=selected_run_ids)
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502, detail=f"Error connecting to TestRail API: {e}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {e}")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # Catch any other unexpected errors
-        raise HTTPException(
-            status_code=500, detail=f"An unexpected error occurred: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
     url = "/reports/" + Path(path).name
     return RedirectResponse(url=url, status_code=303)
 
@@ -765,9 +740,7 @@ def api_report_sync(
     if run_ids and plan is None:
         raise HTTPException(status_code=400, detail="Run selection requires a plan")
     if (plan is None and run is None) or (plan is not None and run is not None):
-        raise HTTPException(
-            status_code=400, detail="Provide exactly one of plan or run"
-        )
+        raise HTTPException(status_code=400, detail="Provide exactly one of plan or run")
     path = generate_report(project=project, plan=plan, run=run, run_ids=run_ids)
     url = "/reports/" + Path(path).name
     return {"path": path, "url": url}
@@ -815,9 +788,7 @@ def api_manage_run(payload: ManageRun):
     if suite_id is None:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "DEFAULT_SUITE_ID is required to create runs when suite_id is omitted"
-            ),
+            detail=("DEFAULT_SUITE_ID is required to create runs when suite_id is omitted"),
         )
     assert suite_id is not None
     body: dict[str, Any] = {}
@@ -851,9 +822,7 @@ def api_manage_case(payload: ManageCase):
     client = _make_client()
     section_id = _default_section_id()
     if section_id is None:
-        raise HTTPException(
-            status_code=400, detail="DEFAULT_SECTION_ID is required to create cases"
-        )
+        raise HTTPException(status_code=400, detail="DEFAULT_SECTION_ID is required to create cases")
     assert section_id is not None
     body: dict[str, Any] = {
         "title": payload.title,
@@ -886,25 +855,25 @@ def api_manage_case(payload: ManageCase):
 def api_update_plan(plan_id: int, payload: UpdatePlan):
     """
     Update an existing test plan.
-    
+
     Args:
         plan_id: TestRail plan ID to update
         payload: UpdatePlan model with fields to update
-    
+
     Returns:
         Updated plan data or dry_run preview
-    
+
     Raises:
         HTTPException 400: Invalid plan_id or validation error
         HTTPException 404: Plan not found
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate plan_id
     if plan_id < 1:
         raise HTTPException(status_code=400, detail="Plan ID must be positive")
-    
+
     # Build update payload with only non-None fields
     body: dict[str, Any] = {}
     if payload.name is not None:
@@ -913,70 +882,55 @@ def api_update_plan(plan_id: int, payload: UpdatePlan):
         body["description"] = payload.description
     if payload.milestone_id is not None:
         body["milestone_id"] = payload.milestone_id
-    
+
     # If no fields to update, return error
     if not body:
-        raise HTTPException(
-            status_code=400, 
-            detail="At least one field must be provided for update"
-        )
-    
+        raise HTTPException(status_code=400, detail="At least one field must be provided for update")
+
     if payload.dry_run:
         return {
             "dry_run": True,
             "plan_id": plan_id,
             "payload": body,
         }
-    
+
     try:
         client = _make_client()
         updated = client.update_plan(plan_id, body)
         return {"plan": updated}
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Plan {plan_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update plan: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update plan: {str(e)}")
 
 
 @app.put("/api/manage/run/{run_id}")
 def api_update_run(run_id: int, payload: UpdateRun):
     """
     Update an existing test run.
-    
+
     Args:
         run_id: TestRail run ID to update
         payload: UpdateRun model with fields to update
-    
+
     Returns:
         Updated run data or dry_run preview
-    
+
     Raises:
         HTTPException 400: Invalid run_id or validation error
         HTTPException 404: Run not found
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate run_id
     if run_id < 1:
         raise HTTPException(status_code=400, detail="Run ID must be positive")
-    
+
     # Build update payload with only non-None fields
     body: dict[str, Any] = {}
     if payload.name is not None:
@@ -985,58 +939,43 @@ def api_update_run(run_id: int, payload: UpdateRun):
         body["description"] = payload.description
     if payload.refs is not None:
         body["refs"] = payload.refs
-    
+
     # If no fields to update, return error
     if not body:
-        raise HTTPException(
-            status_code=400, 
-            detail="At least one field must be provided for update"
-        )
-    
+        raise HTTPException(status_code=400, detail="At least one field must be provided for update")
+
     if payload.dry_run:
         return {
             "dry_run": True,
             "run_id": run_id,
             "payload": body,
         }
-    
+
     try:
         client = _make_client()
         updated = client.update_run(run_id, body)
         return {"run": updated}
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Run {run_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update run: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update run: {str(e)}")
 
 
 @app.get("/api/manage/case/{case_id}")
 def api_get_case(case_id: int):
     """
     Get details for a specific test case.
-    
+
     Args:
         case_id: TestRail case ID to fetch
-    
+
     Returns:
         Case data including title, refs, and custom fields
-    
+
     Raises:
         HTTPException 400: Invalid case_id
         HTTPException 404: Case not found
@@ -1045,17 +984,17 @@ def api_get_case(case_id: int):
     # Validate case_id
     if case_id < 1:
         raise HTTPException(status_code=400, detail="Case ID must be positive")
-    
+
     try:
         client = _make_client()
         with client.make_session() as session:
             base_url = client.base_url
-            
+
             # Fetch case details from TestRail
             response = session.get(f"{base_url}/index.php?/api/v2/get_case/{case_id}")
             response.raise_for_status()
             case_data = response.json()
-            
+
             # Extract BDD scenarios if present
             bdd_scenario = None
             try:
@@ -1068,67 +1007,59 @@ def api_get_case(case_id: int):
             except Exception:
                 # If there's any issue extracting BDD scenario, just set it to None
                 pass
-            
+
             return {
                 "success": True,
                 "case": {
                     "id": case_data.get("id"),
                     "title": case_data.get("title"),
                     "refs": case_data.get("refs"),
-                    "custom_bdd_scenario": bdd_scenario
-                }
+                    "custom_bdd_scenario": bdd_scenario,
+                },
             }
     except requests.exceptions.HTTPError as e:
         if e.response and e.response.status_code == 404:
             raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
         import traceback
+
         traceback.print_exc()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch case: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch case: {str(e)}")
 
 
 @app.put("/api/manage/case/{case_id}")
 def api_update_case(case_id: int, payload: UpdateCase):
     """
     Update an existing test case.
-    
+
     Args:
         case_id: TestRail case ID to update
         payload: UpdateCase model with fields to update
-    
+
     Returns:
         Updated case data or dry_run preview
-    
+
     Raises:
         HTTPException 400: Invalid case_id or validation error
         HTTPException 404: Case not found
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate case_id
     if case_id < 1:
         raise HTTPException(status_code=400, detail="Case ID must be positive")
-    
+
     # Build update payload with only non-None fields
     body: dict[str, Any] = {}
     if payload.title is not None:
         body["title"] = payload.title
     if payload.refs is not None:
         body["refs"] = payload.refs
-    
+
     # Handle BDD scenarios if provided
     if payload.bdd_scenarios is not None:
         bdd_text = payload.bdd_scenarios
@@ -1136,45 +1067,30 @@ def api_update_case(case_id: int, payload: UpdateCase):
         if steps:
             combined = "\n".join(steps)
             body["custom_testrail_bdd_scenario"] = [{"content": combined}]
-    
+
     # If no fields to update, return error
     if not body:
-        raise HTTPException(
-            status_code=400, 
-            detail="At least one field must be provided for update"
-        )
-    
+        raise HTTPException(status_code=400, detail="At least one field must be provided for update")
+
     if payload.dry_run:
         return {
             "dry_run": True,
             "case_id": case_id,
             "payload": body,
         }
-    
+
     try:
         client = _make_client()
         updated = client.update_case(case_id, body)
         return {"case": updated}
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Case {case_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update case: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to update case: {str(e)}")
 
 
 # File attachment constants
@@ -1194,59 +1110,53 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 async def api_add_case_attachment(case_id: int, file: UploadFile = File(...)):
     """
     Upload a file attachment to a test case.
-    
+
     Args:
         case_id: TestRail case ID
         file: File to upload (multipart/form-data)
-    
+
     Returns:
         Attachment metadata on success
-    
+
     Raises:
         HTTPException 400: Invalid case_id, file type, or file size
         HTTPException 404: Case not found
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate case_id
     if case_id < 1:
         raise HTTPException(status_code=400, detail="Case ID must be positive")
-    
+
     # Validate file type
     content_type = file.content_type or ""
     if content_type not in ALLOWED_FILE_TYPES:
         allowed_types = ", ".join(ALLOWED_FILE_TYPES.values())
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type not allowed. Accepted types: {allowed_types}"
-        )
-    
+        raise HTTPException(status_code=400, detail=f"File type not allowed. Accepted types: {allowed_types}")
+
     # Read file content and validate size
     content = await file.read()
     file_size = len(content)
-    
+
     if file_size > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit"
-        )
-    
+        raise HTTPException(status_code=400, detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit")
+
     # Save to temporary file for upload
     import tempfile
-    
+
     filename = file.filename or "attachment"
-    
+
     try:
         suffix = Path(filename).suffix
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
-        
+
         try:
             client = _make_client()
             result = client.add_attachment_to_case(case_id, tmp_path, filename)
-            
+
             # Build response with attachment metadata
             attachment = {
                 "id": result.get("attachment_id"),
@@ -1256,7 +1166,7 @@ async def api_add_case_attachment(case_id: int, file: UploadFile = File(...)):
                 "content_type": content_type,
                 "created_on": int(time.time()),
             }
-            
+
             return {"attachment": attachment}
         finally:
             # Clean up temp file
@@ -1264,42 +1174,30 @@ async def api_add_case_attachment(case_id: int, file: UploadFile = File(...)):
                 Path(tmp_path).unlink(missing_ok=True)
             except Exception:
                 pass
-    
+
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Case {case_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to upload attachment: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to upload attachment: {str(e)}")
 
 
 @app.get("/api/manage/case/{case_id}/attachments")
 def api_get_case_attachments(case_id: int):
     """
     Get list of attachments for a test case.
-    
+
     Args:
         case_id: TestRail case ID
-    
+
     Returns:
         List of attachment metadata
-    
+
     Raises:
         HTTPException 400: Invalid case_id
         HTTPException 404: Case not found
@@ -1308,234 +1206,177 @@ def api_get_case_attachments(case_id: int):
     # Validate case_id
     if case_id < 1:
         raise HTTPException(status_code=400, detail="Case ID must be positive")
-    
+
     try:
         client = _make_client()
         attachments = client.get_attachments_for_case(case_id)
-        
+
         # Map attachments to response format
         attachment_list = []
         for att in attachments:
             att_id = att.get("id")
             if att_id is None:
                 continue
-            
+
             att_name = att.get("name") or att.get("filename") or f"Attachment {att_id}"
             att_fname = att.get("filename") or att.get("name") or f"attachment_{att_id}"
-            attachment_list.append({
-                "id": att_id,
-                "name": att_name,
-                "filename": att_fname,
-                "size": att.get("size") or 0,
-                "content_type": att.get("content_type") or "application/octet-stream",
-                "created_on": att.get("created_on") or 0,
-            })
-        
+            attachment_list.append(
+                {
+                    "id": att_id,
+                    "name": att_name,
+                    "filename": att_fname,
+                    "size": att.get("size") or 0,
+                    "content_type": att.get("content_type") or "application/octet-stream",
+                    "created_on": att.get("created_on") or 0,
+                }
+            )
+
         return {
             "attachments": attachment_list,
             "count": len(attachment_list),
         }
-    
+
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Case {case_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch attachments: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch attachments: {str(e)}")
 
 
 @app.delete("/api/manage/plan/{plan_id}")
 def api_delete_plan(plan_id: int, dry_run: bool = False):
     """
     Delete a test plan from TestRail.
-    
+
     Args:
         plan_id: TestRail plan ID to delete
         dry_run: If True, return preview without actually deleting
-    
+
     Returns:
         Success message with deleted plan ID or dry_run preview
-    
+
     Raises:
         HTTPException 400: Invalid plan_id
         HTTPException 404: Plan not found
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate plan_id
     if plan_id < 1:
         raise HTTPException(status_code=400, detail="Plan ID must be positive")
-    
+
     if dry_run:
-        return {
-            "dry_run": True,
-            "plan_id": plan_id,
-            "action": "delete_plan",
-            "message": f"Would delete plan {plan_id}"
-        }
-    
+        return {"dry_run": True, "plan_id": plan_id, "action": "delete_plan", "message": f"Would delete plan {plan_id}"}
+
     try:
         client = _make_client()
-        
+
         # Attempt to delete the plan
         client.delete_plan(plan_id)
-        
+
         # Clear relevant cache entries after successful deletion
         _plans_cache.clear()
         _dashboard_plans_cache.clear()
         _dashboard_plan_detail_cache.clear()
         _dashboard_stats_cache.clear()
-        
-        return {
-            "success": True,
-            "plan_id": plan_id,
-            "message": f"Plan {plan_id} deleted successfully"
-        }
+
+        return {"success": True, "plan_id": plan_id, "message": f"Plan {plan_id} deleted successfully"}
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Plan {plan_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete plan: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete plan: {str(e)}")
 
 
 @app.delete("/api/manage/run/{run_id}")
 def api_delete_run(run_id: int, dry_run: bool = False):
     """
     Delete a test run from TestRail.
-    
+
     Args:
         run_id: TestRail run ID to delete
         dry_run: If True, return preview without actually deleting
-    
+
     Returns:
         Success message with deleted run ID or dry_run preview
-    
+
     Raises:
         HTTPException 400: Invalid run_id
         HTTPException 404: Run not found
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate run_id
     if run_id < 1:
         raise HTTPException(status_code=400, detail="Run ID must be positive")
-    
+
     if dry_run:
-        return {
-            "dry_run": True,
-            "run_id": run_id,
-            "action": "delete_run",
-            "message": f"Would delete run {run_id}"
-        }
-    
+        return {"dry_run": True, "run_id": run_id, "action": "delete_run", "message": f"Would delete run {run_id}"}
+
     try:
         client = _make_client()
-        
+
         # Attempt to delete the run
         client.delete_run(run_id)
-        
+
         # Clear relevant cache entries after successful deletion
         _runs_cache.clear()
         _dashboard_plans_cache.clear()
         _dashboard_plan_detail_cache.clear()
         _dashboard_stats_cache.clear()
         _dashboard_run_stats_cache.clear()
-        
-        return {
-            "success": True,
-            "run_id": run_id,
-            "message": f"Run {run_id} deleted successfully"
-        }
+
+        return {"success": True, "run_id": run_id, "message": f"Run {run_id} deleted successfully"}
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Run {run_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete run: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete run: {str(e)}")
 
 
 @app.delete("/api/manage/case/{case_id}")
 def api_delete_case(case_id: int, dry_run: bool = False):
     """
     Delete a test case from TestRail.
-    
+
     Args:
         case_id: TestRail case ID to delete
         dry_run: If True, return preview without actually deleting
-    
+
     Returns:
         Success message with deleted case ID or dry_run preview
-    
+
     Raises:
         HTTPException 400: Invalid case_id
         HTTPException 404: Case not found
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate case_id
     if case_id < 1:
         raise HTTPException(status_code=400, detail="Case ID must be positive")
-    
+
     if dry_run:
-        return {
-            "dry_run": True,
-            "case_id": case_id,
-            "action": "delete_case",
-            "message": f"Would delete case {case_id}"
-        }
-    
+        return {"dry_run": True, "case_id": case_id, "action": "delete_case", "message": f"Would delete case {case_id}"}
+
     try:
         client = _make_client()
-        
+
         # Attempt to delete the case
         client.delete_case(case_id)
-        
+
         # Clear relevant cache entries after successful deletion
         # Cases don't have dedicated cache, but clear dashboard caches
         # in case the case was part of a run being displayed
@@ -1543,32 +1384,16 @@ def api_delete_case(case_id: int, dry_run: bool = False):
         _dashboard_plan_detail_cache.clear()
         _dashboard_stats_cache.clear()
         _dashboard_run_stats_cache.clear()
-        
-        return {
-            "success": True,
-            "case_id": case_id,
-            "message": f"Case {case_id} deleted successfully"
-        }
+
+        return {"success": True, "case_id": case_id, "message": f"Case {case_id} deleted successfully"}
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Case {case_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to delete case: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to delete case: {str(e)}")
 
 
 @app.get("/api/plans")
@@ -1586,14 +1411,10 @@ def api_plans(project: int = 1, is_completed: int | None = None):
         user = env_or_die("TESTRAIL_USER")
         api_key = env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
-        raise HTTPException(
-            status_code=500, detail="Server missing TestRail credentials"
-        )
+        raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
     session = requests.Session()
     session.auth = (user, api_key)
-    plans = get_plans_for_project(
-        session, base_url, project_id=project, is_completed=is_completed
-    )
+    plans = get_plans_for_project(session, base_url, project_id=project, is_completed=is_completed)
     # return concise info
     slim = [
         {
@@ -1644,9 +1465,7 @@ def api_runs(plan: int | None = None, project: int = 1):
         user = env_or_die("TESTRAIL_USER")
         api_key = env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
-        raise HTTPException(
-            status_code=500, detail="Server missing TestRail credentials"
-        )
+        raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
     session = requests.Session()
     session.auth = (user, api_key)
     try:
@@ -1697,19 +1516,17 @@ def api_get_run(run_id: int):
         user = env_or_die("TESTRAIL_USER")
         api_key = env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
-        raise HTTPException(
-            status_code=500, detail="Server missing TestRail credentials"
-        )
-    
+        raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
+
     session = requests.Session()
     session.auth = (user, api_key)
-    
+
     try:
         # Fetch run details from TestRail
         response = session.get(f"{base_url}/index.php?/api/v2/get_run/{run_id}")
         response.raise_for_status()
         run_data = response.json()
-        
+
         return {
             "run": {
                 "id": run_data.get("id"),
@@ -1728,17 +1545,17 @@ def api_get_run(run_id: int):
 def api_tests_for_run(run_id: int):
     """
     Fetch test cases for a specific run.
-    
+
     Args:
         run_id: TestRail run ID
-    
+
     Returns:
         JSON response containing:
         - run_id: The run ID
         - run_name: Name of the run
         - tests: List of test cases with id, case_id, title, status_id, status_name, refs
         - count: Number of tests
-    
+
     Raises:
         HTTPException 400: Invalid run_id
         HTTPException 404: Run not found
@@ -1747,95 +1564,81 @@ def api_tests_for_run(run_id: int):
     # Validate run_id
     if run_id < 1:
         raise HTTPException(status_code=400, detail="Run ID must be positive")
-    
+
     try:
         client = _make_client()
-        
+
         # Fetch run details for the run name
         run_data = client.get_run(run_id)
         run_name = run_data.get("name") or f"Run {run_id}"
-        
+
         # Fetch tests for the run
         tests = client.get_tests_for_run(run_id)
-        
+
         # Get status mapping (use defaults if API fails)
         try:
             statuses = client.get_statuses_map(defaults=DEFAULT_STATUS_MAP)
         except Exception:
             statuses = DEFAULT_STATUS_MAP.copy()
-        
+
         # Map tests to response format
         test_list = []
         for test in tests:
             test_id = test.get("id")
             if test_id is None:
                 continue
-            
+
             status_id = test.get("status_id")
             status_name = statuses.get(status_id, f"Status {status_id}") if status_id else "Unknown"
-            
-            test_list.append({
-                "id": test_id,
-                "case_id": test.get("case_id"),
-                "title": test.get("title") or f"Test {test_id}",
-                "status_id": status_id,
-                "status_name": status_name,
-                "refs": test.get("refs"),
-            })
-        
+
+            test_list.append(
+                {
+                    "id": test_id,
+                    "case_id": test.get("case_id"),
+                    "title": test.get("title") or f"Test {test_id}",
+                    "status_id": status_id,
+                    "status_name": status_name,
+                    "refs": test.get("refs"),
+                }
+            )
+
         return {
             "run_id": run_id,
             "run_name": run_name,
             "tests": test_list,
             "count": len(test_list),
         }
-    
+
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Run {run_id} not found"
-            )
-        raise HTTPException(
-            status_code=502,
-            detail=f"TestRail API error: {str(e)}"
-        )
+            raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch tests: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch tests: {str(e)}")
 
 
 @app.post("/api/cache/clear")
 def api_cache_clear():
     """
     Clear the plans and runs cache for the reporter page.
-    
+
     This endpoint clears the server-side cache for plans and runs,
     forcing fresh data to be fetched from TestRail on the next request.
-    
+
     Use this when:
     - Plans have been added/removed in TestRail
     - Runs have been modified in TestRail
     - You want to ensure you're seeing the latest data
-    
+
     Returns:
         dict: Success message with timestamp
     """
     _plans_cache.clear()
     _runs_cache.clear()
-    
-    return {
-        "success": True,
-        "message": "Cache cleared successfully",
-        "cleared_at": datetime.now().isoformat()
-    }
+
+    return {"success": True, "message": "Cache cleared successfully", "cleared_at": datetime.now().isoformat()}
 
 
 @app.get("/api/cases")
@@ -1851,9 +1654,7 @@ def api_cases(
         if not section_id and filters:
             try:
                 parsed = json.loads(filters)
-                section_vals = (
-                    parsed.get("filters", {}).get("cases:section_id", {}).get("values")
-                )
+                section_vals = parsed.get("filters", {}).get("cases:section_id", {}).get("values")
                 if isinstance(section_vals, list) and section_vals:
                     try:
                         filter_section_id = int(str(section_vals[0]).strip())
@@ -1862,9 +1663,7 @@ def api_cases(
             except Exception:
                 filter_section_id = None
         effective_section = section_id or filter_section_id
-        cases = client.get_cases(
-            project, suite_id=suite_id, section_id=effective_section
-        )
+        cases = client.get_cases(project, suite_id=suite_id, section_id=effective_section)
     except HTTPException:
         raise
     except requests.exceptions.RequestException as e:
@@ -1895,10 +1694,7 @@ def api_users(project: int = 1):
     try:
         client = _make_client()
         users = client.get_users_map()
-        items = [
-            {"id": uid, "name": name}
-            for uid, name in sorted(users.items(), key=lambda kv: kv[1])
-        ]
+        items = [{"id": uid, "name": name} for uid, name in sorted(users.items(), key=lambda kv: kv[1])]
         return {"count": len(items), "users": items}
     except HTTPException:
         raise
@@ -1946,46 +1742,46 @@ def api_dashboard_plans(
 ):
     """
     Get paginated list of test plans with aggregated statistics for the dashboard.
-    
+
     This endpoint fetches test plans from TestRail and calculates comprehensive statistics
     for each plan, including pass rates, completion rates, and status distributions.
     Results are cached for performance (default: 5 minutes).
-    
+
     Query Parameters:
         project (int): TestRail project ID (default: 1)
             - Must be a positive integer
             - Identifies which project's plans to fetch
-        
+
         is_completed (int, optional): Filter by completion status
             - 0: Show only active (incomplete) plans
             - 1: Show only completed plans
             - None: Show all plans (default)
-        
+
         limit (int, optional): Maximum number of plans to return per page
             - Default: 25 (configured via DASHBOARD_DEFAULT_PAGE_SIZE)
             - Maximum: 25 (configured via DASHBOARD_MAX_PAGE_SIZE)
             - Automatically clamped to valid range
             - Note: Statistics calculation is parallelized (2 workers) for better performance
-        
+
         offset (int): Number of plans to skip for pagination (default: 0)
             - Must be non-negative
             - Used with limit for pagination (e.g., offset=50, limit=50 for page 2)
-        
+
         created_after (int, optional): Unix timestamp filter
             - Only return plans created after this timestamp
             - Must be non-negative
             - Can be combined with created_before for date range
-        
+
         created_before (int, optional): Unix timestamp filter
             - Only return plans created before this timestamp
             - Must be non-negative
             - Must be >= created_after if both specified
-        
+
         search (str, optional): Search term for filtering by plan name
             - Case-insensitive substring match
             - Applied after other filters
             - Searches in plan name field only
-    
+
     Returns:
         DashboardPlansResponse: JSON response containing:
             - plans (list): Array of plan objects with statistics
@@ -2003,7 +1799,7 @@ def api_dashboard_plans(
                 - failed_count: Number of failed tests
                 - blocked_count: Number of blocked tests
                 - untested_count: Number of untested tests
-            
+
             - total_count (int): Total number of plans matching filters (before pagination)
             - offset (int): Current offset value
             - limit (int): Current limit value
@@ -2012,16 +1808,16 @@ def api_dashboard_plans(
                 - cache.hit: Whether response came from cache
                 - cache.expires_at: ISO timestamp when cache expires
                 - cache.seconds_remaining: Seconds until cache expiration
-    
+
     Raises:
         HTTPException 400: Invalid parameters (negative values, invalid date range, etc.)
         HTTPException 502: TestRail API connection error
         HTTPException 504: TestRail API timeout
         HTTPException 500: Unexpected server error
-    
+
     Example:
         GET /api/dashboard/plans?project=1&is_completed=0&limit=25&offset=0
-        
+
         Response:
         {
             "plans": [
@@ -2049,13 +1845,13 @@ def api_dashboard_plans(
                 }
             }
         }
-    
+
     Performance Notes:
         - Results are cached for DASHBOARD_PLANS_CACHE_TTL seconds (default: 300)
         - Statistics calculation involves multiple API calls to TestRail
         - Large plans with many runs may take several seconds to process
         - Use pagination and filters to improve response times
-    
+
     Cache Behavior:
         - Cache key includes all query parameters
         - Different filter combinations have separate cache entries
@@ -2065,28 +1861,28 @@ def api_dashboard_plans(
     # Validate parameters
     if project < 1:
         raise HTTPException(status_code=400, detail="Project ID must be positive")
-    
+
     if offset < 0:
         raise HTTPException(status_code=400, detail="Offset must be non-negative")
-    
+
     if is_completed is not None and is_completed not in (0, 1):
         raise HTTPException(status_code=400, detail="is_completed must be 0 or 1")
-    
+
     # Validate date range
     if created_after is not None and created_after < 0:
         raise HTTPException(status_code=400, detail="created_after must be non-negative timestamp")
-    
+
     if created_before is not None and created_before < 0:
         raise HTTPException(status_code=400, detail="created_before must be non-negative timestamp")
-    
+
     if created_after is not None and created_before is not None and created_after > created_before:
         raise HTTPException(status_code=400, detail="created_after must be less than or equal to created_before")
-    
+
     # Validate and normalize limit using configured defaults
     if limit is None:
         limit = dashboard_default_page_size
     limit = max(1, min(limit, dashboard_max_page_size))
-    
+
     # Check cache
     cache_key = ("dashboard_plans", project, is_completed, offset, limit, created_after, created_before, search)
     cached = _dashboard_plans_cache.get(cache_key)
@@ -2097,10 +1893,10 @@ def api_dashboard_plans(
         data["meta"] = _cache_meta(True, expires_at)
         data["meta"]["estimated_total"] = estimated_flag
         return data
-    
+
     try:
         client = _make_client()
-        
+
         def _apply_search_and_date(plans: list[dict]) -> list[dict]:
             filtered = []
             search_term = search.strip().lower() if search else None
@@ -2149,15 +1945,11 @@ def api_dashboard_plans(
                 )
             except requests.exceptions.Timeout as e:
                 print(f"Error: TestRail API timeout for project {project}: {e}", flush=True)
-                raise HTTPException(
-                    status_code=504,
-                    detail="TestRail API request timed out. Please try again."
-                )
+                raise HTTPException(status_code=504, detail="TestRail API request timed out. Please try again.")
             except requests.exceptions.ConnectionError as e:
                 print(f"Error: TestRail API connection error for project {project}: {e}", flush=True)
                 raise HTTPException(
-                    status_code=502,
-                    detail="Unable to connect to TestRail API. Please check your connection."
+                    status_code=502, detail="Unable to connect to TestRail API. Please check your connection."
                 )
 
             if not batch:
@@ -2166,10 +1958,7 @@ def api_dashboard_plans(
 
             if not isinstance(batch, list):
                 print(f"Error: Invalid plans data type: {type(batch)}", flush=True)
-                raise HTTPException(
-                    status_code=500,
-                    detail="Invalid response from TestRail API"
-                )
+                raise HTTPException(status_code=500, detail="Invalid response from TestRail API")
 
             cursor += len(batch)
             filtered_batch = _apply_search_and_date(batch)
@@ -2185,26 +1974,26 @@ def api_dashboard_plans(
             total_count += 1
 
         paginated_plans = collected[:limit]
-        
+
         # Calculate statistics for each plan using parallel processing
         from app.dashboard_stats import calculate_plan_statistics
-        
+
         def calculate_stats_for_plan(plan):
             """Helper function to calculate stats for a single plan."""
             if not isinstance(plan, dict):
                 print(f"Warning: Skipping invalid plan data: {plan}", flush=True)
                 return None
-            
+
             plan_id = plan.get("id")
             if not plan_id:
                 print(f"Warning: Skipping plan with missing ID: {plan}", flush=True)
                 return None
-            
+
             try:
                 # Create a new client for this thread
                 thread_client = _make_client()
                 stats = calculate_plan_statistics(plan_id, thread_client)
-                
+
                 # Convert to dict format
                 return {
                     "plan_id": stats.plan_id,
@@ -2257,17 +2046,17 @@ def api_dashboard_plans(
                     "blocked_count": 0,
                     "untested_count": 0,
                 }
-        
+
         # Use ThreadPoolExecutor to calculate stats in parallel
         # Limit to 2 workers to avoid TestRail API rate limits
         max_workers = min(2, len(paginated_plans))
         plans_with_stats = []
-        
+
         if paginated_plans:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 # Submit all tasks
                 future_to_plan = {executor.submit(calculate_stats_for_plan, plan): plan for plan in paginated_plans}
-                
+
                 # Collect results as they complete
                 for future in future_to_plan:
                     try:
@@ -2278,10 +2067,10 @@ def api_dashboard_plans(
                         plan = future_to_plan[future]
                         plan_id = plan.get("id") if isinstance(plan, dict) else "unknown"
                         print(f"Warning: Failed to get stats for plan {plan_id}: {e}", flush=True)
-        
+
         has_more = (len(collected) > limit) or (not source_exhausted)
         estimated_total = not source_exhausted or len(collected) > limit
-        
+
         response_data = {
             "plans": plans_with_stats,
             "total_count": total_count,
@@ -2291,44 +2080,38 @@ def api_dashboard_plans(
             "meta": {},
             "_estimated_total": estimated_total,
         }
-        
+
         # Cache the response
         expires_at = _dashboard_plans_cache.set(cache_key, response_data, ttl_seconds=dashboard_plans_cache_ttl)
         response_data["meta"] = _cache_meta(False, expires_at)
         response_data["meta"]["estimated_total"] = estimated_total
-        
+
         return response_data
-        
+
     except HTTPException:
         raise
     except requests.exceptions.RequestException as e:
         print(f"Error: TestRail API error in dashboard plans: {e}", flush=True)
-        raise HTTPException(
-            status_code=502, 
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
         print(f"Error: Unexpected error in dashboard plans: {e}", flush=True)
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to fetch dashboard plans: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch dashboard plans: {str(e)}")
 
 
 @app.get("/api/dashboard/plan/{plan_id}", response_model=DashboardPlanDetail)
 def api_dashboard_plan_detail(plan_id: int):
     """
     Get detailed information for a specific test plan including all runs and their statistics.
-    
+
     This endpoint fetches comprehensive details for a single plan, including aggregated
     plan-level statistics and individual statistics for each run within the plan.
     Results are cached for performance (default: 3 minutes).
-    
+
     Path Parameters:
         plan_id (int): TestRail plan ID
             - Must be a positive integer
             - Plan must exist and be accessible
-    
+
     Returns:
         DashboardPlanDetail: JSON response containing:
             - plan (dict): Plan object with aggregated statistics
@@ -2345,7 +2128,7 @@ def api_dashboard_plan_detail(plan_id: int):
                 - failed_count: Number of failed tests
                 - blocked_count: Number of blocked tests
                 - untested_count: Number of untested tests
-            
+
             - runs (list): Array of run objects with statistics
                 Each run includes:
                 - run_id: TestRail run ID
@@ -2357,22 +2140,22 @@ def api_dashboard_plan_detail(plan_id: int):
                 - pass_rate: Percentage of passed tests (0.0-100.0)
                 - completion_rate: Percentage of executed tests (0.0-100.0)
                 - updated_on: Unix timestamp of last update (may be null)
-            
+
             - meta (dict): Cache metadata
                 - cache.hit: Whether response came from cache
                 - cache.expires_at: ISO timestamp when cache expires
                 - cache.seconds_remaining: Seconds until cache expiration
-    
+
     Raises:
         HTTPException 400: Invalid plan_id (not positive integer)
         HTTPException 404: Plan not found or contains invalid data
         HTTPException 502: TestRail API connection error
         HTTPException 504: TestRail API timeout
         HTTPException 500: Unexpected server error
-    
+
     Example:
         GET /api/dashboard/plan/123
-        
+
         Response:
         {
             "plan": {
@@ -2402,13 +2185,13 @@ def api_dashboard_plan_detail(plan_id: int):
                 }
             }
         }
-    
+
     Performance Notes:
         - Results are cached for DASHBOARD_PLAN_DETAIL_CACHE_TTL seconds (default: 180)
         - Fetches statistics for all runs in the plan
         - May involve many API calls for plans with numerous runs
         - Failed run statistics are logged but don't fail the entire request
-    
+
     Use Cases:
         - Expanding a plan card in the dashboard UI
         - Viewing detailed run-level statistics
@@ -2418,7 +2201,7 @@ def api_dashboard_plan_detail(plan_id: int):
     # Validate plan_id
     if plan_id < 1:
         raise HTTPException(status_code=400, detail="Plan ID must be positive")
-    
+
     # Check cache
     cache_key = ("dashboard_plan_detail", plan_id)
     cached = _dashboard_plan_detail_cache.get(cache_key)
@@ -2427,37 +2210,30 @@ def api_dashboard_plan_detail(plan_id: int):
         data = payload.copy()
         data["meta"] = _cache_meta(True, expires_at)
         return data
-    
+
     try:
         client = _make_client()
-        
+
         # Calculate plan statistics
         from app.dashboard_stats import (
             calculate_plan_statistics,
             calculate_run_statistics,
         )
-        
+
         try:
             plan_stats = calculate_plan_statistics(plan_id, client)
         except requests.exceptions.Timeout as e:
             print(f"Error: TestRail API timeout for plan {plan_id}: {e}", flush=True)
-            raise HTTPException(
-                status_code=504,
-                detail="TestRail API request timed out. Please try again."
-            )
+            raise HTTPException(status_code=504, detail="TestRail API request timed out. Please try again.")
         except requests.exceptions.ConnectionError as e:
             print(f"Error: TestRail API connection error for plan {plan_id}: {e}", flush=True)
             raise HTTPException(
-                status_code=502,
-                detail="Unable to connect to TestRail API. Please check your connection."
+                status_code=502, detail="Unable to connect to TestRail API. Please check your connection."
             )
         except ValueError as e:
             print(f"Error: Invalid data for plan {plan_id}: {e}", flush=True)
-            raise HTTPException(
-                status_code=404,
-                detail=f"Plan {plan_id} not found or contains invalid data"
-            )
-        
+            raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found or contains invalid data")
+
         # Convert plan stats to dict
         plan_dict = {
             "plan_id": plan_stats.plan_id,
@@ -2474,31 +2250,25 @@ def api_dashboard_plan_detail(plan_id: int):
             "blocked_count": plan_stats.blocked_count,
             "untested_count": plan_stats.untested_count,
         }
-        
+
         # Get all runs for the plan
         try:
             plan_data = client.get_plan(plan_id)
         except requests.exceptions.RequestException as e:
             print(f"Error: Failed to fetch plan data for {plan_id}: {e}", flush=True)
-            raise HTTPException(
-                status_code=502,
-                detail=f"Error fetching plan data from TestRail API: {str(e)}"
-            )
-        
+            raise HTTPException(status_code=502, detail=f"Error fetching plan data from TestRail API: {str(e)}")
+
         # Validate plan data
         if not isinstance(plan_data, dict):
             print(f"Error: Invalid plan data type for {plan_id}: {type(plan_data)}", flush=True)
-            raise HTTPException(
-                status_code=500,
-                detail="Invalid response from TestRail API"
-            )
-        
+            raise HTTPException(status_code=500, detail="Invalid response from TestRail API")
+
         run_ids = []
         entries = plan_data.get("entries", [])
         if not isinstance(entries, list):
             print(f"Warning: Invalid entries type for plan {plan_id}: {type(entries)}", flush=True)
             entries = []
-        
+
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
@@ -2511,13 +2281,13 @@ def api_dashboard_plan_detail(plan_id: int):
                 run_id = run.get("id")
                 if run_id:
                     run_ids.append(run_id)
-        
+
         # Calculate statistics for each run
         runs_with_stats = []
         for run_id in run_ids:
             try:
                 run_stats = calculate_run_statistics(run_id, client)
-                
+
                 # Convert to dict format
                 run_dict = {
                     "run_id": run_stats.run_id,
@@ -2535,44 +2305,40 @@ def api_dashboard_plan_detail(plan_id: int):
                 print(f"Warning: API error calculating stats for run {run_id}: {e}", flush=True)
             except Exception as e:
                 print(f"Warning: Failed to calculate stats for run {run_id}: {e}", flush=True)
-        
+
         response_data = {
             "plan": plan_dict,
             "runs": runs_with_stats,
             "meta": {},
         }
-        
+
         # Cache the response
-        expires_at = _dashboard_plan_detail_cache.set(cache_key, response_data, ttl_seconds=dashboard_plan_detail_cache_ttl)
+        expires_at = _dashboard_plan_detail_cache.set(
+            cache_key, response_data, ttl_seconds=dashboard_plan_detail_cache_ttl
+        )
         response_data["meta"] = _cache_meta(False, expires_at)
-        
+
         return response_data
-        
+
     except HTTPException:
         raise
     except requests.exceptions.RequestException as e:
         print(f"Error: TestRail API error in plan detail: {e}", flush=True)
-        raise HTTPException(
-            status_code=502, 
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
         print(f"Error: Unexpected error in plan detail: {e}", flush=True)
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to fetch plan details: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch plan details: {str(e)}")
 
 
 @app.get("/api/dashboard/config")
 def api_dashboard_config():
     """
     Get dashboard configuration values for client-side use.
-    
+
     This endpoint returns the server-side configuration values that control
     dashboard behavior, allowing the frontend to apply consistent thresholds,
     pagination limits, and cache TTLs.
-    
+
     Returns:
         dict: Configuration object containing:
             - cache (dict): Cache TTL values in seconds
@@ -2580,20 +2346,20 @@ def api_dashboard_config():
                 - plan_detail_ttl: Plan details cache duration (default: 180)
                 - stats_ttl: Statistics cache duration (default: 120)
                 - run_stats_ttl: Run statistics cache duration (default: 120)
-            
+
             - pagination (dict): Pagination configuration
                 - default_page_size: Default plans per page (default: 50)
                 - max_page_size: Maximum plans per page (default: 200)
-            
+
             - visual_thresholds (dict): Thresholds for visual indicators (percentages)
                 - pass_rate_high: Green threshold (default: 80)
                 - pass_rate_medium: Yellow threshold (default: 50)
                 - critical_fail_threshold: Critical failure rate (default: 20)
                 - critical_block_threshold: Critical block rate (default: 10)
-    
+
     Example:
         GET /api/dashboard/config
-        
+
         Response:
         {
             "cache": {
@@ -2613,7 +2379,7 @@ def api_dashboard_config():
                 "critical_block_threshold": 10
             }
         }
-    
+
     Configuration Sources:
         All values can be customized via environment variables:
         - DASHBOARD_PLANS_CACHE_TTL
@@ -2626,7 +2392,7 @@ def api_dashboard_config():
         - DASHBOARD_PASS_RATE_MEDIUM
         - DASHBOARD_CRITICAL_FAIL_THRESHOLD
         - DASHBOARD_CRITICAL_BLOCK_THRESHOLD
-    
+
     Use Cases:
         - Frontend initialization to match server configuration
         - Displaying cache expiration information to users
@@ -2649,7 +2415,7 @@ def api_dashboard_config():
             "pass_rate_medium": dashboard_pass_rate_medium,
             "critical_fail_threshold": dashboard_critical_fail_threshold,
             "critical_block_threshold": dashboard_critical_block_threshold,
-        }
+        },
     }
 
 
@@ -2657,22 +2423,22 @@ def api_dashboard_config():
 def api_dashboard_cache_clear():
     """
     Clear all dashboard caches to force fresh data fetch from TestRail.
-    
+
     This endpoint clears all server-side caches used by the dashboard,
     ensuring that the next request fetches fresh data from TestRail.
     Used by the dashboard refresh functionality.
-    
+
     Method: POST (to prevent accidental cache clearing from GET requests)
-    
+
     Returns:
         dict: Status response containing:
             - status: "success" if caches were cleared
             - message: Human-readable confirmation message
             - cleared_caches: List of cache names that were cleared
-    
+
     Example:
         POST /api/dashboard/cache/clear
-        
+
         Response:
         {
             "status": "success",
@@ -2684,25 +2450,25 @@ def api_dashboard_cache_clear():
                 "dashboard_run_stats"
             ]
         }
-    
+
     Caches Cleared:
         - dashboard_plans: Plans list cache (all filter combinations)
         - dashboard_plan_detail: Individual plan details cache
         - dashboard_stats: Plan statistics cache
         - dashboard_run_stats: Run statistics cache
-    
+
     Side Effects:
         - All cached dashboard data is immediately invalidated
         - Next dashboard request will fetch fresh data from TestRail
         - May cause temporary performance impact as caches rebuild
         - Does not affect other application caches (plans, runs, etc.)
-    
+
     Use Cases:
         - User clicks "Refresh" button in dashboard
         - After creating/updating plans or runs in TestRail
         - When immediate data accuracy is required
         - Troubleshooting stale data issues
-    
+
     Performance Notes:
         - Cache clearing is instantaneous (< 1ms)
         - Subsequent requests will be slower until caches rebuild
@@ -2713,16 +2479,11 @@ def api_dashboard_cache_clear():
     _dashboard_plan_detail_cache.clear()
     _dashboard_stats_cache.clear()
     _dashboard_run_stats_cache.clear()
-    
+
     return {
         "status": "success",
         "message": "All dashboard caches cleared",
-        "cleared_caches": [
-            "dashboard_plans",
-            "dashboard_plan_detail",
-            "dashboard_stats",
-            "dashboard_run_stats"
-        ]
+        "cleared_caches": ["dashboard_plans", "dashboard_plan_detail", "dashboard_stats", "dashboard_run_stats"],
     }
 
 
@@ -2730,17 +2491,17 @@ def api_dashboard_cache_clear():
 def api_dashboard_runs(plan_id: int):
     """
     Get list of runs for a specific plan with statistics.
-    
+
     Args:
         plan_id: TestRail plan ID
-    
+
     Returns:
         DashboardRunsResponse with run statistics
     """
     # Validate plan_id
     if plan_id < 1:
         raise HTTPException(status_code=400, detail="Plan ID must be positive")
-    
+
     # Check cache
     cache_key = ("dashboard_runs", plan_id)
     cached = _dashboard_stats_cache.get(cache_key)
@@ -2749,46 +2510,36 @@ def api_dashboard_runs(plan_id: int):
         data = payload.copy()
         data["meta"] = _cache_meta(True, expires_at)
         return data
-    
+
     try:
         client = _make_client()
-        
+
         # Get all runs for the plan
         try:
             plan_data = client.get_plan(plan_id)
         except requests.exceptions.Timeout as e:
             print(f"Error: TestRail API timeout for plan {plan_id}: {e}", flush=True)
-            raise HTTPException(
-                status_code=504,
-                detail="TestRail API request timed out. Please try again."
-            )
+            raise HTTPException(status_code=504, detail="TestRail API request timed out. Please try again.")
         except requests.exceptions.ConnectionError as e:
             print(f"Error: TestRail API connection error for plan {plan_id}: {e}", flush=True)
             raise HTTPException(
-                status_code=502,
-                detail="Unable to connect to TestRail API. Please check your connection."
+                status_code=502, detail="Unable to connect to TestRail API. Please check your connection."
             )
         except requests.exceptions.RequestException as e:
             print(f"Error: Failed to fetch plan data for {plan_id}: {e}", flush=True)
-            raise HTTPException(
-                status_code=502,
-                detail=f"Error fetching plan data from TestRail API: {str(e)}"
-            )
-        
+            raise HTTPException(status_code=502, detail=f"Error fetching plan data from TestRail API: {str(e)}")
+
         # Validate plan data
         if not isinstance(plan_data, dict):
             print(f"Error: Invalid plan data type for {plan_id}: {type(plan_data)}", flush=True)
-            raise HTTPException(
-                status_code=500,
-                detail="Invalid response from TestRail API"
-            )
-        
+            raise HTTPException(status_code=500, detail="Invalid response from TestRail API")
+
         run_ids = []
         entries = plan_data.get("entries", [])
         if not isinstance(entries, list):
             print(f"Warning: Invalid entries type for plan {plan_id}: {type(entries)}", flush=True)
             entries = []
-        
+
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
@@ -2801,14 +2552,15 @@ def api_dashboard_runs(plan_id: int):
                 run_id = run.get("id")
                 if run_id:
                     run_ids.append(run_id)
-        
+
         # Calculate statistics for each run
         from app.dashboard_stats import calculate_run_statistics
+
         runs_with_stats = []
         for run_id in run_ids:
             try:
                 run_stats = calculate_run_statistics(run_id, client)
-                
+
                 # Convert to dict format
                 run_dict = {
                     "run_id": run_stats.run_id,
@@ -2826,30 +2578,24 @@ def api_dashboard_runs(plan_id: int):
                 print(f"Warning: API error calculating stats for run {run_id}: {e}", flush=True)
             except Exception as e:
                 print(f"Warning: Failed to calculate stats for run {run_id}: {e}", flush=True)
-        
+
         response_data = {
             "plan_id": plan_id,
             "runs": runs_with_stats,
             "meta": {},
         }
-        
+
         # Cache the response
         expires_at = _dashboard_stats_cache.set(cache_key, response_data, ttl_seconds=dashboard_run_stats_cache_ttl)
         response_data["meta"] = _cache_meta(False, expires_at)
-        
+
         return response_data
-        
+
     except HTTPException:
         raise
     except requests.exceptions.RequestException as e:
         print(f"Error: TestRail API error in dashboard runs: {e}", flush=True)
-        raise HTTPException(
-            status_code=502, 
-            detail=f"Error connecting to TestRail API: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
         print(f"Error: Unexpected error in dashboard runs: {e}", flush=True)
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Failed to fetch runs: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to fetch runs: {str(e)}")

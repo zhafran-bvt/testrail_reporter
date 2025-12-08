@@ -44,9 +44,7 @@ def capture_telemetry():
         _telemetry_ctx.reset(token)
 
 
-def record_api_call(
-    kind: str, endpoint: str, elapsed_ms: float, status: str, error: str | None = None
-):
+def record_api_call(kind: str, endpoint: str, elapsed_ms: float, status: str, error: str | None = None):
     telemetry = _telemetry_ctx.get()
     if not telemetry:
         return
@@ -70,9 +68,7 @@ class AttachmentTooLarge(Exception):
     """Raised when an attachment streaming download exceeds the allowed limit."""
 
     def __init__(self, size_bytes: int, limit_bytes: int):
-        super().__init__(
-            f"Attachment exceeded limit ({size_bytes} > {limit_bytes} bytes)"
-        )
+        super().__init__(f"Attachment exceeded limit ({size_bytes} > {limit_bytes} bytes)")
         self.size_bytes = size_bytes
         self.limit_bytes = limit_bytes
 
@@ -101,9 +97,7 @@ def api_get(
             if isinstance(data, dict) and any(k in data for k in ("error", "message")):
                 msg = data.get("error") or data.get("message") or str(data)
                 raise RuntimeError(f"API error for '{endpoint}': {msg}")
-            record_api_call(
-                "GET", endpoint, (time.perf_counter() - start) * 1000.0, "ok"
-            )
+            record_api_call("GET", endpoint, (time.perf_counter() - start) * 1000.0, "ok")
             return data
         except requests.exceptions.HTTPError as exc:
             last_exc = exc
@@ -115,9 +109,7 @@ def api_get(
                 "error",
                 str(exc),
             )
-            retryable = status_code == 429 or (
-                status_code is not None and 500 <= status_code < 600
-            )
+            retryable = status_code == 429 or (status_code is not None and 500 <= status_code < 600)
             if not retryable or attempt == attempts:
                 raise
             time.sleep(delay)
@@ -179,9 +171,7 @@ def api_post(
             if isinstance(data, dict) and any(k in data for k in ("error", "message")):
                 msg = data.get("error") or data.get("message") or str(data)
                 raise RuntimeError(f"API error for '{endpoint}': {msg}")
-            record_api_call(
-                "POST", endpoint, (time.perf_counter() - start) * 1000.0, "ok"
-            )
+            record_api_call("POST", endpoint, (time.perf_counter() - start) * 1000.0, "ok")
             return data
         except requests.exceptions.HTTPError as exc:
             last_exc = exc
@@ -193,9 +183,7 @@ def api_post(
                 "error",
                 str(exc),
             )
-            retryable = status_code == 429 or (
-                status_code is not None and 500 <= status_code < 600
-            )
+            retryable = status_code == 429 or (status_code is not None and 500 <= status_code < 600)
             if not retryable or attempt == attempts:
                 raise
             time.sleep(delay)
@@ -509,8 +497,7 @@ def get_results_for_run(
         else:
             keys = list(batch.keys()) if isinstance(batch, dict) else "n/a"
             print(
-                f"Warning: Unexpected payload for results (run {run_id}): "
-                f"{type(batch)} keys={keys}",
+                f"Warning: Unexpected payload for results (run {run_id}): " f"{type(batch)} keys={keys}",
                 file=sys.stderr,
             )
             break
@@ -685,9 +672,7 @@ def download_attachment(
     attempt = 0
     while True:
         try:
-            with session.get(
-                url, stream=True, timeout=timeout or DEFAULT_HTTP_TIMEOUT
-            ) as r:
+            with session.get(url, stream=True, timeout=timeout or DEFAULT_HTTP_TIMEOUT) as r:
                 if r.status_code == 429:
                     retry_after = r.headers.get("Retry-After")
                     wait_for = backoff_delay
@@ -705,9 +690,7 @@ def download_attachment(
                 r.raise_for_status()
                 content_type = r.headers.get("Content-Type")
                 # Write to a temp file to avoid holding full content in memory
-                fd, tmp_path = tempfile.mkstemp(
-                    prefix=f"att_{attachment_id}_", suffix=".bin"
-                )
+                fd, tmp_path = tempfile.mkstemp(prefix=f"att_{attachment_id}_", suffix=".bin")
                 tmp = Path(tmp_path)
                 try:
                     bytes_downloaded = 0
@@ -716,11 +699,7 @@ def download_attachment(
                             if not chunk:
                                 continue
                             bytes_downloaded += len(chunk)
-                            if (
-                                size_limit
-                                and size_limit > 0
-                                and bytes_downloaded > size_limit
-                            ):
+                            if size_limit and size_limit > 0 and bytes_downloaded > size_limit:
                                 raise AttachmentTooLarge(bytes_downloaded, size_limit)
                             f.write(chunk)
                 except AttachmentTooLarge:
@@ -940,9 +919,7 @@ class TestRailClient:
                 backoff=self.backoff,
             )
 
-    def download_attachment(
-        self, attachment_id: int, *, size_limit: int | None = None, max_retries: int = 4
-    ):
+    def download_attachment(self, attachment_id: int, *, size_limit: int | None = None, max_retries: int = 4):
         with self.make_session() as session:
             return download_attachment(
                 session,
@@ -1108,12 +1085,12 @@ class TestRailClient:
     def add_attachment_to_case(self, case_id: int, file_path: str, filename: str):
         """
         Add an attachment to a test case.
-        
+
         Args:
             case_id: TestRail case ID
             file_path: Path to the file to upload
             filename: Original filename to use
-        
+
         Returns:
             Attachment metadata from TestRail API
         """

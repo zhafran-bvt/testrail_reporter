@@ -9,14 +9,14 @@ def test_manage_plan_requires_write_flag(monkeypatch):
     """Test that manage plan endpoint works when write is enabled."""
     api = TestClient(main.app)
     fake = types.SimpleNamespace()
-    
+
     def add_plan(project_id, payload):
         return {"id": 999, "name": payload["name"]}
-    
+
     fake.add_plan = add_plan
     monkeypatch.setattr(main, "_make_client", lambda: fake)
     monkeypatch.setattr(main, "_write_enabled", lambda: True)
-    
+
     resp = api.post("/api/manage/plan", json={"project": 1, "name": "X"})
     assert resp.status_code in (200, 201)
 
@@ -103,6 +103,4 @@ def test_manage_case_calls_client(monkeypatch):
     assert called["payload"]["template_id"] == 4
     assert called["payload"]["type_id"] == 7
     assert called["payload"]["priority_id"] == 2
-    assert called["payload"]["custom_testrail_bdd_scenario"] == [
-        {"content": "Given\nWhen\nThen"}
-    ]
+    assert called["payload"]["custom_testrail_bdd_scenario"] == [{"content": "Given\nWhen\nThen"}]

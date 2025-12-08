@@ -17,7 +17,7 @@ def gen_plan_list(draw):
     """Generate a list of plan dictionaries with sortable fields."""
     num_plans = draw(st.integers(min_value=0, max_value=20))
     plans = []
-    
+
     for i in range(num_plans):
         plan = {
             "plan_id": draw(st.integers(min_value=1, max_value=10000)),
@@ -28,19 +28,19 @@ def gen_plan_list(draw):
             "is_completed": draw(st.booleans()),
         }
         plans.append(plan)
-    
+
     return plans
 
 
 def sort_plans(plans, column, direction="asc"):
     """
     Sort plans by specified column and direction.
-    
+
     Args:
         plans: List of plan dictionaries
         column: Column name to sort by ('name', 'created_on', 'pass_rate', 'total_tests')
         direction: Sort direction ('asc' or 'desc')
-    
+
     Returns:
         Sorted list of plans
     """
@@ -51,10 +51,10 @@ def sort_plans(plans, column, direction="asc"):
         "pass_rate": "pass_rate",
         "total_tests": "total_tests",
     }
-    
+
     sort_key = column_map.get(column, "plan_name")
     reverse = direction == "desc"
-    
+
     # Sort with None values handled (put them at the end)
     def get_sort_value(plan):
         value = plan.get(sort_key)
@@ -63,12 +63,12 @@ def sort_plans(plans, column, direction="asc"):
             if sort_key == "plan_name":
                 return "" if not reverse else "~" * 100
             else:
-                return float('-inf') if not reverse else float('inf')
+                return float("-inf") if not reverse else float("inf")
         # For string values, use casefold for case-insensitive sorting
         if sort_key == "plan_name" and isinstance(value, str):
             return value.casefold()
         return value
-    
+
     return sorted(plans, key=get_sort_value, reverse=reverse)
 
 
@@ -84,12 +84,12 @@ class TestSortOrderCorrectness(unittest.TestCase):
         """Sorting by name in ascending order should produce alphabetically ordered list."""
         if len(plans) == 0:
             return  # Skip empty lists
-        
+
         sorted_plans = sort_plans(plans, "name", "asc")
-        
+
         # Verify all plans are present
         self.assertEqual(len(sorted_plans), len(plans))
-        
+
         # Verify ascending order (using casefold for better Unicode handling)
         for i in range(len(sorted_plans) - 1):
             name1 = sorted_plans[i]["plan_name"]
@@ -103,12 +103,12 @@ class TestSortOrderCorrectness(unittest.TestCase):
         """Sorting by date in ascending order should produce chronologically ordered list."""
         if len(plans) == 0:
             return  # Skip empty lists
-        
+
         sorted_plans = sort_plans(plans, "created_on", "asc")
-        
+
         # Verify all plans are present
         self.assertEqual(len(sorted_plans), len(plans))
-        
+
         # Verify ascending chronological order
         for i in range(len(sorted_plans) - 1):
             date1 = sorted_plans[i]["created_on"]
@@ -121,12 +121,12 @@ class TestSortOrderCorrectness(unittest.TestCase):
         """Sorting by pass rate in ascending order should produce numerically ordered list."""
         if len(plans) == 0:
             return  # Skip empty lists
-        
+
         sorted_plans = sort_plans(plans, "pass_rate", "asc")
-        
+
         # Verify all plans are present
         self.assertEqual(len(sorted_plans), len(plans))
-        
+
         # Verify ascending numerical order
         for i in range(len(sorted_plans) - 1):
             rate1 = sorted_plans[i]["pass_rate"]
@@ -139,12 +139,12 @@ class TestSortOrderCorrectness(unittest.TestCase):
         """Sorting by test count in ascending order should produce numerically ordered list."""
         if len(plans) == 0:
             return  # Skip empty lists
-        
+
         sorted_plans = sort_plans(plans, "total_tests", "asc")
-        
+
         # Verify all plans are present
         self.assertEqual(len(sorted_plans), len(plans))
-        
+
         # Verify ascending numerical order
         for i in range(len(sorted_plans) - 1):
             count1 = sorted_plans[i]["total_tests"]
@@ -156,10 +156,10 @@ class TestSortOrderCorrectness(unittest.TestCase):
     def test_sort_maintains_all_elements(self, plans):
         """Sorting should maintain all original elements without adding or removing any."""
         sorted_plans = sort_plans(plans, "name", "asc")
-        
+
         # Verify same number of elements
         self.assertEqual(len(sorted_plans), len(plans))
-        
+
         # Verify all plan IDs are present
         original_ids = {p["plan_id"] for p in plans}
         sorted_ids = {p["plan_id"] for p in sorted_plans}
@@ -178,7 +178,7 @@ class TestSortToggleBehavior(unittest.TestCase):
         """Toggling sort direction should reverse the order of items with distinct values."""
         if len(plans) < 2:
             return  # Need at least 2 items to test reversal
-        
+
         # Filter to plans with unique names to avoid stable sort issues
         unique_names = {}
         filtered_plans = []
@@ -187,16 +187,16 @@ class TestSortToggleBehavior(unittest.TestCase):
             if name not in unique_names:
                 unique_names[name] = True
                 filtered_plans.append(plan)
-        
+
         if len(filtered_plans) < 2:
             return  # Need at least 2 unique items
-        
+
         # Sort ascending
         asc_sorted = sort_plans(filtered_plans, "name", "asc")
-        
+
         # Sort descending
         desc_sorted = sort_plans(filtered_plans, "name", "desc")
-        
+
         # Verify descending is reverse of ascending
         self.assertEqual(asc_sorted, list(reversed(desc_sorted)))
 
@@ -206,7 +206,7 @@ class TestSortToggleBehavior(unittest.TestCase):
         """Toggle behavior should work consistently for all sortable columns."""
         if len(plans) < 2:
             return  # Need at least 2 items to test reversal
-        
+
         # Map column to key
         column_map = {
             "name": "plan_name",
@@ -215,7 +215,7 @@ class TestSortToggleBehavior(unittest.TestCase):
             "total_tests": "total_tests",
         }
         key = column_map[column]
-        
+
         # Filter to plans with unique values for the sort column
         unique_values = {}
         filtered_plans = []
@@ -224,16 +224,16 @@ class TestSortToggleBehavior(unittest.TestCase):
             if value not in unique_values:
                 unique_values[value] = True
                 filtered_plans.append(plan)
-        
+
         if len(filtered_plans) < 2:
             return  # Need at least 2 unique items
-        
+
         # Sort ascending
         asc_sorted = sort_plans(filtered_plans, column, "asc")
-        
+
         # Sort descending
         desc_sorted = sort_plans(filtered_plans, column, "desc")
-        
+
         # Verify descending is reverse of ascending
         self.assertEqual(asc_sorted, list(reversed(desc_sorted)))
 
@@ -260,7 +260,7 @@ class TestSortingEdgeCases(unittest.TestCase):
             {"plan_id": 2, "plan_name": "B", "created_on": 200, "pass_rate": 50.0, "total_tests": 20},
             {"plan_id": 3, "plan_name": "C", "created_on": 300, "pass_rate": 75.0, "total_tests": 30},
         ]
-        
+
         # Should not raise an error
         sorted_plans = sort_plans(plans, "pass_rate", "asc")
         self.assertEqual(len(sorted_plans), 3)
@@ -272,12 +272,12 @@ class TestSortingEdgeCases(unittest.TestCase):
             {"plan_id": 2, "plan_name": "Test", "created_on": 200, "pass_rate": 50.0, "total_tests": 20},
             {"plan_id": 3, "plan_name": "Test", "created_on": 300, "pass_rate": 50.0, "total_tests": 30},
         ]
-        
+
         sorted_plans = sort_plans(plans, "plan_name", "asc")
-        
+
         # All plans should still be present
         self.assertEqual(len(sorted_plans), 3)
-        
+
         # Order should be stable (maintain relative order for equal values)
         # Python's sort is stable, so original order should be preserved
         plan_ids = [p["plan_id"] for p in sorted_plans]
@@ -290,10 +290,10 @@ class TestSortingEdgeCases(unittest.TestCase):
             {"plan_id": 2, "plan_name": "B", "created_on": 100, "pass_rate": 50.0, "total_tests": 20},
             {"plan_id": 3, "plan_name": "C", "created_on": 100, "pass_rate": 50.0, "total_tests": 30},
         ]
-        
+
         # Sort by created_on (all equal)
         sorted_plans = sort_plans(plans, "created_on", "asc")
-        
+
         # Original order should be maintained
         plan_ids = [p["plan_id"] for p in sorted_plans]
         self.assertEqual(plan_ids, [1, 2, 3])
@@ -305,9 +305,9 @@ class TestSortingEdgeCases(unittest.TestCase):
             {"plan_id": 2, "plan_name": "Apple", "created_on": 200, "pass_rate": 60.0, "total_tests": 20},
             {"plan_id": 3, "plan_name": "banana", "created_on": 300, "pass_rate": 70.0, "total_tests": 30},
         ]
-        
+
         sorted_plans = sort_plans(plans, "name", "asc")
-        
+
         # Should be sorted: Apple, banana, zebra (case-insensitive)
         names = [p["plan_name"] for p in sorted_plans]
         self.assertEqual(names, ["Apple", "banana", "zebra"])

@@ -7,6 +7,7 @@ These tests verify that after successful entity creation:
 3. Create section stays expanded (Requirement 6.5)
 4. Form fields are cleared (Requirement 6.4)
 """
+
 import types
 import unittest
 from unittest.mock import Mock
@@ -22,13 +23,13 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
     def setUp(self):
         """Set up test client and mocks."""
         self.client = TestClient(main.app)
-        
+
         # Create fake client
         self.fake_client = types.SimpleNamespace()
         self.fake_client.add_plan = Mock(return_value={"id": 123, "name": "Test Plan"})
         self.fake_client.add_plan_entry = Mock(return_value={"id": 456, "name": "Test Run"})
         self.fake_client.add_case = Mock(return_value={"id": 789, "title": "Test Case"})
-        
+
         # Patch the client
         main._make_client = lambda: self.fake_client
         main._write_enabled = lambda: True
@@ -40,19 +41,15 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
 
     def test_create_plan_returns_success_with_entity_name(self):
         """Test that creating a plan returns success with entity name for toast."""
-        payload = {
-            "project": 1,
-            "name": "Sprint 42 Testing",
-            "description": "Test plan for sprint 42"
-        }
-        
+        payload = {"project": 1, "name": "Sprint 42 Testing", "description": "Test plan for sprint 42"}
+
         response = self.client.post("/api/manage/plan", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "plan" in result
         assert result["plan"]["id"] == 123
-        
+
         # Verify the plan was created with the correct name
         self.fake_client.add_plan.assert_called_once()
         call_args = self.fake_client.add_plan.call_args
@@ -65,16 +62,16 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
             "plan_id": 99,
             "name": "Regression Run",
             "description": "Full regression test run",
-            "include_all": True
+            "include_all": True,
         }
-        
+
         response = self.client.post("/api/manage/run", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "run" in result
         assert result["run"]["id"] == 456
-        
+
         # Verify the run was created with the correct name
         self.fake_client.add_plan_entry.assert_called_once()
         call_args = self.fake_client.add_plan_entry.call_args
@@ -86,16 +83,16 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
             "project": 1,
             "title": "Login with valid credentials",
             "refs": "REF-123",
-            "bdd_scenarios": "Given user is on login page\nWhen user enters valid credentials\nThen user is logged in"
+            "bdd_scenarios": "Given user is on login page\nWhen user enters valid credentials\nThen user is logged in",
         }
-        
+
         response = self.client.post("/api/manage/case", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "case" in result
         assert result["case"]["id"] == 789
-        
+
         # Verify the case was created with the correct title
         self.fake_client.add_case.assert_called_once()
         call_args = self.fake_client.add_case.call_args
@@ -103,13 +100,10 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
 
     def test_create_plan_with_minimal_data(self):
         """Test that creating a plan with minimal data works."""
-        payload = {
-            "project": 1,
-            "name": "Minimal Plan"
-        }
-        
+        payload = {"project": 1, "name": "Minimal Plan"}
+
         response = self.client.post("/api/manage/plan", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "plan" in result
@@ -122,15 +116,15 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
             "plan_id": 99,
             "name": "Smoke Test Run",
             "include_all": False,
-            "case_ids": [1, 2, 3, 4, 5]
+            "case_ids": [1, 2, 3, 4, 5],
         }
-        
+
         response = self.client.post("/api/manage/run", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "run" in result
-        
+
         # Verify case_ids were passed correctly
         call_args = self.fake_client.add_plan_entry.call_args
         assert "case_ids" in call_args[0][1]
@@ -141,15 +135,15 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         payload = {
             "project": 1,
             "title": "User can logout",
-            "bdd_scenarios": "Given user is logged in\nWhen user clicks logout\nThen user is logged out"
+            "bdd_scenarios": "Given user is logged in\nWhen user clicks logout\nThen user is logged out",
         }
-        
+
         response = self.client.post("/api/manage/case", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "case" in result
-        
+
         # Verify BDD scenarios were formatted correctly
         call_args = self.fake_client.add_case.call_args
         assert "custom_testrail_bdd_scenario" in call_args[0][1]
@@ -162,11 +156,11 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         # This test verifies that the API accepts the request structure
         payload = {
             "project": 1,
-            "name": "Valid Plan Name"  # Frontend ensures name is not empty
+            "name": "Valid Plan Name",  # Frontend ensures name is not empty
         }
-        
+
         response = self.client.post("/api/manage/plan", json=payload)
-        
+
         # Should succeed when name is provided
         assert response.status_code == 200
         result = response.json()
@@ -180,11 +174,11 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
             "project": 1,
             "plan_id": 99,
             "name": "Valid Run Name",  # Frontend ensures name is not empty
-            "include_all": True
+            "include_all": True,
         }
-        
+
         response = self.client.post("/api/manage/run", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "run" in result
@@ -195,11 +189,11 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         # This test verifies that the API accepts the request structure
         payload = {
             "project": 1,
-            "title": "Valid Case Title"  # Frontend ensures title is not empty
+            "title": "Valid Case Title",  # Frontend ensures title is not empty
         }
-        
+
         response = self.client.post("/api/manage/case", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "case" in result
@@ -207,38 +201,28 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
     def test_multiple_plans_can_be_created_sequentially(self):
         """Test that multiple plans can be created in sequence (simulating expanded Create section)."""
         # First plan
-        payload1 = {
-            "project": 1,
-            "name": "Plan 1"
-        }
+        payload1 = {"project": 1, "name": "Plan 1"}
         response1 = self.client.post("/api/manage/plan", json=payload1)
         assert response1.status_code == 200
-        
+
         # Second plan (simulating user creating another without collapsing section)
-        payload2 = {
-            "project": 1,
-            "name": "Plan 2"
-        }
+        payload2 = {"project": 1, "name": "Plan 2"}
         response2 = self.client.post("/api/manage/plan", json=payload2)
         assert response2.status_code == 200
-        
+
         # Verify both calls were made
         assert self.fake_client.add_plan.call_count == 2
 
     def test_create_plan_with_milestone(self):
         """Test that creating a plan with milestone works."""
-        payload = {
-            "project": 1,
-            "name": "Release 2.0 Testing",
-            "milestone_id": 5
-        }
-        
+        payload = {"project": 1, "name": "Release 2.0 Testing", "milestone_id": 5}
+
         response = self.client.post("/api/manage/plan", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "plan" in result
-        
+
         # Verify milestone was passed
         call_args = self.fake_client.add_plan.call_args
         assert call_args[0][1].get("milestone_id") == 5
@@ -250,15 +234,15 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
             "plan_id": 99,
             "name": "Feature Test Run",
             "refs": "JIRA-123,JIRA-456",
-            "include_all": True
+            "include_all": True,
         }
-        
+
         response = self.client.post("/api/manage/run", json=payload)
-        
+
         assert response.status_code == 200
         result = response.json()
         assert "run" in result
-        
+
         # Verify refs were passed
         call_args = self.fake_client.add_plan_entry.call_args
         assert "refs" in call_args[0][1]

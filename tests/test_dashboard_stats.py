@@ -153,9 +153,7 @@ class TestTestCaseCountAggregation(unittest.TestCase):
 
         # Create entries with runs
         for i in range(num_runs):
-            entry = {
-                "runs": [{"id": i + 1}]
-            }
+            entry = {"runs": [{"id": i + 1}]}
             plan_data["entries"].append(entry)
 
         mock_client.get_plan.return_value = plan_data

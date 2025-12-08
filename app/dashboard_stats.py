@@ -15,7 +15,7 @@ Key Concepts:
 - Pass Rate: (Passed / (Total - Untested)) * 100
   - Only counts executed tests in the denominator
   - Returns 0.0 if no tests have been executed
-  
+
 - Completion Rate: ((Total - Untested) / Total) * 100
   - Measures how many tests have been executed (any status except Untested)
   - Returns 0.0 if there are no tests
@@ -89,7 +89,7 @@ def calculate_status_distribution(results: list[dict[str, Any]]) -> dict[str, in
     # Validate input
     if not isinstance(results, list):
         raise ValueError(f"Results must be a list, got {type(results)}")
-    
+
     # Common TestRail status IDs
     status_map = {
         1: "Passed",
@@ -105,7 +105,7 @@ def calculate_status_distribution(results: list[dict[str, Any]]) -> dict[str, in
         # Handle non-dict results
         if not isinstance(result, dict):
             continue
-        
+
         status_id = result.get("status_id")
         if status_id is None:
             status_name = "Untested"
@@ -139,11 +139,11 @@ def calculate_pass_rate(status_distribution: dict[str, int]) -> float:
     # Validate input
     if not isinstance(status_distribution, dict):
         raise ValueError(f"Status distribution must be a dict, got {type(status_distribution)}")
-    
+
     # Handle empty distribution
     if not status_distribution:
         return 0.0
-    
+
     # Calculate total, handling non-integer values
     total = 0
     for count in status_distribution.values():
@@ -154,11 +154,11 @@ def calculate_pass_rate(status_distribution: dict[str, int]) -> float:
                 total += int(count)
             except (ValueError, TypeError):
                 pass  # Skip invalid string values
-    
+
     # Handle division by zero - no tests at all
     if total == 0:
         return 0.0
-    
+
     untested = status_distribution.get("Untested", 0)
     if isinstance(untested, (int, float)):
         untested = int(untested)
@@ -169,7 +169,7 @@ def calculate_pass_rate(status_distribution: dict[str, int]) -> float:
             untested = 0
     else:
         untested = 0
-    
+
     executed = total - untested
 
     # Handle division by zero - no executed tests
@@ -186,7 +186,7 @@ def calculate_pass_rate(status_distribution: dict[str, int]) -> float:
             passed = 0
     else:
         passed = 0
-    
+
     # Calculate pass rate with division by zero protection
     try:
         pass_rate = (passed / executed) * 100.0
@@ -209,11 +209,11 @@ def calculate_completion_rate(status_distribution: dict[str, int]) -> float:
     # Validate input
     if not isinstance(status_distribution, dict):
         raise ValueError(f"Status distribution must be a dict, got {type(status_distribution)}")
-    
+
     # Handle empty distribution
     if not status_distribution:
         return 0.0
-    
+
     # Calculate total, handling non-integer values
     total = 0
     for count in status_distribution.values():
@@ -239,7 +239,7 @@ def calculate_completion_rate(status_distribution: dict[str, int]) -> float:
             untested = 0
     else:
         untested = 0
-    
+
     executed = total - untested
 
     # Calculate completion rate with division by zero protection
@@ -251,9 +251,7 @@ def calculate_completion_rate(status_distribution: dict[str, int]) -> float:
         return 0.0
 
 
-def calculate_run_statistics(
-    run_id: int, client: TestRailClient
-) -> RunStatistics:
+def calculate_run_statistics(run_id: int, client: TestRailClient) -> RunStatistics:
     """
     Calculate statistics for a single test run.
 
@@ -263,23 +261,23 @@ def calculate_run_statistics(
 
     Returns:
         RunStatistics object with aggregated statistics
-    
+
     Raises:
         ValueError: If run_id is invalid or tests data is malformed
     """
     # Validate input
     if not isinstance(run_id, int) or run_id < 1:
         raise ValueError(f"Invalid run_id: {run_id}")
-    
+
     if client is None:
         raise ValueError("TestRail client cannot be None")
-    
+
     # Fetch tests for the run
     try:
         tests = client.get_tests_for_run(run_id)
     except Exception as e:
         raise ValueError(f"Failed to fetch tests for run {run_id}: {e}")
-    
+
     # Validate tests data
     if not isinstance(tests, list):
         raise ValueError(f"Invalid tests data type: {type(tests)}")
@@ -288,9 +286,7 @@ def calculate_run_statistics(
     try:
         status_distribution = calculate_status_distribution(tests)
     except Exception as e:
-        raise ValueError(
-            f"Failed to calculate status distribution for run {run_id}: {e}"
-        )
+        raise ValueError(f"Failed to calculate status distribution for run {run_id}: {e}")
 
     # Calculate rates
     try:
@@ -309,16 +305,13 @@ def calculate_run_statistics(
         first_test = tests[0] if isinstance(tests[0], dict) else {}
         run_name = first_test.get("run_name") or run_name
         suite_name = first_test.get("suite_name")
-        
+
         # Check if run is completed (all tests have status)
         try:
-            is_completed = all(
-                isinstance(t, dict) and t.get("status_id") is not None 
-                for t in tests
-            )
+            is_completed = all(isinstance(t, dict) and t.get("status_id") is not None for t in tests)
         except Exception:
             is_completed = False
-        
+
         # Get most recent update timestamp
         try:
             timestamps = []
@@ -344,9 +337,7 @@ def calculate_run_statistics(
     )
 
 
-def calculate_plan_statistics(
-    plan_id: int, client: TestRailClient
-) -> PlanStatistics:
+def calculate_plan_statistics(plan_id: int, client: TestRailClient) -> PlanStatistics:
     """
     Calculate aggregated statistics across all runs in a plan.
 
@@ -356,23 +347,23 @@ def calculate_plan_statistics(
 
     Returns:
         PlanStatistics object with aggregated statistics
-    
+
     Raises:
         ValueError: If plan_id is invalid or plan data is malformed
     """
     # Validate input
     if not isinstance(plan_id, int) or plan_id < 1:
         raise ValueError(f"Invalid plan_id: {plan_id}")
-    
+
     if client is None:
         raise ValueError("TestRail client cannot be None")
-    
+
     # Fetch plan details
     try:
         plan = client.get_plan(plan_id)
     except Exception as e:
         raise ValueError(f"Failed to fetch plan {plan_id}: {e}")
-    
+
     # Validate plan data
     if not isinstance(plan, dict):
         raise ValueError(f"Invalid plan data type: {type(plan)}")
@@ -381,17 +372,17 @@ def calculate_plan_statistics(
     plan_name = plan.get("name")
     if not plan_name or not isinstance(plan_name, str):
         plan_name = f"Plan {plan_id}"
-    
+
     created_on = plan.get("created_on")
     if not isinstance(created_on, (int, float)):
         created_on = 0
     else:
         created_on = int(created_on)
-    
+
     is_completed = plan.get("is_completed")
     if not isinstance(is_completed, bool):
         is_completed = False
-    
+
     updated_on = plan.get("updated_on")
     if updated_on is not None and not isinstance(updated_on, (int, float)):
         updated_on = None
@@ -401,7 +392,7 @@ def calculate_plan_statistics(
     entries = plan.get("entries", [])
     if not isinstance(entries, list):
         entries = []
-    
+
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -424,7 +415,7 @@ def calculate_plan_statistics(
             tests = client.get_tests_for_run(run_id)
             if not isinstance(tests, list):
                 continue
-            
+
             total_tests += len(tests)
 
             # Aggregate status distribution
@@ -436,10 +427,7 @@ def calculate_plan_statistics(
                         combined_distribution[status] = current + int(count)
             except Exception as e:
                 # Log but continue with other runs
-                print(
-                    f"Warning: Failed to calculate distribution for run {run_id}: {e}",
-                    flush=True
-                )
+                print(f"Warning: Failed to calculate distribution for run {run_id}: {e}", flush=True)
                 continue
         except Exception as e:
             # Log but continue with other runs
@@ -459,11 +447,11 @@ def calculate_plan_statistics(
     failed_count = combined_distribution.get("Failed", 0)
     if not isinstance(failed_count, (int, float)):
         failed_count = 0
-    
+
     blocked_count = combined_distribution.get("Blocked", 0)
     if not isinstance(blocked_count, (int, float)):
         blocked_count = 0
-    
+
     untested_count = combined_distribution.get("Untested", 0)
     if not isinstance(untested_count, (int, float)):
         untested_count = 0

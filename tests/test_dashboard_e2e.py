@@ -170,7 +170,7 @@ class TestDashboardEndToEnd:
         html = response.text
 
         # Verify dashboard navigation link
-        assert 'id="navDashboard"' in html or 'Dashboard' in html
+        assert 'id="navDashboard"' in html or "Dashboard" in html
 
         # Verify dashboard view container
         assert 'id="dashboardView"' in html
@@ -301,9 +301,7 @@ class TestDashboardEndToEnd:
         assert response.status_code == 400
 
         # Test invalid date range
-        response = client.get(
-            "/api/dashboard/plans?project=1&created_after=1000&created_before=500"
-        )
+        response = client.get("/api/dashboard/plans?project=1&created_after=1000&created_before=500")
         assert response.status_code == 400
 
         # Test invalid is_completed value
@@ -330,7 +328,7 @@ class TestDashboardEndToEnd:
         """Test that caching works correctly."""
         # Clear cache first to ensure clean state
         client.post("/api/dashboard/cache/clear")
-        
+
         # First request should be a cache miss
         response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
