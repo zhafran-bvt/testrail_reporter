@@ -953,7 +953,7 @@ def api_update_run(run_id: int, payload: UpdateRun):
 
     try:
         client = _make_client()
-        
+
         # Get run details to check if it's part of a plan
         try:
             run_data = client.get_run(run_id)
@@ -961,15 +961,15 @@ def api_update_run(run_id: int, payload: UpdateRun):
             if e.response is not None and e.response.status_code == 400:
                 raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
             raise
-        
+
         plan_id = run_data.get("plan_id")
-        
+
         # If run is part of a plan, we need to use update_plan_entry
         if plan_id:
             # Get plan details to find entry_id
             plan_data = client.get_plan(plan_id)
             entry_id = None
-            
+
             # Find the entry that contains this run
             for entry in plan_data.get("entries", []):
                 for run in entry.get("runs", []):
@@ -978,13 +978,13 @@ def api_update_run(run_id: int, payload: UpdateRun):
                         break
                 if entry_id:
                     break
-            
+
             if not entry_id:
                 raise HTTPException(status_code=500, detail="Could not find plan entry for this run")
-            
+
             # Update plan entry
             updated = client.update_plan_entry(plan_id, entry_id, body)
-            
+
             # Extract the updated run from the entry
             # update_plan_entry returns the entry, not the run directly
             updated_run = None
@@ -992,7 +992,7 @@ def api_update_run(run_id: int, payload: UpdateRun):
                 if run.get("id") == run_id:
                     updated_run = run
                     break
-            
+
             return {"success": True, "run": updated_run or updated}
         else:
             # Standalone run, use update_run
@@ -1005,8 +1005,7 @@ def api_update_run(run_id: int, payload: UpdateRun):
             raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
         if e.response is not None and e.response.status_code == 403:
             raise HTTPException(
-                status_code=403, 
-                detail="Cannot update this run. It may have restrictions or be locked."
+                status_code=403, detail="Cannot update this run. It may have restrictions or be locked."
             )
         raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
@@ -1268,7 +1267,7 @@ def api_get_case_attachments(case_id: int):
             att_id = att.get("id")
             if att_id is None or att_id in seen_ids:
                 continue
-            
+
             seen_ids.add(att_id)
 
             att_name = att.get("name") or att.get("filename") or f"Attachment {att_id}"
@@ -1532,7 +1531,7 @@ def api_delete_run(run_id: int, dry_run: bool = False):
             if e.response is not None and e.response.status_code == 400:
                 raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
             raise
-        
+
         plan_id = run_data.get("plan_id")
 
         # If run is part of a plan, we need to delete the plan entry
@@ -1540,7 +1539,7 @@ def api_delete_run(run_id: int, dry_run: bool = False):
             # Get plan details to find entry_id
             plan_data = client.get_plan(plan_id)
             entry_id = None
-            
+
             # Find the entry that contains this run
             for entry in plan_data.get("entries", []):
                 for run in entry.get("runs", []):
@@ -1549,10 +1548,10 @@ def api_delete_run(run_id: int, dry_run: bool = False):
                         break
                 if entry_id:
                     break
-            
+
             if not entry_id:
                 raise HTTPException(status_code=500, detail="Could not find plan entry for this run")
-            
+
             # Delete plan entry (which deletes the run)
             client.delete_plan_entry(plan_id, entry_id)
         else:
@@ -1574,8 +1573,7 @@ def api_delete_run(run_id: int, dry_run: bool = False):
             raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
         if e.response is not None and e.response.status_code == 403:
             raise HTTPException(
-                status_code=403, 
-                detail="Cannot delete this run. It may be part of a plan or have restrictions."
+                status_code=403, detail="Cannot delete this run. It may be part of a plan or have restrictions."
             )
         raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
@@ -1588,17 +1586,17 @@ def api_delete_run(run_id: int, dry_run: bool = False):
 def api_remove_cases_from_run(run_id: int, case_ids: list[int] = Body(..., embed=True)):
     """
     Remove test cases from a test run.
-    
+
     NOTE: TestRail API limitation - This only works for runs that don't have test results yet.
     For runs with existing results, TestRail returns 403 Forbidden.
-    
+
     Args:
         run_id: TestRail run ID
         case_ids: List of case IDs to remove from the run
-        
+
     Returns:
         Success message with removed case count
-        
+
     Raises:
         HTTPException 400: Invalid run_id or case_ids
         HTTPException 403: Run cannot be modified (has test results)
@@ -1606,37 +1604,37 @@ def api_remove_cases_from_run(run_id: int, case_ids: list[int] = Body(..., embed
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate run_id
     if run_id < 1:
         raise HTTPException(status_code=400, detail="Run ID must be positive")
-    
+
     # Validate case_ids
     if not case_ids:
         raise HTTPException(status_code=400, detail="case_ids cannot be empty")
-    
+
     if any(cid < 1 for cid in case_ids):
         raise HTTPException(status_code=400, detail="All case IDs must be positive")
-    
+
     try:
         client = _make_client()
-        
+
         # Get run details to check if it's part of a plan
         run_data = client.get_run(run_id)
         plan_id = run_data.get("plan_id")
-        
+
         # Get current tests in the run
         current_tests = client.get_tests_for_run(run_id)
-        
+
         if not isinstance(current_tests, list):
             raise HTTPException(status_code=500, detail="Invalid response from TestRail API")
-        
+
         # Extract current case IDs
         current_case_ids = [test.get("case_id") for test in current_tests if test.get("case_id")]
-        
+
         # Remove the specified case IDs
         remaining_case_ids = [cid for cid in current_case_ids if cid not in case_ids]
-        
+
         # Update the run with remaining case IDs
         # If no cases remain, we still update with empty list (TestRail will handle this)
         # If run is part of a plan, we need to use update_plan_entry
@@ -1645,7 +1643,7 @@ def api_remove_cases_from_run(run_id: int, case_ids: list[int] = Body(..., embed
                 # Get plan details to find entry_id
                 plan_data = client.get_plan(plan_id)
                 entry_id = None
-                
+
                 # Find the entry that contains this run
                 for entry in plan_data.get("entries", []):
                     for run in entry.get("runs", []):
@@ -1654,10 +1652,10 @@ def api_remove_cases_from_run(run_id: int, case_ids: list[int] = Body(..., embed
                             break
                     if entry_id:
                         break
-                
+
                 if not entry_id:
                     raise HTTPException(status_code=500, detail="Could not find plan entry for this run")
-                
+
                 # Update plan entry with remaining case_ids
                 client.update_plan_entry(plan_id, entry_id, {"case_ids": remaining_case_ids})
             else:
@@ -1666,26 +1664,26 @@ def api_remove_cases_from_run(run_id: int, case_ids: list[int] = Body(..., embed
         except requests.exceptions.HTTPError as e:
             if e.response is not None and e.response.status_code == 403:
                 raise HTTPException(
-                    status_code=403, 
-                    detail="Cannot remove cases from this run. TestRail does not allow modifying runs that have test results."
+                    status_code=403,
+                    detail="Cannot remove cases from this run. TestRail does not allow modifying runs that have test results.",
                 )
             raise
-        
+
         # Clear relevant cache entries
         _runs_cache.clear()
         _dashboard_plans_cache.clear()
         _dashboard_plan_detail_cache.clear()
         _dashboard_stats_cache.clear()
         _dashboard_run_stats_cache.clear()
-        
+
         removed_count = len([cid for cid in case_ids if cid in current_case_ids])
-        
+
         return {
             "success": True,
             "run_id": run_id,
             "removed_count": removed_count,
             "remaining_count": len(remaining_case_ids),
-            "message": f"Removed {removed_count} case(s) from run {run_id}"
+            "message": f"Removed {removed_count} case(s) from run {run_id}",
         }
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
@@ -1701,15 +1699,15 @@ def api_remove_cases_from_run(run_id: int, case_ids: list[int] = Body(..., embed
 def api_get_available_cases_for_run(run_id: int, project: int = 1, suite_id: int | None = None):
     """
     Get test cases that are available to add to a run (not already in the run).
-    
+
     Args:
         run_id: TestRail run ID
         project: Project ID (default: 1)
         suite_id: Optional suite ID to filter cases
-        
+
     Returns:
         List of available test cases
-        
+
     Raises:
         HTTPException 400: Invalid run_id
         HTTPException 404: Run not found
@@ -1718,28 +1716,25 @@ def api_get_available_cases_for_run(run_id: int, project: int = 1, suite_id: int
     # Validate run_id
     if run_id < 1:
         raise HTTPException(status_code=400, detail="Run ID must be positive")
-    
+
     try:
         client = _make_client()
-        
+
         # Get current tests in the run
         current_tests = client.get_tests_for_run(run_id)
         current_case_ids = set(test.get("case_id") for test in current_tests if test.get("case_id"))
-        
+
         # Get all cases from the project/suite
         all_cases = client.get_cases(project, suite_id=suite_id)
-        
+
         # Filter out cases that are already in the run
-        available_cases = [
-            case for case in all_cases 
-            if case.get("id") not in current_case_ids
-        ]
-        
+        available_cases = [case for case in all_cases if case.get("id") not in current_case_ids]
+
         return {
             "success": True,
             "run_id": run_id,
             "available_cases": available_cases,
-            "total_available": len(available_cases)
+            "total_available": len(available_cases),
         }
     except requests.exceptions.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
@@ -1755,17 +1750,17 @@ def api_get_available_cases_for_run(run_id: int, project: int = 1, suite_id: int
 def api_add_cases_to_run(run_id: int, case_ids: list[int] = Body(..., embed=True)):
     """
     Add test cases to an existing test run.
-    
+
     NOTE: TestRail API limitation - This only works for runs that don't have test results yet.
     For runs with existing results, TestRail returns 403 Forbidden.
-    
+
     Args:
         run_id: TestRail run ID
         case_ids: List of case IDs to add to the run
-        
+
     Returns:
         Success message with added case count
-        
+
     Raises:
         HTTPException 400: Invalid run_id or case_ids
         HTTPException 403: Run cannot be modified (has test results)
@@ -1773,37 +1768,37 @@ def api_add_cases_to_run(run_id: int, case_ids: list[int] = Body(..., embed=True
         HTTPException 502: TestRail API error
     """
     _require_write_enabled()
-    
+
     # Validate run_id
     if run_id < 1:
         raise HTTPException(status_code=400, detail="Run ID must be positive")
-    
+
     # Validate case_ids
     if not case_ids:
         raise HTTPException(status_code=400, detail="case_ids cannot be empty")
-    
+
     if any(cid < 1 for cid in case_ids):
         raise HTTPException(status_code=400, detail="All case IDs must be positive")
-    
+
     try:
         client = _make_client()
-        
+
         # Get run details to check if it's part of a plan
         run_data = client.get_run(run_id)
         plan_id = run_data.get("plan_id")
-        
+
         # Get current tests in the run
         current_tests = client.get_tests_for_run(run_id)
-        
+
         if not isinstance(current_tests, list):
             raise HTTPException(status_code=500, detail="Invalid response from TestRail API")
-        
+
         # Extract current case IDs
         current_case_ids = [test.get("case_id") for test in current_tests if test.get("case_id")]
-        
+
         # Add new case IDs (avoid duplicates)
         new_case_ids = [cid for cid in case_ids if cid not in current_case_ids]
-        
+
         if not new_case_ids:
             return {
                 "success": True,
@@ -1811,11 +1806,11 @@ def api_add_cases_to_run(run_id: int, case_ids: list[int] = Body(..., embed=True
                 "added_count": 0,
                 "total_count": len(current_case_ids),
                 "skipped_count": len(case_ids),
-                "message": "All selected cases are already in the run"
+                "message": "All selected cases are already in the run",
             }
-        
+
         updated_case_ids = current_case_ids + new_case_ids
-        
+
         # Try to update the run with combined case IDs
         # If run is part of a plan, we need to use update_plan_entry
         try:
@@ -1823,7 +1818,7 @@ def api_add_cases_to_run(run_id: int, case_ids: list[int] = Body(..., embed=True
                 # Get plan details to find entry_id
                 plan_data = client.get_plan(plan_id)
                 entry_id = None
-                
+
                 # Find the entry that contains this run
                 for entry in plan_data.get("entries", []):
                     for run in entry.get("runs", []):
@@ -1832,10 +1827,10 @@ def api_add_cases_to_run(run_id: int, case_ids: list[int] = Body(..., embed=True
                             break
                     if entry_id:
                         break
-                
+
                 if not entry_id:
                     raise HTTPException(status_code=500, detail="Could not find plan entry for this run")
-                
+
                 # Update plan entry with new case_ids
                 client.update_plan_entry(plan_id, entry_id, {"case_ids": updated_case_ids})
             else:
@@ -1844,25 +1839,25 @@ def api_add_cases_to_run(run_id: int, case_ids: list[int] = Body(..., embed=True
         except requests.exceptions.HTTPError as e:
             if e.response is not None and e.response.status_code == 403:
                 raise HTTPException(
-                    status_code=403, 
-                    detail="Cannot add cases to this run. TestRail does not allow modifying runs that have test results. Please create a new run instead."
+                    status_code=403,
+                    detail="Cannot add cases to this run. TestRail does not allow modifying runs that have test results. Please create a new run instead.",
                 )
             raise
-        
+
         # Clear relevant cache entries
         _runs_cache.clear()
         _dashboard_plans_cache.clear()
         _dashboard_plan_detail_cache.clear()
         _dashboard_stats_cache.clear()
         _dashboard_run_stats_cache.clear()
-        
+
         return {
             "success": True,
             "run_id": run_id,
             "added_count": len(new_case_ids),
             "total_count": len(updated_case_ids),
             "skipped_count": len(case_ids) - len(new_case_ids),
-            "message": f"Added {len(new_case_ids)} case(s) to run {run_id}"
+            "message": f"Added {len(new_case_ids)} case(s) to run {run_id}",
         }
     except HTTPException:
         raise
@@ -1871,8 +1866,8 @@ def api_add_cases_to_run(run_id: int, case_ids: list[int] = Body(..., embed=True
             raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
         if e.response is not None and e.response.status_code == 403:
             raise HTTPException(
-                status_code=403, 
-                detail="Cannot add cases to this run. TestRail does not allow modifying runs that have test results. Please create a new run instead."
+                status_code=403,
+                detail="Cannot add cases to this run. TestRail does not allow modifying runs that have test results. Please create a new run instead.",
             )
         raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
     except requests.exceptions.RequestException as e:
