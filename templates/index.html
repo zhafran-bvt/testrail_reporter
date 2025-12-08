@@ -4174,9 +4174,34 @@
         
         <!-- Test Cases Section -->
         <div id="runDetailsCasesContainer" class="hidden" style="margin-top: 24px;">
-          <h4 style="margin: 0 0 16px; font-size: 15px; font-weight: 600; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-            Test Cases
-          </h4>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">
+              Test Cases
+            </h4>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" id="runDetailsAddCases" class="btn-edit" style="padding: 6px 12px; font-size: 13px; background: var(--primary); color: white; border-color: var(--primary);">
+                <span class="icon" aria-hidden="true">➕</span> Add Cases
+              </button>
+              <button type="button" id="runDetailsSelectAll" class="btn-edit" style="padding: 6px 12px; font-size: 13px;">
+                Select All
+              </button>
+              <button type="button" id="runDetailsDeselectAll" class="btn-edit" style="padding: 6px 12px; font-size: 13px;">
+                Deselect All
+              </button>
+            </div>
+          </div>
+          
+          <!-- Bulk Action Toolbar -->
+          <div id="runDetailsBulkToolbar" class="hidden" style="background: rgba(26, 138, 133, 0.1); border: 2px solid var(--primary); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 600; color: var(--primary); font-size: 14px;">
+                <span id="runDetailsBulkCount">0</span> selected
+              </span>
+            </div>
+            <button type="button" id="runDetailsBulkRemove" class="btn-delete" style="padding: 8px 16px; font-size: 13px; font-weight: 600;">
+              <span class="icon" aria-hidden="true">🗑️</span> Remove from Run
+            </button>
+          </div>
           
           <!-- Loading State -->
           <div id="runDetailsCasesLoadingState" class="loading-state hidden">
@@ -4227,6 +4252,220 @@
             <path fill="currentColor" d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
           </svg>
           Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Test Result Modal -->
+  <div id="addTestResultModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="addTestResultModalTitle">
+    <div class="modal-card" style="max-width: 700px;">
+      <!-- Loading Overlay -->
+      <div id="addResultLoadingOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 14px;">
+        <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="margin-top: 12px; font-size: 14px; color: var(--muted); font-weight: 500;">Submitting result...</span>
+      </div>
+      
+      <div class="modal-head" style="background: rgba(26, 138, 133, 0.08); border-bottom: 2px solid var(--primary);">
+        <div style="flex: 1;">
+          <h3 id="addTestResultModalTitle" style="margin:0; font-size:17px; color: var(--primary); font-weight: 700;">
+            <span class="icon" aria-hidden="true">✅</span> Add Test Result
+          </h3>
+          <p id="addResultTestTitle" style="margin: 4px 0 0; font-size: 13px; color: var(--muted);"></p>
+        </div>
+        <button type="button" id="addTestResultModalClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      
+      <div class="modal-body" style="padding: 20px;">
+        <form id="addTestResultForm">
+          <!-- Status -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="resultStatus" class="form-label">
+              Status <span class="required">*</span>
+            </label>
+            <select 
+              id="resultStatus" 
+              class="form-input" 
+              required
+              style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text);"
+            >
+              <option value="">Select status...</option>
+              <option value="1">✅ Passed</option>
+              <option value="5">❌ Failed</option>
+              <option value="2">🚫 Blocked</option>
+              <option value="4">🔄 Retest</option>
+              <option value="3">⚪ Untested</option>
+            </select>
+          </div>
+          
+          <!-- Comment -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="resultComment" class="form-label">
+              Comment
+            </label>
+            <textarea 
+              id="resultComment" 
+              class="form-textarea" 
+              rows="4"
+              placeholder="Add notes, observations, or failure details..."
+              style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text); resize: vertical;"
+            ></textarea>
+          </div>
+          
+          <!-- Elapsed Time -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="resultElapsed" class="form-label">
+              Elapsed Time
+            </label>
+            <input 
+              type="text" 
+              id="resultElapsed" 
+              class="form-input" 
+              placeholder="e.g., 2m 30s, 1h 15m"
+              style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text);"
+            />
+          </div>
+          
+          <!-- Defects -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="resultDefects" class="form-label">
+              Defects
+            </label>
+            <input 
+              type="text" 
+              id="resultDefects" 
+              class="form-input" 
+              placeholder="e.g., BUG-123, BUG-456"
+              style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text);"
+            />
+          </div>
+          
+          <!-- Version -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="resultVersion" class="form-label">
+              Version
+            </label>
+            <input 
+              type="text" 
+              id="resultVersion" 
+              class="form-input" 
+              placeholder="e.g., 1.0.0, v2.3.1"
+              style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text);"
+            />
+          </div>
+          
+          <!-- Attachments -->
+          <div class="form-group" style="margin-bottom: 16px;">
+            <label for="resultAttachments" class="form-label">
+              Attachments (Screenshots, Logs)
+            </label>
+            <input 
+              type="file" 
+              id="resultAttachments" 
+              class="form-input" 
+              multiple
+              accept="image/png,image/jpeg,image/gif,video/mp4,video/webm,application/pdf"
+              style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card-bg); color: var(--text);"
+            />
+            <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted);">
+              Accepted: PNG, JPEG, GIF, MP4, WebM, PDF (max 25MB each)
+            </p>
+          </div>
+        </form>
+      </div>
+      
+      <div class="modal-actions" style="background: rgba(0,0,0,0.02); padding: 16px 20px;">
+        <button type="button" id="addResultCancelBtn" class="btn-edit" style="font-weight: 600;">
+          Cancel
+        </button>
+        <button type="button" id="addResultSubmitBtn" style="padding: 10px 16px; font-size: 14px; cursor: pointer; border-radius: 10px; border: 1px solid var(--primary); background: var(--primary); color: #fff; transition: background .15s ease, transform .05s ease; font-weight: 600;">
+          <span class="icon" aria-hidden="true">✅</span> Submit Result
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Cases to Run Modal -->
+  <div id="addCasesToRunModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="addCasesToRunModalTitle">
+    <div class="modal-card" style="max-width: 800px;">
+      <!-- Loading Overlay -->
+      <div id="addCasesLoadingOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 14px;">
+        <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+        <span style="margin-top: 12px; font-size: 14px; color: var(--muted); font-weight: 500;">Loading available cases...</span>
+      </div>
+      
+      <div class="modal-head" style="background: rgba(26, 138, 133, 0.08); border-bottom: 2px solid var(--primary);">
+        <div style="flex: 1;">
+          <h3 id="addCasesToRunModalTitle" style="margin:0; font-size:17px; color: var(--primary); font-weight: 700;">
+            <span class="icon" aria-hidden="true">➕</span> Add Test Cases to Run
+          </h3>
+        </div>
+        <button type="button" id="addCasesToRunModalClose" class="modal-close" aria-label="Close">×</button>
+      </div>
+      
+      <div class="modal-body" style="padding: 20px;">
+        <!-- Search Box -->
+        <div style="margin-bottom: 16px;">
+          <input 
+            type="text" 
+            id="addCasesSearch" 
+            class="form-input" 
+            placeholder="Search cases by title or ID..."
+            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;"
+          />
+        </div>
+        
+        <!-- Selection Controls -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding: 12px; background: rgba(0,0,0,0.02); border-radius: 8px;">
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="addCasesSelectAll" class="btn-edit" style="padding: 6px 12px; font-size: 13px;">
+              Select All
+            </button>
+            <button type="button" id="addCasesDeselectAll" class="btn-edit" style="padding: 6px 12px; font-size: 13px;">
+              Deselect All
+            </button>
+          </div>
+          <div style="font-size: 14px; color: var(--muted);">
+            <span id="addCasesSelectedCount" style="font-weight: 600; color: var(--primary);">0</span> selected
+          </div>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="addCasesLoadingState" class="loading-state hidden">
+          <div class="spinner"></div>
+          <span class="loading-text">Loading available cases...</span>
+        </div>
+        
+        <!-- Error State -->
+        <div id="addCasesErrorState" class="hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center;">
+          <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.5;">⚠️</div>
+          <h4 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: var(--text);">Failed to Load Cases</h4>
+          <p id="addCasesErrorMessage" style="margin: 0 0 16px; font-size: 14px; color: var(--muted); max-width: 400px;">
+            An error occurred while loading available cases.
+          </p>
+        </div>
+        
+        <!-- Empty State -->
+        <div id="addCasesEmptyState" class="empty-state hidden">
+          <div class="empty-state-icon">✅</div>
+          <h4 class="empty-state-title">All Cases Already Added</h4>
+          <p class="empty-state-message">
+            All test cases from this project are already in this run.
+          </p>
+        </div>
+        
+        <!-- Available Cases List -->
+        <div id="addCasesList" class="hidden" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+          <!-- Cases will be dynamically inserted here -->
+        </div>
+      </div>
+      
+      <div class="modal-actions" style="background: rgba(0,0,0,0.02); padding: 16px 20px;">
+        <button type="button" id="addCasesCancelBtn" class="btn-edit" style="font-weight: 600;">
+          Cancel
+        </button>
+        <button type="button" id="addCasesConfirmBtn" style="padding: 10px 16px; font-size: 14px; cursor: pointer; border-radius: 10px; border: 1px solid var(--primary); background: var(--primary); color: #fff; transition: background .15s ease, transform .05s ease; font-weight: 600;" disabled>
+          <span class="icon" aria-hidden="true">➕</span> Add Selected Cases
         </button>
       </div>
     </div>

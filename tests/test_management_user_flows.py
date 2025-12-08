@@ -562,16 +562,8 @@ class TestManagementViewHTMLStructure:
         assert 'id="plansListContainer"' in html
         assert 'id="plansCount"' in html
 
-        # Verify Runs subsection
-        assert 'id="manageRunsSubsection"' in html
-        assert 'id="runsPlanFilter"' in html
-        assert 'id="refreshRunsBtn"' in html
-        assert 'id="runsLoadingState"' in html
-        assert 'id="runsEmptyState"' in html
-        assert 'id="runsListContainer"' in html
-        assert 'id="runsCount"' in html
-
-        # Cases subsection has been removed from the Management view
+        # Runs and Cases subsections have been removed from the Management view
+        # They are now accessed through hierarchical modals (Plan Runs Modal and Run Details Modal)
 
         # Verify delete confirmation modal
         assert 'id="deleteConfirmModal"' in html

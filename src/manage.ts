@@ -1395,9 +1395,578 @@ async function loadRunDetailsCases(runId: number) {
   }
 }
 
+// Track selected case IDs for bulk operations
+let selectedCaseIds: Set<number> = new Set();
+
+// Track selected case IDs for adding to run
+let selectedAddCaseIds: Set<number> = new Set();
+let availableCasesData: any[] = [];
+
+// Track current test for adding result
+let currentTestId: number | null = null;
+let currentTestTitle: string = "";
+
+/**
+ * Update bulk action toolbar visibility and count
+ */
+function updateBulkActionToolbar() {
+  const toolbar = document.getElementById("runDetailsBulkToolbar");
+  const countEl = document.getElementById("runDetailsBulkCount");
+  
+  if (!toolbar || !countEl) return;
+  
+  const count = selectedCaseIds.size;
+  
+  if (count > 0) {
+    toolbar.classList.remove("hidden");
+    countEl.textContent = String(count);
+  } else {
+    toolbar.classList.add("hidden");
+  }
+}
+
+/**
+ * Toggle case selection
+ */
+function toggleCaseSelection(caseId: number, checked: boolean) {
+  if (checked) {
+    selectedCaseIds.add(caseId);
+  } else {
+    selectedCaseIds.delete(caseId);
+  }
+  updateBulkActionToolbar();
+}
+
+/**
+ * Select all cases
+ */
+function selectAllCases() {
+  const checkboxes = document.querySelectorAll(".case-checkbox") as NodeListOf<HTMLInputElement>;
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = true;
+    const caseId = parseInt(checkbox.dataset.caseId || "0", 10);
+    if (caseId > 0) {
+      selectedCaseIds.add(caseId);
+    }
+  });
+  updateBulkActionToolbar();
+}
+
+/**
+ * Deselect all cases
+ */
+function deselectAllCases() {
+  const checkboxes = document.querySelectorAll(".case-checkbox") as NodeListOf<HTMLInputElement>;
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = false;
+  });
+  selectedCaseIds.clear();
+  updateBulkActionToolbar();
+}
+
+/**
+ * Show add test result modal
+ */
+export function showAddTestResultModal(testId: number, testTitle: string) {
+  const modal = document.getElementById("addTestResultModal");
+  const titleEl = document.getElementById("addResultTestTitle");
+  const statusSelect = document.getElementById("resultStatus") as HTMLSelectElement;
+  const commentInput = document.getElementById("resultComment") as HTMLTextAreaElement;
+  const elapsedInput = document.getElementById("resultElapsed") as HTMLInputElement;
+  const defectsInput = document.getElementById("resultDefects") as HTMLInputElement;
+  const versionInput = document.getElementById("resultVersion") as HTMLInputElement;
+  const attachmentsInput = document.getElementById("resultAttachments") as HTMLInputElement;
+  
+  if (!modal) return;
+  
+  // Store current test
+  currentTestId = testId;
+  currentTestTitle = testTitle;
+  
+  // Set test title
+  if (titleEl) {
+    titleEl.textContent = testTitle;
+  }
+  
+  // Reset form
+  if (statusSelect) statusSelect.value = "";
+  if (commentInput) commentInput.value = "";
+  if (elapsedInput) elapsedInput.value = "";
+  if (defectsInput) defectsInput.value = "";
+  if (versionInput) versionInput.value = "";
+  if (attachmentsInput) attachmentsInput.value = "";
+  
+  // Show modal
+  modal.classList.remove("hidden");
+  activateFocusTrap("addTestResultModal");
+  
+  // Focus status select
+  setTimeout(() => {
+    if (statusSelect) statusSelect.focus();
+  }, 100);
+}
+
+/**
+ * Hide add test result modal
+ */
+export function hideAddTestResultModal() {
+  const modal = document.getElementById("addTestResultModal");
+  if (!modal) return;
+  
+  modal.classList.add("hidden");
+  deactivateFocusTrap("addTestResultModal");
+  
+  currentTestId = null;
+  currentTestTitle = "";
+}
+
+/**
+ * Submit test result with attachments
+ */
+async function submitTestResult() {
+  if (currentTestId === null) return;
+  
+  const statusSelect = document.getElementById("resultStatus") as HTMLSelectElement;
+  const commentInput = document.getElementById("resultComment") as HTMLTextAreaElement;
+  const elapsedInput = document.getElementById("resultElapsed") as HTMLInputElement;
+  const defectsInput = document.getElementById("resultDefects") as HTMLInputElement;
+  const versionInput = document.getElementById("resultVersion") as HTMLInputElement;
+  const attachmentsInput = document.getElementById("resultAttachments") as HTMLInputElement;
+  const loadingOverlay = document.getElementById("addResultLoadingOverlay");
+  const submitBtn = document.getElementById("addResultSubmitBtn") as HTMLButtonElement;
+  
+  // Validate status
+  if (!statusSelect || !statusSelect.value) {
+    showToast("Please select a status", "error");
+    if (statusSelect) statusSelect.focus();
+    return;
+  }
+  
+  const statusId = parseInt(statusSelect.value, 10);
+  
+  // Show loading
+  if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+  if (submitBtn) submitBtn.disabled = true;
+  
+  try {
+    // Step 1: Add test result
+    const resultPayload: any = {
+      status_id: statusId,
+    };
+    
+    if (commentInput && commentInput.value.trim()) {
+      resultPayload.comment = commentInput.value.trim();
+    }
+    if (elapsedInput && elapsedInput.value.trim()) {
+      resultPayload.elapsed = elapsedInput.value.trim();
+    }
+    if (defectsInput && defectsInput.value.trim()) {
+      resultPayload.defects = defectsInput.value.trim();
+    }
+    if (versionInput && versionInput.value.trim()) {
+      resultPayload.version = versionInput.value.trim();
+    }
+    
+    const resultResponse = await requestJson(`/api/manage/test/${currentTestId}/result`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(resultPayload),
+    });
+    
+    if (!resultResponse.success) {
+      throw new Error(resultResponse.message || "Failed to add result");
+    }
+    
+    const resultId = resultResponse.result.id;
+    
+    // Step 2: Upload attachments if any
+    if (attachmentsInput && attachmentsInput.files && attachmentsInput.files.length > 0) {
+      const files = Array.from(attachmentsInput.files);
+      let uploadedCount = 0;
+      
+      for (const file of files) {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          
+          const attachResponse = await fetch(`/api/manage/result/${resultId}/attachment`, {
+            method: "POST",
+            body: formData,
+          });
+          
+          if (attachResponse.ok) {
+            uploadedCount++;
+          }
+        } catch (err) {
+          console.error(`Failed to upload ${file.name}:`, err);
+        }
+      }
+      
+      if (uploadedCount > 0) {
+        showToast(`Result added with ${uploadedCount} attachment(s)`, "success");
+      } else {
+        showToast("Result added (some attachments failed to upload)", "success");
+      }
+    } else {
+      showToast("Test result added successfully", "success");
+    }
+    
+    // Close modal
+    hideAddTestResultModal();
+    
+    // Reload test cases to show updated status
+    if (currentRunId !== null) {
+      await loadRunDetailsCases(currentRunId);
+    }
+    
+  } catch (err: any) {
+    showToast(err?.message || "Failed to add test result", "error");
+  } finally {
+    if (loadingOverlay) loadingOverlay.classList.add("hidden");
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+/**
+ * Show add cases to run modal
+ */
+export async function showAddCasesToRunModal() {
+  if (currentRunId === null) return;
+  
+  const modal = document.getElementById("addCasesToRunModal");
+  const loadingOverlay = document.getElementById("addCasesLoadingOverlay");
+  const loadingState = document.getElementById("addCasesLoadingState");
+  const errorState = document.getElementById("addCasesErrorState");
+  const emptyState = document.getElementById("addCasesEmptyState");
+  const casesList = document.getElementById("addCasesList");
+  
+  if (!modal) return;
+  
+  // Reset state
+  selectedAddCaseIds.clear();
+  availableCasesData = [];
+  updateAddCasesCount();
+  
+  // Show modal
+  modal.classList.remove("hidden");
+  activateFocusTrap("addCasesToRunModal");
+  
+  // Show loading
+  if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+  if (loadingState) loadingState.classList.remove("hidden");
+  if (errorState) errorState.classList.add("hidden");
+  if (emptyState) emptyState.classList.add("hidden");
+  if (casesList) casesList.classList.add("hidden");
+  
+  try {
+    // Fetch available cases
+    const response = await requestJson(`/api/manage/run/${currentRunId}/available_cases?project=1`);
+    
+    if (response.success) {
+      availableCasesData = response.available_cases || [];
+      
+      if (loadingOverlay) loadingOverlay.classList.add("hidden");
+      if (loadingState) loadingState.classList.add("hidden");
+      
+      if (availableCasesData.length === 0) {
+        if (emptyState) emptyState.classList.remove("hidden");
+      } else {
+        renderAvailableCases(availableCasesData);
+      }
+    } else {
+      throw new Error(response.message || "Failed to load available cases");
+    }
+  } catch (err: any) {
+    if (loadingOverlay) loadingOverlay.classList.add("hidden");
+    if (loadingState) loadingState.classList.add("hidden");
+    if (errorState) {
+      errorState.classList.remove("hidden");
+      const errorMessage = document.getElementById("addCasesErrorMessage");
+      if (errorMessage) {
+        errorMessage.textContent = err?.message || "Failed to load available cases";
+      }
+    }
+    showToast(err?.message || "Failed to load available cases", "error");
+  }
+}
+
+/**
+ * Hide add cases to run modal
+ */
+export function hideAddCasesToRunModal() {
+  const modal = document.getElementById("addCasesToRunModal");
+  if (!modal) return;
+  
+  modal.classList.add("hidden");
+  deactivateFocusTrap("addCasesToRunModal");
+  
+  // Reset state
+  selectedAddCaseIds.clear();
+  availableCasesData = [];
+  
+  const searchInput = document.getElementById("addCasesSearch") as HTMLInputElement;
+  if (searchInput) searchInput.value = "";
+}
+
+/**
+ * Render available cases list
+ */
+function renderAvailableCases(cases: any[]) {
+  const casesList = document.getElementById("addCasesList");
+  if (!casesList) return;
+  
+  casesList.innerHTML = cases
+    .map((testCase: any) => {
+      const caseId = testCase.id;
+      const title = escapeHtml(testCase.title || `Case ${caseId}`);
+      const refs = testCase.refs ? escapeHtml(String(testCase.refs)) : "";
+      const sectionName = testCase.section_name ? escapeHtml(String(testCase.section_name)) : "";
+      
+      return `
+        <div class="add-case-item" data-case-id="${caseId}" data-case-title="${escapeHtml(testCase.title || '')}" style="padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.15s ease;">
+          <input 
+            type="checkbox" 
+            class="add-case-checkbox" 
+            data-case-id="${caseId}"
+            style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;"
+          />
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 4px;">${title}</div>
+            <div style="font-size: 13px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap;">
+              <span><span class="icon" aria-hidden="true">🆔</span> C${caseId}</span>
+              ${refs ? `<span><span class="icon" aria-hidden="true">🔗</span> ${refs}</span>` : ''}
+              ${sectionName ? `<span><span class="icon" aria-hidden="true">📁</span> ${sectionName}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+  
+  casesList.classList.remove("hidden");
+  
+  // Attach checkbox event listeners
+  const checkboxes = casesList.querySelectorAll(".add-case-checkbox") as NodeListOf<HTMLInputElement>;
+  checkboxes.forEach(checkbox => {
+    checkbox.addEventListener("change", (e) => {
+      const target = e.target as HTMLInputElement;
+      const caseId = parseInt(target.dataset.caseId || "0", 10);
+      toggleAddCaseSelection(caseId, target.checked);
+    });
+  });
+  
+  // Make entire row clickable
+  const items = casesList.querySelectorAll(".add-case-item");
+  items.forEach(item => {
+    item.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).classList.contains("add-case-checkbox")) return;
+      const checkbox = item.querySelector(".add-case-checkbox") as HTMLInputElement;
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        const caseId = parseInt(checkbox.dataset.caseId || "0", 10);
+        toggleAddCaseSelection(caseId, checkbox.checked);
+      }
+    });
+  });
+}
+
+/**
+ * Toggle case selection for adding
+ */
+function toggleAddCaseSelection(caseId: number, checked: boolean) {
+  if (checked) {
+    selectedAddCaseIds.add(caseId);
+  } else {
+    selectedAddCaseIds.delete(caseId);
+  }
+  updateAddCasesCount();
+}
+
+/**
+ * Update add cases count and button state
+ */
+function updateAddCasesCount() {
+  const countEl = document.getElementById("addCasesSelectedCount");
+  const confirmBtn = document.getElementById("addCasesConfirmBtn") as HTMLButtonElement;
+  
+  const count = selectedAddCaseIds.size;
+  
+  if (countEl) {
+    countEl.textContent = String(count);
+  }
+  
+  if (confirmBtn) {
+    confirmBtn.disabled = count === 0;
+    confirmBtn.style.opacity = count === 0 ? "0.5" : "1";
+    confirmBtn.style.cursor = count === 0 ? "not-allowed" : "pointer";
+  }
+}
+
+/**
+ * Select all available cases
+ */
+function selectAllAddCases() {
+  const checkboxes = document.querySelectorAll(".add-case-checkbox") as NodeListOf<HTMLInputElement>;
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = true;
+    const caseId = parseInt(checkbox.dataset.caseId || "0", 10);
+    if (caseId > 0) {
+      selectedAddCaseIds.add(caseId);
+    }
+  });
+  updateAddCasesCount();
+}
+
+/**
+ * Deselect all available cases
+ */
+function deselectAllAddCases() {
+  const checkboxes = document.querySelectorAll(".add-case-checkbox") as NodeListOf<HTMLInputElement>;
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = false;
+  });
+  selectedAddCaseIds.clear();
+  updateAddCasesCount();
+}
+
+/**
+ * Filter available cases by search term
+ */
+function filterAvailableCases(searchTerm: string) {
+  const term = searchTerm.toLowerCase().trim();
+  
+  if (!term) {
+    renderAvailableCases(availableCasesData);
+    return;
+  }
+  
+  const filtered = availableCasesData.filter((testCase: any) => {
+    const title = (testCase.title || "").toLowerCase();
+    const id = String(testCase.id);
+    const refs = (testCase.refs || "").toLowerCase();
+    
+    return title.includes(term) || id.includes(term) || refs.includes(term);
+  });
+  
+  renderAvailableCases(filtered);
+}
+
+/**
+ * Add selected cases to run
+ */
+async function addSelectedCasesToRun() {
+  if (selectedAddCaseIds.size === 0 || currentRunId === null) return;
+  
+  const count = selectedAddCaseIds.size;
+  const caseIdsArray = Array.from(selectedAddCaseIds);
+  const confirmBtn = document.getElementById("addCasesConfirmBtn") as HTMLButtonElement;
+  
+  try {
+    if (confirmBtn) confirmBtn.disabled = true;
+    
+    const response = await requestJson(`/api/manage/run/${currentRunId}/add_cases`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        case_ids: caseIdsArray,
+      }),
+    });
+    
+    if (response.success) {
+      const message = response.skipped_count > 0 
+        ? `Added ${response.added_count} case(s) (${response.skipped_count} already in run)`
+        : `Added ${response.added_count} case(s) to run`;
+      
+      showToast(message, "success");
+      
+      // Close modal
+      hideAddCasesToRunModal();
+      
+      // Reload cases list in run details modal
+      await loadRunDetailsCases(currentRunId);
+    } else {
+      throw new Error(response.message || "Failed to add cases to run");
+    }
+  } catch (err: any) {
+    // Check if it's a 403 error (TestRail limitation)
+    const errorMessage = err?.message || "Failed to add cases to run";
+    
+    if (errorMessage.includes("403") || errorMessage.includes("test results")) {
+      showToast("⚠️ Cannot modify this run - it has test results. TestRail doesn't allow adding cases to runs with results.", "error");
+    } else {
+      showToast(errorMessage, "error");
+    }
+  } finally {
+    if (confirmBtn) confirmBtn.disabled = false;
+  }
+}
+
+/**
+ * Remove selected cases from run
+ */
+async function removeSelectedCasesFromRun() {
+  if (selectedCaseIds.size === 0 || currentRunId === null) return;
+  
+  const count = selectedCaseIds.size;
+  const caseIdsArray = Array.from(selectedCaseIds);
+  
+  // Show confirmation
+  const confirmed = confirm(`Remove ${count} test case${count > 1 ? 's' : ''} from this run?\n\nNote: This will only remove them from the run, not delete them from the project.`);
+  
+  if (!confirmed) return;
+  
+  try {
+    // Show loading state
+    const toolbar = document.getElementById("runDetailsBulkToolbar");
+    const removeBtn = document.getElementById("runDetailsBulkRemove") as HTMLButtonElement;
+    if (removeBtn) removeBtn.disabled = true;
+    
+    // Send request to remove cases
+    const response = await requestJson(`/api/manage/run/${currentRunId}/remove_cases`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        case_ids: caseIdsArray,
+      }),
+    });
+    
+    if (response.success) {
+      showToast(`Removed ${response.removed_count} case(s) from run`, "success");
+      
+      // Clear selection
+      selectedCaseIds.clear();
+      updateBulkActionToolbar();
+      
+      // Reload cases list
+      await loadRunDetailsCases(currentRunId);
+    } else {
+      throw new Error(response.message || "Failed to remove cases from run");
+    }
+  } catch (err: any) {
+    // Check if it's a 403 error (TestRail limitation)
+    const errorMessage = err?.message || "Failed to remove cases from run";
+    
+    if (errorMessage.includes("403") || errorMessage.includes("test results")) {
+      showToast("⚠️ Cannot modify this run - it has test results. TestRail doesn't allow removing cases from runs with results.", "error");
+    } else {
+      showToast(errorMessage, "error");
+    }
+  } finally {
+    const removeBtn = document.getElementById("runDetailsBulkRemove") as HTMLButtonElement;
+    if (removeBtn) removeBtn.disabled = false;
+  }
+}
+
 /**
  * Render test cases in the run details modal
  * Implements Requirements: 3.3, 3.4
+ * Updated to support multi-select for bulk removal
  * 
  * @param tests - Array of test case objects from the API
  */
@@ -1412,7 +1981,11 @@ function renderRunDetailsCases(tests: any[]) {
   if (emptyState) emptyState.classList.add("hidden");
   if (errorState) errorState.classList.add("hidden");
 
-  // Render test case cards with edit/delete buttons (Requirement 3.3, 3.4)
+  // Clear selection when re-rendering
+  selectedCaseIds.clear();
+  updateBulkActionToolbar();
+
+  // Render test case cards with checkboxes and edit button (removed delete button)
   casesList.innerHTML = tests
     .map((test: any) => {
       const testTitle = escapeHtml(test.title || `Test ${test.id}`);
@@ -1425,10 +1998,19 @@ function renderRunDetailsCases(tests: any[]) {
       
       return `
         <div class="entity-card" role="listitem" data-entity-type="test" data-entity-id="${testId}" data-case-id="${caseId}" aria-label="Test: ${testTitle}, Status: ${statusName}">
-          <div class="entity-card-header">
-            <div class="entity-card-title" id="test-title-${testId}">${testTitle}</div>
-            <div class="entity-card-badges">
-              <span class="badge ${badgeClass}" role="status" aria-label="Status: ${statusName}">${statusName}</span>
+          <div class="entity-card-header" style="display: flex; align-items: flex-start; gap: 12px;">
+            <input 
+              type="checkbox" 
+              class="case-checkbox" 
+              data-case-id="${caseId}"
+              aria-label="Select ${testTitle}"
+              style="margin-top: 4px; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;"
+            />
+            <div style="flex: 1; min-width: 0;">
+              <div class="entity-card-title" id="test-title-${testId}">${testTitle}</div>
+              <div class="entity-card-badges" style="margin-top: 6px;">
+                <span class="badge ${badgeClass}" role="status" aria-label="Status: ${statusName}">${statusName}</span>
+              </div>
             </div>
           </div>
           <div class="entity-card-meta">
@@ -1441,11 +2023,11 @@ function renderRunDetailsCases(tests: any[]) {
             ${refs ? `<span class="meta-item"><span class="icon" aria-hidden="true">🔗</span> Refs: ${refs}</span>` : ''}
           </div>
           <div class="entity-card-actions" role="group" aria-label="Actions for ${testTitle}">
+            <button type="button" class="btn-edit add-result-btn-modal" data-test-id="${testId}" data-test-title="${escapeHtml(test.title || '')}" aria-label="Add result for ${testTitle}" aria-describedby="test-title-${testId}" style="background: var(--primary); color: white; border-color: var(--primary);">
+              <span class="icon" aria-hidden="true">✅</span> Add Result
+            </button>
             <button type="button" class="btn-edit edit-case-btn-modal" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || '')}" data-case-refs="${escapeHtml(test.refs || '')}" aria-label="Edit case ${testTitle}" aria-describedby="test-title-${testId}">
               <span class="icon" aria-hidden="true">✏️</span> Edit
-            </button>
-            <button type="button" class="btn-delete delete-case-btn-modal" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || '')}" aria-label="Delete case ${testTitle}" aria-describedby="test-title-${testId}">
-              <span class="icon" aria-hidden="true">🗑️</span> Delete
             </button>
           </div>
         </div>
@@ -1456,8 +2038,17 @@ function renderRunDetailsCases(tests: any[]) {
   // Show cases list
   casesList.classList.remove("hidden");
 
-  // Event listeners are attached via event delegation in initRunDetailsModal()
-  // No need to attach them here to avoid duplicate listeners
+  // Attach checkbox event listeners
+  const checkboxes = document.querySelectorAll(".case-checkbox") as NodeListOf<HTMLInputElement>;
+  checkboxes.forEach(checkbox => {
+    checkbox.addEventListener("change", (e) => {
+      const target = e.target as HTMLInputElement;
+      const caseId = parseInt(target.dataset.caseId || "0", 10);
+      toggleCaseSelection(caseId, target.checked);
+    });
+  });
+
+  // Event listeners for edit buttons are attached via event delegation in initRunDetailsModal()
 }
 
 /**
@@ -2041,12 +2632,87 @@ function initRunDetailsModal() {
     }
   });
 
-  // Event delegation for case edit/delete buttons (Requirement 4.1)
+  // Add cases button
+  document.getElementById("runDetailsAddCases")?.addEventListener("click", showAddCasesToRunModal);
+  
+  // Bulk action buttons
+  document.getElementById("runDetailsSelectAll")?.addEventListener("click", selectAllCases);
+  document.getElementById("runDetailsDeselectAll")?.addEventListener("click", deselectAllCases);
+  document.getElementById("runDetailsBulkRemove")?.addEventListener("click", removeSelectedCasesFromRun);
+  
+  // Add cases modal event listeners
+  document.getElementById("addCasesToRunModalClose")?.addEventListener("click", hideAddCasesToRunModal);
+  document.getElementById("addCasesCancelBtn")?.addEventListener("click", hideAddCasesToRunModal);
+  document.getElementById("addCasesConfirmBtn")?.addEventListener("click", addSelectedCasesToRun);
+  document.getElementById("addCasesSelectAll")?.addEventListener("click", selectAllAddCases);
+  document.getElementById("addCasesDeselectAll")?.addEventListener("click", deselectAllAddCases);
+  
+  // Search input for add cases modal
+  const addCasesSearch = document.getElementById("addCasesSearch") as HTMLInputElement;
+  if (addCasesSearch) {
+    addCasesSearch.addEventListener("input", (e) => {
+      const target = e.target as HTMLInputElement;
+      filterAvailableCases(target.value);
+    });
+  }
+  
+  // Close add cases modal on backdrop click
+  document.getElementById("addCasesToRunModal")?.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement)?.id === "addCasesToRunModal") {
+      hideAddCasesToRunModal();
+    }
+  });
+  
+  // Escape key closes add cases modal
+  document.addEventListener("keydown", (e) => {
+    const modal = document.getElementById("addCasesToRunModal");
+    if (!modal || modal.classList.contains("hidden")) return;
+    
+    if (e.key === "Escape") {
+      e.preventDefault();
+      hideAddCasesToRunModal();
+    }
+  });
+
+  // Add result modal event listeners
+  document.getElementById("addTestResultModalClose")?.addEventListener("click", hideAddTestResultModal);
+  document.getElementById("addResultCancelBtn")?.addEventListener("click", hideAddTestResultModal);
+  document.getElementById("addResultSubmitBtn")?.addEventListener("click", submitTestResult);
+  
+  // Close add result modal on backdrop click
+  document.getElementById("addTestResultModal")?.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement)?.id === "addTestResultModal") {
+      hideAddTestResultModal();
+    }
+  });
+  
+  // Escape key closes add result modal
+  document.addEventListener("keydown", (e) => {
+    const modal = document.getElementById("addTestResultModal");
+    if (!modal || modal.classList.contains("hidden")) return;
+    
+    if (e.key === "Escape") {
+      e.preventDefault();
+      hideAddTestResultModal();
+    }
+  });
+
+  // Event delegation for case edit and add result buttons (Requirement 4.1)
   // Using event delegation to avoid duplicate listeners when cases list is re-rendered
   const casesList = document.getElementById("runDetailsCasesList");
   if (casesList) {
     casesList.addEventListener("click", async (e) => {
       const target = e.target as HTMLElement;
+      
+      // Handle add result button clicks
+      if (target.closest(".add-result-btn-modal")) {
+        e.stopPropagation();
+        const btn = target.closest(".add-result-btn-modal") as HTMLElement;
+        const testId = parseInt(btn.dataset.testId || "0", 10);
+        const testTitle = btn.dataset.testTitle || "";
+        
+        showAddTestResultModal(testId, testTitle);
+      }
       
       // Handle edit button clicks
       if (target.closest(".edit-case-btn-modal")) {
@@ -2089,22 +2755,6 @@ function initRunDetailsModal() {
           btnElement.disabled = false;
           btnElement.innerHTML = originalText;
         }
-      }
-      
-      // Handle delete button clicks
-      if (target.closest(".delete-case-btn-modal")) {
-        e.stopPropagation();
-        const btn = target.closest(".delete-case-btn-modal") as HTMLElement;
-        const caseId = parseInt(btn.dataset.caseId || "0", 10);
-        const caseTitle = btn.dataset.caseTitle || `Case ${caseId}`;
-
-        showDeleteConfirmation("case", caseTitle, caseId, async () => {
-          const success = await deleteCase(caseId, caseTitle);
-          if (success && currentRunId !== null) {
-            // Refresh cases list after deletion
-            await loadRunDetailsCases(currentRunId);
-          }
-        });
       }
     });
   }

@@ -997,22 +997,6 @@
       return false;
     }
   }
-  async function deleteCase(caseId, caseTitle) {
-    try {
-      const response = await requestJson(`/api/manage/case/${caseId}`, {
-        method: "DELETE"
-      });
-      if (response.success) {
-        showToast(`Case "${caseTitle}" deleted successfully`, "success");
-        return true;
-      } else {
-        throw new Error(response.message || "Failed to delete case");
-      }
-    } catch (err) {
-      showToast((err == null ? void 0 : err.message) || "Failed to delete case", "error");
-      return false;
-    }
-  }
   function disableEntityButtons(entityType) {
     const editButtons = document.querySelectorAll(`.edit-${entityType}-btn`);
     const deleteButtons = document.querySelectorAll(`.delete-${entityType}-btn`);
@@ -1344,6 +1328,402 @@
       showToast((err == null ? void 0 : err.message) || "Failed to load test cases", "error");
     }
   }
+  var selectedCaseIds = /* @__PURE__ */ new Set();
+  var selectedAddCaseIds = /* @__PURE__ */ new Set();
+  var availableCasesData = [];
+  var currentTestId = null;
+  var currentTestTitle = "";
+  function updateBulkActionToolbar() {
+    const toolbar = document.getElementById("runDetailsBulkToolbar");
+    const countEl = document.getElementById("runDetailsBulkCount");
+    if (!toolbar || !countEl) return;
+    const count = selectedCaseIds.size;
+    if (count > 0) {
+      toolbar.classList.remove("hidden");
+      countEl.textContent = String(count);
+    } else {
+      toolbar.classList.add("hidden");
+    }
+  }
+  function toggleCaseSelection(caseId, checked) {
+    if (checked) {
+      selectedCaseIds.add(caseId);
+    } else {
+      selectedCaseIds.delete(caseId);
+    }
+    updateBulkActionToolbar();
+  }
+  function selectAllCases() {
+    const checkboxes = document.querySelectorAll(".case-checkbox");
+    checkboxes.forEach((checkbox) => {
+      checkbox.checked = true;
+      const caseId = parseInt(checkbox.dataset.caseId || "0", 10);
+      if (caseId > 0) {
+        selectedCaseIds.add(caseId);
+      }
+    });
+    updateBulkActionToolbar();
+  }
+  function deselectAllCases() {
+    const checkboxes = document.querySelectorAll(".case-checkbox");
+    checkboxes.forEach((checkbox) => {
+      checkbox.checked = false;
+    });
+    selectedCaseIds.clear();
+    updateBulkActionToolbar();
+  }
+  function showAddTestResultModal(testId, testTitle) {
+    const modal = document.getElementById("addTestResultModal");
+    const titleEl = document.getElementById("addResultTestTitle");
+    const statusSelect = document.getElementById("resultStatus");
+    const commentInput = document.getElementById("resultComment");
+    const elapsedInput = document.getElementById("resultElapsed");
+    const defectsInput = document.getElementById("resultDefects");
+    const versionInput = document.getElementById("resultVersion");
+    const attachmentsInput = document.getElementById("resultAttachments");
+    if (!modal) return;
+    currentTestId = testId;
+    currentTestTitle = testTitle;
+    if (titleEl) {
+      titleEl.textContent = testTitle;
+    }
+    if (statusSelect) statusSelect.value = "";
+    if (commentInput) commentInput.value = "";
+    if (elapsedInput) elapsedInput.value = "";
+    if (defectsInput) defectsInput.value = "";
+    if (versionInput) versionInput.value = "";
+    if (attachmentsInput) attachmentsInput.value = "";
+    modal.classList.remove("hidden");
+    activateFocusTrap("addTestResultModal");
+    setTimeout(() => {
+      if (statusSelect) statusSelect.focus();
+    }, 100);
+  }
+  function hideAddTestResultModal() {
+    const modal = document.getElementById("addTestResultModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    deactivateFocusTrap("addTestResultModal");
+    currentTestId = null;
+    currentTestTitle = "";
+  }
+  async function submitTestResult() {
+    if (currentTestId === null) return;
+    const statusSelect = document.getElementById("resultStatus");
+    const commentInput = document.getElementById("resultComment");
+    const elapsedInput = document.getElementById("resultElapsed");
+    const defectsInput = document.getElementById("resultDefects");
+    const versionInput = document.getElementById("resultVersion");
+    const attachmentsInput = document.getElementById("resultAttachments");
+    const loadingOverlay = document.getElementById("addResultLoadingOverlay");
+    const submitBtn = document.getElementById("addResultSubmitBtn");
+    if (!statusSelect || !statusSelect.value) {
+      showToast("Please select a status", "error");
+      if (statusSelect) statusSelect.focus();
+      return;
+    }
+    const statusId = parseInt(statusSelect.value, 10);
+    if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      const resultPayload = {
+        status_id: statusId
+      };
+      if (commentInput && commentInput.value.trim()) {
+        resultPayload.comment = commentInput.value.trim();
+      }
+      if (elapsedInput && elapsedInput.value.trim()) {
+        resultPayload.elapsed = elapsedInput.value.trim();
+      }
+      if (defectsInput && defectsInput.value.trim()) {
+        resultPayload.defects = defectsInput.value.trim();
+      }
+      if (versionInput && versionInput.value.trim()) {
+        resultPayload.version = versionInput.value.trim();
+      }
+      const resultResponse = await requestJson(`/api/manage/test/${currentTestId}/result`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(resultPayload)
+      });
+      if (!resultResponse.success) {
+        throw new Error(resultResponse.message || "Failed to add result");
+      }
+      const resultId = resultResponse.result.id;
+      if (attachmentsInput && attachmentsInput.files && attachmentsInput.files.length > 0) {
+        const files = Array.from(attachmentsInput.files);
+        let uploadedCount = 0;
+        for (const file of files) {
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const attachResponse = await fetch(`/api/manage/result/${resultId}/attachment`, {
+              method: "POST",
+              body: formData
+            });
+            if (attachResponse.ok) {
+              uploadedCount++;
+            }
+          } catch (err) {
+            console.error(`Failed to upload ${file.name}:`, err);
+          }
+        }
+        if (uploadedCount > 0) {
+          showToast(`Result added with ${uploadedCount} attachment(s)`, "success");
+        } else {
+          showToast("Result added (some attachments failed to upload)", "success");
+        }
+      } else {
+        showToast("Test result added successfully", "success");
+      }
+      hideAddTestResultModal();
+      if (currentRunId !== null) {
+        await loadRunDetailsCases(currentRunId);
+      }
+    } catch (err) {
+      showToast((err == null ? void 0 : err.message) || "Failed to add test result", "error");
+    } finally {
+      if (loadingOverlay) loadingOverlay.classList.add("hidden");
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+  async function showAddCasesToRunModal() {
+    if (currentRunId === null) return;
+    const modal = document.getElementById("addCasesToRunModal");
+    const loadingOverlay = document.getElementById("addCasesLoadingOverlay");
+    const loadingState = document.getElementById("addCasesLoadingState");
+    const errorState = document.getElementById("addCasesErrorState");
+    const emptyState = document.getElementById("addCasesEmptyState");
+    const casesList = document.getElementById("addCasesList");
+    if (!modal) return;
+    selectedAddCaseIds.clear();
+    availableCasesData = [];
+    updateAddCasesCount();
+    modal.classList.remove("hidden");
+    activateFocusTrap("addCasesToRunModal");
+    if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+    if (loadingState) loadingState.classList.remove("hidden");
+    if (errorState) errorState.classList.add("hidden");
+    if (emptyState) emptyState.classList.add("hidden");
+    if (casesList) casesList.classList.add("hidden");
+    try {
+      const response = await requestJson(`/api/manage/run/${currentRunId}/available_cases?project=1`);
+      if (response.success) {
+        availableCasesData = response.available_cases || [];
+        if (loadingOverlay) loadingOverlay.classList.add("hidden");
+        if (loadingState) loadingState.classList.add("hidden");
+        if (availableCasesData.length === 0) {
+          if (emptyState) emptyState.classList.remove("hidden");
+        } else {
+          renderAvailableCases(availableCasesData);
+        }
+      } else {
+        throw new Error(response.message || "Failed to load available cases");
+      }
+    } catch (err) {
+      if (loadingOverlay) loadingOverlay.classList.add("hidden");
+      if (loadingState) loadingState.classList.add("hidden");
+      if (errorState) {
+        errorState.classList.remove("hidden");
+        const errorMessage = document.getElementById("addCasesErrorMessage");
+        if (errorMessage) {
+          errorMessage.textContent = (err == null ? void 0 : err.message) || "Failed to load available cases";
+        }
+      }
+      showToast((err == null ? void 0 : err.message) || "Failed to load available cases", "error");
+    }
+  }
+  function hideAddCasesToRunModal() {
+    const modal = document.getElementById("addCasesToRunModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    deactivateFocusTrap("addCasesToRunModal");
+    selectedAddCaseIds.clear();
+    availableCasesData = [];
+    const searchInput = document.getElementById("addCasesSearch");
+    if (searchInput) searchInput.value = "";
+  }
+  function renderAvailableCases(cases) {
+    const casesList = document.getElementById("addCasesList");
+    if (!casesList) return;
+    casesList.innerHTML = cases.map((testCase) => {
+      const caseId = testCase.id;
+      const title = escapeHtml(testCase.title || `Case ${caseId}`);
+      const refs = testCase.refs ? escapeHtml(String(testCase.refs)) : "";
+      const sectionName = testCase.section_name ? escapeHtml(String(testCase.section_name)) : "";
+      return `
+        <div class="add-case-item" data-case-id="${caseId}" data-case-title="${escapeHtml(testCase.title || "")}" style="padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background 0.15s ease;">
+          <input 
+            type="checkbox" 
+            class="add-case-checkbox" 
+            data-case-id="${caseId}"
+            style="width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;"
+          />
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 4px;">${title}</div>
+            <div style="font-size: 13px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap;">
+              <span><span class="icon" aria-hidden="true">\u{1F194}</span> C${caseId}</span>
+              ${refs ? `<span><span class="icon" aria-hidden="true">\u{1F517}</span> ${refs}</span>` : ""}
+              ${sectionName ? `<span><span class="icon" aria-hidden="true">\u{1F4C1}</span> ${sectionName}</span>` : ""}
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+    casesList.classList.remove("hidden");
+    const checkboxes = casesList.querySelectorAll(".add-case-checkbox");
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener("change", (e) => {
+        const target = e.target;
+        const caseId = parseInt(target.dataset.caseId || "0", 10);
+        toggleAddCaseSelection(caseId, target.checked);
+      });
+    });
+    const items = casesList.querySelectorAll(".add-case-item");
+    items.forEach((item) => {
+      item.addEventListener("click", (e) => {
+        if (e.target.classList.contains("add-case-checkbox")) return;
+        const checkbox = item.querySelector(".add-case-checkbox");
+        if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+          const caseId = parseInt(checkbox.dataset.caseId || "0", 10);
+          toggleAddCaseSelection(caseId, checkbox.checked);
+        }
+      });
+    });
+  }
+  function toggleAddCaseSelection(caseId, checked) {
+    if (checked) {
+      selectedAddCaseIds.add(caseId);
+    } else {
+      selectedAddCaseIds.delete(caseId);
+    }
+    updateAddCasesCount();
+  }
+  function updateAddCasesCount() {
+    const countEl = document.getElementById("addCasesSelectedCount");
+    const confirmBtn = document.getElementById("addCasesConfirmBtn");
+    const count = selectedAddCaseIds.size;
+    if (countEl) {
+      countEl.textContent = String(count);
+    }
+    if (confirmBtn) {
+      confirmBtn.disabled = count === 0;
+      confirmBtn.style.opacity = count === 0 ? "0.5" : "1";
+      confirmBtn.style.cursor = count === 0 ? "not-allowed" : "pointer";
+    }
+  }
+  function selectAllAddCases() {
+    const checkboxes = document.querySelectorAll(".add-case-checkbox");
+    checkboxes.forEach((checkbox) => {
+      checkbox.checked = true;
+      const caseId = parseInt(checkbox.dataset.caseId || "0", 10);
+      if (caseId > 0) {
+        selectedAddCaseIds.add(caseId);
+      }
+    });
+    updateAddCasesCount();
+  }
+  function deselectAllAddCases() {
+    const checkboxes = document.querySelectorAll(".add-case-checkbox");
+    checkboxes.forEach((checkbox) => {
+      checkbox.checked = false;
+    });
+    selectedAddCaseIds.clear();
+    updateAddCasesCount();
+  }
+  function filterAvailableCases(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) {
+      renderAvailableCases(availableCasesData);
+      return;
+    }
+    const filtered = availableCasesData.filter((testCase) => {
+      const title = (testCase.title || "").toLowerCase();
+      const id = String(testCase.id);
+      const refs = (testCase.refs || "").toLowerCase();
+      return title.includes(term) || id.includes(term) || refs.includes(term);
+    });
+    renderAvailableCases(filtered);
+  }
+  async function addSelectedCasesToRun() {
+    if (selectedAddCaseIds.size === 0 || currentRunId === null) return;
+    const count = selectedAddCaseIds.size;
+    const caseIdsArray = Array.from(selectedAddCaseIds);
+    const confirmBtn = document.getElementById("addCasesConfirmBtn");
+    try {
+      if (confirmBtn) confirmBtn.disabled = true;
+      const response = await requestJson(`/api/manage/run/${currentRunId}/add_cases`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          case_ids: caseIdsArray
+        })
+      });
+      if (response.success) {
+        const message = response.skipped_count > 0 ? `Added ${response.added_count} case(s) (${response.skipped_count} already in run)` : `Added ${response.added_count} case(s) to run`;
+        showToast(message, "success");
+        hideAddCasesToRunModal();
+        await loadRunDetailsCases(currentRunId);
+      } else {
+        throw new Error(response.message || "Failed to add cases to run");
+      }
+    } catch (err) {
+      const errorMessage = (err == null ? void 0 : err.message) || "Failed to add cases to run";
+      if (errorMessage.includes("403") || errorMessage.includes("test results")) {
+        showToast("\u26A0\uFE0F Cannot modify this run - it has test results. TestRail doesn't allow adding cases to runs with results.", "error");
+      } else {
+        showToast(errorMessage, "error");
+      }
+    } finally {
+      if (confirmBtn) confirmBtn.disabled = false;
+    }
+  }
+  async function removeSelectedCasesFromRun() {
+    if (selectedCaseIds.size === 0 || currentRunId === null) return;
+    const count = selectedCaseIds.size;
+    const caseIdsArray = Array.from(selectedCaseIds);
+    const confirmed = confirm(`Remove ${count} test case${count > 1 ? "s" : ""} from this run?
+
+Note: This will only remove them from the run, not delete them from the project.`);
+    if (!confirmed) return;
+    try {
+      const toolbar = document.getElementById("runDetailsBulkToolbar");
+      const removeBtn = document.getElementById("runDetailsBulkRemove");
+      if (removeBtn) removeBtn.disabled = true;
+      const response = await requestJson(`/api/manage/run/${currentRunId}/remove_cases`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          case_ids: caseIdsArray
+        })
+      });
+      if (response.success) {
+        showToast(`Removed ${response.removed_count} case(s) from run`, "success");
+        selectedCaseIds.clear();
+        updateBulkActionToolbar();
+        await loadRunDetailsCases(currentRunId);
+      } else {
+        throw new Error(response.message || "Failed to remove cases from run");
+      }
+    } catch (err) {
+      const errorMessage = (err == null ? void 0 : err.message) || "Failed to remove cases from run";
+      if (errorMessage.includes("403") || errorMessage.includes("test results")) {
+        showToast("\u26A0\uFE0F Cannot modify this run - it has test results. TestRail doesn't allow removing cases from runs with results.", "error");
+      } else {
+        showToast(errorMessage, "error");
+      }
+    } finally {
+      const removeBtn = document.getElementById("runDetailsBulkRemove");
+      if (removeBtn) removeBtn.disabled = false;
+    }
+  }
   function renderRunDetailsCases(tests) {
     const casesList = document.getElementById("runDetailsCasesList");
     const emptyState = document.getElementById("runDetailsCasesEmptyState");
@@ -1351,6 +1731,8 @@
     if (!casesList) return;
     if (emptyState) emptyState.classList.add("hidden");
     if (errorState) errorState.classList.add("hidden");
+    selectedCaseIds.clear();
+    updateBulkActionToolbar();
     casesList.innerHTML = tests.map((test) => {
       const testTitle = escapeHtml(test.title || `Test ${test.id}`);
       const testId = test.id;
@@ -1361,10 +1743,19 @@
       const badgeClass = getStatusBadgeClass(statusId);
       return `
         <div class="entity-card" role="listitem" data-entity-type="test" data-entity-id="${testId}" data-case-id="${caseId}" aria-label="Test: ${testTitle}, Status: ${statusName}">
-          <div class="entity-card-header">
-            <div class="entity-card-title" id="test-title-${testId}">${testTitle}</div>
-            <div class="entity-card-badges">
-              <span class="badge ${badgeClass}" role="status" aria-label="Status: ${statusName}">${statusName}</span>
+          <div class="entity-card-header" style="display: flex; align-items: flex-start; gap: 12px;">
+            <input 
+              type="checkbox" 
+              class="case-checkbox" 
+              data-case-id="${caseId}"
+              aria-label="Select ${testTitle}"
+              style="margin-top: 4px; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;"
+            />
+            <div style="flex: 1; min-width: 0;">
+              <div class="entity-card-title" id="test-title-${testId}">${testTitle}</div>
+              <div class="entity-card-badges" style="margin-top: 6px;">
+                <span class="badge ${badgeClass}" role="status" aria-label="Status: ${statusName}">${statusName}</span>
+              </div>
             </div>
           </div>
           <div class="entity-card-meta">
@@ -1377,17 +1768,25 @@
             ${refs ? `<span class="meta-item"><span class="icon" aria-hidden="true">\u{1F517}</span> Refs: ${refs}</span>` : ""}
           </div>
           <div class="entity-card-actions" role="group" aria-label="Actions for ${testTitle}">
+            <button type="button" class="btn-edit add-result-btn-modal" data-test-id="${testId}" data-test-title="${escapeHtml(test.title || "")}" aria-label="Add result for ${testTitle}" aria-describedby="test-title-${testId}" style="background: var(--primary); color: white; border-color: var(--primary);">
+              <span class="icon" aria-hidden="true">\u2705</span> Add Result
+            </button>
             <button type="button" class="btn-edit edit-case-btn-modal" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || "")}" data-case-refs="${escapeHtml(test.refs || "")}" aria-label="Edit case ${testTitle}" aria-describedby="test-title-${testId}">
               <span class="icon" aria-hidden="true">\u270F\uFE0F</span> Edit
-            </button>
-            <button type="button" class="btn-delete delete-case-btn-modal" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || "")}" aria-label="Delete case ${testTitle}" aria-describedby="test-title-${testId}">
-              <span class="icon" aria-hidden="true">\u{1F5D1}\uFE0F</span> Delete
             </button>
           </div>
         </div>
       `;
     }).join("");
     casesList.classList.remove("hidden");
+    const checkboxes = document.querySelectorAll(".case-checkbox");
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener("change", (e) => {
+        const target = e.target;
+        const caseId = parseInt(target.dataset.caseId || "0", 10);
+        toggleCaseSelection(caseId, target.checked);
+      });
+    });
   }
   async function saveRunDetails() {
     const nameInput = document.getElementById("runDetailsName");
@@ -1643,7 +2042,7 @@
     });
   }
   function initRunDetailsModal() {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
     (_a = document.getElementById("runDetailsModalClose")) == null ? void 0 : _a.addEventListener("click", () => {
       handleRunDetailsBack();
     });
@@ -1710,10 +2109,64 @@
         handleRunDetailsBack();
       }
     });
+    (_i = document.getElementById("runDetailsAddCases")) == null ? void 0 : _i.addEventListener("click", showAddCasesToRunModal);
+    (_j = document.getElementById("runDetailsSelectAll")) == null ? void 0 : _j.addEventListener("click", selectAllCases);
+    (_k = document.getElementById("runDetailsDeselectAll")) == null ? void 0 : _k.addEventListener("click", deselectAllCases);
+    (_l = document.getElementById("runDetailsBulkRemove")) == null ? void 0 : _l.addEventListener("click", removeSelectedCasesFromRun);
+    (_m = document.getElementById("addCasesToRunModalClose")) == null ? void 0 : _m.addEventListener("click", hideAddCasesToRunModal);
+    (_n = document.getElementById("addCasesCancelBtn")) == null ? void 0 : _n.addEventListener("click", hideAddCasesToRunModal);
+    (_o = document.getElementById("addCasesConfirmBtn")) == null ? void 0 : _o.addEventListener("click", addSelectedCasesToRun);
+    (_p = document.getElementById("addCasesSelectAll")) == null ? void 0 : _p.addEventListener("click", selectAllAddCases);
+    (_q = document.getElementById("addCasesDeselectAll")) == null ? void 0 : _q.addEventListener("click", deselectAllAddCases);
+    const addCasesSearch = document.getElementById("addCasesSearch");
+    if (addCasesSearch) {
+      addCasesSearch.addEventListener("input", (e) => {
+        const target = e.target;
+        filterAvailableCases(target.value);
+      });
+    }
+    (_r = document.getElementById("addCasesToRunModal")) == null ? void 0 : _r.addEventListener("click", (e) => {
+      var _a2;
+      if (((_a2 = e.target) == null ? void 0 : _a2.id) === "addCasesToRunModal") {
+        hideAddCasesToRunModal();
+      }
+    });
+    document.addEventListener("keydown", (e) => {
+      const modal = document.getElementById("addCasesToRunModal");
+      if (!modal || modal.classList.contains("hidden")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        hideAddCasesToRunModal();
+      }
+    });
+    (_s = document.getElementById("addTestResultModalClose")) == null ? void 0 : _s.addEventListener("click", hideAddTestResultModal);
+    (_t = document.getElementById("addResultCancelBtn")) == null ? void 0 : _t.addEventListener("click", hideAddTestResultModal);
+    (_u = document.getElementById("addResultSubmitBtn")) == null ? void 0 : _u.addEventListener("click", submitTestResult);
+    (_v = document.getElementById("addTestResultModal")) == null ? void 0 : _v.addEventListener("click", (e) => {
+      var _a2;
+      if (((_a2 = e.target) == null ? void 0 : _a2.id) === "addTestResultModal") {
+        hideAddTestResultModal();
+      }
+    });
+    document.addEventListener("keydown", (e) => {
+      const modal = document.getElementById("addTestResultModal");
+      if (!modal || modal.classList.contains("hidden")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        hideAddTestResultModal();
+      }
+    });
     const casesList = document.getElementById("runDetailsCasesList");
     if (casesList) {
       casesList.addEventListener("click", async (e) => {
         const target = e.target;
+        if (target.closest(".add-result-btn-modal")) {
+          e.stopPropagation();
+          const btn = target.closest(".add-result-btn-modal");
+          const testId = parseInt(btn.dataset.testId || "0", 10);
+          const testTitle = btn.dataset.testTitle || "";
+          showAddTestResultModal(testId, testTitle);
+        }
         if (target.closest(".edit-case-btn-modal")) {
           e.stopPropagation();
           const btn = target.closest(".edit-case-btn-modal");
@@ -1745,18 +2198,6 @@
             btnElement.disabled = false;
             btnElement.innerHTML = originalText;
           }
-        }
-        if (target.closest(".delete-case-btn-modal")) {
-          e.stopPropagation();
-          const btn = target.closest(".delete-case-btn-modal");
-          const caseId = parseInt(btn.dataset.caseId || "0", 10);
-          const caseTitle = btn.dataset.caseTitle || `Case ${caseId}`;
-          showDeleteConfirmation("case", caseTitle, caseId, async () => {
-            const success = await deleteCase(caseId, caseTitle);
-            if (success && currentRunId !== null) {
-              await loadRunDetailsCases(currentRunId);
-            }
-          });
         }
       });
     }

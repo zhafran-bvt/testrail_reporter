@@ -968,6 +968,32 @@ class TestRailClient:
                 backoff=self.backoff,
             )
 
+    def update_plan_entry(self, plan_id: int, entry_id: str, payload: dict[str, Any]):
+        """Update a test plan entry (run within a plan)."""
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"update_plan_entry/{plan_id}/{entry_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def delete_plan_entry(self, plan_id: int, entry_id: str):
+        """Delete a test plan entry (run within a plan)."""
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"delete_plan_entry/{plan_id}/{entry_id}",
+                {},
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
     def add_case(self, section_id: int, payload: dict[str, Any]):
         with self.make_session() as session:
             return api_post(
@@ -1114,6 +1140,66 @@ class TestRailClient:
                 record_api_call(
                     "POST",
                     f"add_attachment_to_case/{case_id}",
+                    (time.perf_counter() - start) * 1000.0,
+                    "error",
+                    str(exc),
+                )
+                raise
+
+    def add_result_for_test(self, test_id: int, payload: dict[str, Any]):
+        """
+        Add a test result for a test.
+
+        Args:
+            test_id: TestRail test ID
+            payload: Result data (status_id, comment, elapsed, defects, etc.)
+
+        Returns:
+            Result data from TestRail API
+        """
+        with self.make_session() as session:
+            return api_post(
+                session,
+                self.base_url,
+                f"add_result/{test_id}",
+                payload,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def add_attachment_to_result(self, result_id: int, file_path: str, filename: str):
+        """
+        Add an attachment to a test result.
+
+        Args:
+            result_id: TestRail result ID
+            file_path: Path to the file to upload
+            filename: Original filename to use
+
+        Returns:
+            Attachment metadata from TestRail API
+        """
+        url = f"{self.base_url}/index.php?/api/v2/add_attachment_to_result/{result_id}"
+        with self.make_session() as session:
+            start = time.perf_counter()
+            try:
+                with open(file_path, "rb") as f:
+                    files = {"attachment": (filename, f)}
+                    r = session.post(url, files=files, timeout=self.timeout)
+                    r.raise_for_status()
+                    data = r.json()
+                    record_api_call(
+                        "POST",
+                        f"add_attachment_to_result/{result_id}",
+                        (time.perf_counter() - start) * 1000.0,
+                        "ok",
+                    )
+                    return data
+            except Exception as exc:
+                record_api_call(
+                    "POST",
+                    f"add_attachment_to_result/{result_id}",
                     (time.perf_counter() - start) * 1000.0,
                     "error",
                     str(exc),
