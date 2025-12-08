@@ -179,13 +179,13 @@ class TestSortToggleBehavior(unittest.TestCase):
         if len(plans) < 2:
             return  # Need at least 2 items to test reversal
 
-        # Filter to plans with unique names to avoid stable sort issues
+        # Filter to plans with unique names (case-insensitive) to avoid stable sort issues
         unique_names = {}
         filtered_plans = []
         for plan in plans:
-            name = plan["plan_name"]
-            if name not in unique_names:
-                unique_names[name] = True
+            name_lower = plan["plan_name"].lower()
+            if name_lower not in unique_names:
+                unique_names[name_lower] = True
                 filtered_plans.append(plan)
 
         if len(filtered_plans) < 2:
@@ -198,7 +198,10 @@ class TestSortToggleBehavior(unittest.TestCase):
         desc_sorted = sort_plans(filtered_plans, "name", "desc")
 
         # Verify descending is reverse of ascending
-        self.assertEqual(asc_sorted, list(reversed(desc_sorted)))
+        # Note: We compare the plan_ids to handle case-insensitive sorting edge cases
+        asc_ids = [p["plan_id"] for p in asc_sorted]
+        desc_ids = [p["plan_id"] for p in desc_sorted]
+        self.assertEqual(asc_ids, list(reversed(desc_ids)))
 
     @settings(max_examples=100)
     @given(plans=gen_plan_list(), column=st.sampled_from(["name", "created_on", "pass_rate", "total_tests"]))

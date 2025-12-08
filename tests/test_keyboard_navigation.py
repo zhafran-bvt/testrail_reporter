@@ -165,8 +165,8 @@ class TestKeyboardNavigationTabOrder(unittest.TestCase):
 
         # Verify buttons exist and are focusable (no tabindex=-1)
         self.assertIn('id="refreshPlansBtn"', html)
-        self.assertIn('id="refreshRunsBtn"', html)
-        self.assertIn('id="refreshTestCasesBtn"', html)
+        # Note: refreshRunsBtn and refreshTestCasesBtn removed due to hierarchical navigation
+        # Runs and Cases are now accessed through modals, not separate subsections
 
         # Verify search inputs exist
         self.assertIn('id="plansSearch"', html)

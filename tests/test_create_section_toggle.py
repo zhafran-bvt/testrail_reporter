@@ -165,10 +165,10 @@ class TestCreateSectionToggle(unittest.TestCase):
         # Verify empty state buttons call expandCreateSection
         self.assertIn('onclick="expandCreateSection()"', html)
 
-        # Verify buttons exist for plans and runs entity types
-        # Count should be 2 (plans, runs) - Cases subsection was removed
+        # Verify button exists for plans entity type only
+        # Count should be 1 (plans only) - Runs and Cases subsections were removed for hierarchical navigation
         count = html.count('onclick="expandCreateSection()"')
-        self.assertEqual(count, 2, "Should have 2 empty state buttons calling expandCreateSection")
+        self.assertEqual(count, 1, "Should have 1 empty state button calling expandCreateSection (Plans only)")
 
     def test_aria_attributes_for_accessibility(self):
         """Test that proper ARIA attributes are present (Requirement 11.3, 11.4)."""
