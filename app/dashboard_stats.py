@@ -288,7 +288,9 @@ def calculate_run_statistics(
     try:
         status_distribution = calculate_status_distribution(tests)
     except Exception as e:
-        raise ValueError(f"Failed to calculate status distribution for run {run_id}: {e}")
+        raise ValueError(
+            f"Failed to calculate status distribution for run {run_id}: {e}"
+        )
 
     # Calculate rates
     try:
@@ -430,10 +432,14 @@ def calculate_plan_statistics(
                 run_distribution = calculate_status_distribution(tests)
                 for status, count in run_distribution.items():
                     if isinstance(count, (int, float)):
-                        combined_distribution[status] = combined_distribution.get(status, 0) + int(count)
+                        current = combined_distribution.get(status, 0)
+                        combined_distribution[status] = current + int(count)
             except Exception as e:
                 # Log but continue with other runs
-                print(f"Warning: Failed to calculate distribution for run {run_id}: {e}", flush=True)
+                print(
+                    f"Warning: Failed to calculate distribution for run {run_id}: {e}",
+                    flush=True
+                )
                 continue
         except Exception as e:
             # Log but continue with other runs

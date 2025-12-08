@@ -574,15 +574,25 @@ def get_plans_for_project(
     is_completed: int | None = None,
     created_after: int | None = None,
     created_before: int | None = None,
+    start_offset: int | None = None,
+    max_plans: int | None = None,
+    page_limit: int | None = None,
     timeout: float | None = None,
     max_attempts: int | None = None,
     backoff: float | None = None,
 ) -> list:
     """Return list of plans for a project."""
     plans: list = []
-    offset, limit = 0, 250
+    offset = max(0, start_offset or 0)
+    base_limit = min(250, page_limit) if page_limit else 250
     while True:
-        qs = [f"limit={limit}", f"offset={offset}"]
+        remaining = None
+        if max_plans is not None:
+            remaining = max_plans - len(plans)
+            if remaining <= 0:
+                break
+        batch_limit = base_limit if remaining is None else max(1, min(base_limit, remaining))
+        qs = [f"limit={batch_limit}", f"offset={offset}"]
         if is_completed is not None:
             qs.append(f"is_completed={is_completed}")
         if created_after is not None:
@@ -610,9 +620,11 @@ def get_plans_for_project(
         else:
             items = []
         plans.extend(items)
-        if len(items) < limit:
+        if max_plans is not None and len(plans) >= max_plans:
             break
-        offset += limit
+        if len(items) < batch_limit:
+            break
+        offset += batch_limit
     return plans
 
 
@@ -807,6 +819,18 @@ class TestRailClient:
                 backoff=self.backoff,
             )
 
+    def get_run(self, run_id: int):
+        """Fetch a single run by ID."""
+        with self.make_session() as session:
+            return api_get(
+                session,
+                self.base_url,
+                f"get_run/{run_id}",
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
     def get_results_for_run(self, run_id: int):
         with self.make_session() as session:
             return get_results_for_run(
@@ -819,7 +843,15 @@ class TestRailClient:
             )
 
     def get_plans_for_project(
-        self, project_id: int, *, is_completed: int | None = None
+        self,
+        project_id: int,
+        *,
+        is_completed: int | None = None,
+        created_after: int | None = None,
+        created_before: int | None = None,
+        start_offset: int | None = None,
+        max_plans: int | None = None,
+        page_limit: int | None = None,
     ):
         with self.make_session() as session:
             return get_plans_for_project(
@@ -827,6 +859,11 @@ class TestRailClient:
                 self.base_url,
                 project_id,
                 is_completed=is_completed,
+                created_after=created_after,
+                created_before=created_before,
+                start_offset=start_offset,
+                max_plans=max_plans,
+                page_limit=page_limit,
                 timeout=self.timeout,
                 max_attempts=self.max_attempts,
                 backoff=self.backoff,
@@ -1043,3 +1080,65 @@ class TestRailClient:
                 max_attempts=self.max_attempts,
                 backoff=self.backoff,
             )
+
+    def get_attachments_for_case(self, case_id: int):
+        """Get all attachments for a test case."""
+        with self.make_session() as session:
+            try:
+                data = api_get(
+                    session,
+                    self.base_url,
+                    f"get_attachments_for_case/{case_id}",
+                    timeout=self.timeout,
+                    max_attempts=self.max_attempts,
+                    backoff=self.backoff,
+                )
+                if isinstance(data, list):
+                    return data
+                if isinstance(data, dict):
+                    return data.get("attachments", [])
+                return []
+            except requests.exceptions.HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    return []
+                raise
+            except Exception:
+                raise
+
+    def add_attachment_to_case(self, case_id: int, file_path: str, filename: str):
+        """
+        Add an attachment to a test case.
+        
+        Args:
+            case_id: TestRail case ID
+            file_path: Path to the file to upload
+            filename: Original filename to use
+        
+        Returns:
+            Attachment metadata from TestRail API
+        """
+        url = f"{self.base_url}/index.php?/api/v2/add_attachment_to_case/{case_id}"
+        with self.make_session() as session:
+            start = time.perf_counter()
+            try:
+                with open(file_path, "rb") as f:
+                    files = {"attachment": (filename, f)}
+                    r = session.post(url, files=files, timeout=self.timeout)
+                    r.raise_for_status()
+                    data = r.json()
+                    record_api_call(
+                        "POST",
+                        f"add_attachment_to_case/{case_id}",
+                        (time.perf_counter() - start) * 1000.0,
+                        "ok",
+                    )
+                    return data
+            except Exception as exc:
+                record_api_call(
+                    "POST",
+                    f"add_attachment_to_case/{case_id}",
+                    (time.perf_counter() - start) * 1000.0,
+                    "error",
+                    str(exc),
+                )
+                raise

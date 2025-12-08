@@ -51,7 +51,7 @@
 const dashboardState = {
   currentProject: 1,
   currentOffset: 0,
-  currentLimit: 50,
+  currentLimit: 25,  // Match backend DASHBOARD_MAX_PAGE_SIZE
   filters: {
     search: '',
     isCompleted: null,
@@ -570,8 +570,12 @@ function updatePagination(data) {
   
   const totalCount = data.total_count || 0;
   const offset = data.offset || 0;
-  const limit = data.limit || 50;
+  const limit = data.limit || 25;
   const hasMore = data.has_more || false;
+  
+  // Sync the frontend limit with the backend's actual limit
+  // This ensures pagination stays consistent even if backend has different max
+  dashboardState.currentLimit = limit;
   
   if (totalCount === 0) {
     pagination.style.display = 'none';
@@ -580,9 +584,10 @@ function updatePagination(data) {
   
   pagination.style.display = 'block';
   
-  // Update info text
+  // Update info text - use actual number of plans returned for accurate display
   const start = offset + 1;
-  const end = Math.min(offset + limit, totalCount);
+  const actualPlansReturned = data.plans ? data.plans.length : 0;
+  const end = offset + actualPlansReturned;
   paginationInfo.textContent = `Showing ${start}-${end} of ${totalCount} plans`;
   
   // Update button states
@@ -768,10 +773,21 @@ function updateStatisticsDisplay(statistics) {
   console.log('Statistics:', statistics);
 }
 
+// Track if dashboard has been initialized to prevent duplicate event listeners
+let dashboardInitialized = false;
+
 /**
  * Initialize dashboard
  */
 function initDashboard() {
+  // If already initialized, just reload the data without adding new event listeners
+  if (dashboardInitialized) {
+    loadDashboardPlans();
+    return;
+  }
+  
+  dashboardInitialized = true;
+  
   // Get project input
   const projectInput = document.getElementById('dashboardProject');
   if (projectInput) {

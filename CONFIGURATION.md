@@ -176,7 +176,7 @@ Control how many plans are displayed per page:
 DASHBOARD_DEFAULT_PAGE_SIZE=25
 
 # Maximum number of plans per page (hard limit)
-DASHBOARD_MAX_PAGE_SIZE=200
+DASHBOARD_MAX_PAGE_SIZE=25
 ```
 
 **Recommendations:**
@@ -467,8 +467,8 @@ Quick reference table of all variables:
 | DASHBOARD_PLAN_DETAIL_CACHE_TTL | int | 180 | Dashboard plan detail cache TTL |
 | DASHBOARD_STATS_CACHE_TTL | int | 120 | Dashboard stats cache TTL |
 | DASHBOARD_RUN_STATS_CACHE_TTL | int | 120 | Dashboard run stats cache TTL |
-| DASHBOARD_DEFAULT_PAGE_SIZE | int | 50 | Default plans per page |
-| DASHBOARD_MAX_PAGE_SIZE | int | 200 | Maximum plans per page |
+| DASHBOARD_DEFAULT_PAGE_SIZE | int | 25 | Default plans per page |
+| DASHBOARD_MAX_PAGE_SIZE | int | 25 | Maximum plans per page |
 | DASHBOARD_PASS_RATE_HIGH | int | 80 | Green threshold (%) |
 | DASHBOARD_PASS_RATE_MEDIUM | int | 50 | Yellow threshold (%) |
 | DASHBOARD_CRITICAL_FAIL_THRESHOLD | int | 20 | Critical failure rate (%) |
