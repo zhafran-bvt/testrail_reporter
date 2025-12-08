@@ -2083,8 +2083,9 @@ def api_dashboard_plans(
 
         # Cache the response
         expires_at = _dashboard_plans_cache.set(cache_key, response_data, ttl_seconds=dashboard_plans_cache_ttl)
-        response_data["meta"] = _cache_meta(False, expires_at)
-        response_data["meta"]["estimated_total"] = estimated_total
+        meta_dict = _cache_meta(False, expires_at)
+        meta_dict["estimated_total"] = estimated_total
+        response_data["meta"] = meta_dict
 
         return response_data
 
