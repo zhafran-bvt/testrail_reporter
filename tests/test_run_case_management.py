@@ -458,6 +458,7 @@ class TestRunEditModalProperties(unittest.TestCase):
             raise Exception(f"Run {rid} not found")
 
         fake.update_run = update_run
+        fake.get_run = lambda rid: {"id": rid, "plan_id": None}
 
         import app.main as main_module
 

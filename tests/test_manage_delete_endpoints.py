@@ -183,6 +183,7 @@ class TestRunDeletionConfirmation(unittest.TestCase):
             return {}
 
         fake.delete_run = delete_run
+        fake.get_run = lambda rid: {"id": rid, "plan_id": None}
 
         # Patch the client
         import app.main as main_module
@@ -252,6 +253,7 @@ class TestRunDeletionSuccess(unittest.TestCase):
 
         fake.delete_run = delete_run
         fake.get_plan = get_plan
+        fake.get_run = lambda rid: {"id": rid, "plan_id": None}
 
         # Patch the client
         import app.main as main_module
@@ -517,6 +519,7 @@ class TestDeleteEndpointsUnit(unittest.TestCase):
             return {}
 
         fake.delete_run = delete_run
+        fake.get_run = lambda rid: {"id": rid, "plan_id": None}
 
         import app.main as main_module
 
@@ -545,6 +548,7 @@ class TestDeleteEndpointsUnit(unittest.TestCase):
             raise requests.exceptions.HTTPError(response=response)
 
         fake.delete_run = delete_run
+        fake.get_run = delete_run
 
         import app.main as main_module
 

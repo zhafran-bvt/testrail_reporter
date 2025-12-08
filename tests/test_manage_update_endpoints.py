@@ -291,6 +291,7 @@ class TestRunUpdateProperties(unittest.TestCase):
             return updated
 
         fake.update_run = update_run
+        fake.get_run = lambda rid: {"id": rid, "plan_id": None}
 
         # Patch the client
         import app.main as main_module
@@ -623,6 +624,7 @@ class TestUpdateEndpointsUnit(unittest.TestCase):
             }
 
         fake.update_run = update_run
+        fake.get_run = lambda rid: {"id": rid, "plan_id": None}
 
         import app.main as main_module
 
@@ -650,6 +652,7 @@ class TestUpdateEndpointsUnit(unittest.TestCase):
             raise requests.exceptions.HTTPError(response=response)
 
         fake.update_run = update_run
+        fake.get_run = lambda rid: update_run(rid, {})
 
         import app.main as main_module
 

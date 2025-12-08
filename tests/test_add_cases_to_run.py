@@ -5,7 +5,6 @@ Tests for adding test cases to a test run.
 import types
 from unittest.mock import Mock
 
-import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main_module
@@ -35,6 +34,7 @@ class TestAddCasesToRun:
 
         fake = types.SimpleNamespace()
         fake.get_tests_for_run = Mock(return_value=current_tests)
+        fake.get_run = Mock(return_value={"id": run_id, "plan_id": None})
         fake.update_run = Mock(return_value=updated_run)
 
         main_module._make_client = lambda: fake
@@ -70,6 +70,7 @@ class TestAddCasesToRun:
 
         fake = types.SimpleNamespace()
         fake.get_tests_for_run = Mock(return_value=current_tests)
+        fake.get_run = Mock(return_value={"id": run_id, "plan_id": None})
         fake.update_run = Mock(return_value={"id": run_id})
 
         main_module._make_client = lambda: fake
@@ -89,6 +90,7 @@ class TestAddCasesToRun:
 
         fake = types.SimpleNamespace()
         fake.get_tests_for_run = Mock(return_value=[])
+        fake.get_run = Mock(return_value={"id": run_id, "plan_id": None})
         fake.update_run = Mock(return_value={"id": run_id})
 
         main_module._make_client = lambda: fake

@@ -26,6 +26,7 @@ class TestCRUDUIFlows(unittest.TestCase):
         self.fake_client.update_plan = Mock(return_value={"id": 123, "name": "Updated Plan"})
         self.fake_client.update_run = Mock(return_value={"id": 456, "name": "Updated Run"})
         self.fake_client.update_case = Mock(return_value={"id": 789, "title": "Updated Case"})
+        self.fake_client.get_run = Mock(side_effect=lambda run_id: {"id": run_id, "plan_id": None})
         self.fake_client.delete_plan = Mock(return_value={})
         self.fake_client.delete_run = Mock(return_value={})
         self.fake_client.delete_case = Mock(return_value={})
