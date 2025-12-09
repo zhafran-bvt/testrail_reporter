@@ -1407,6 +1407,91 @@ let currentTestId: number | null = null;
 let currentTestTitle: string = "";
 
 /**
+ * Parse JSON stringify BDD format and convert to proper Gherkin format
+ * Handles the escaped format from TestRail API
+ */
+function parseJsonStringifyToGherkin(jsonString: string): string {
+  if (!jsonString || jsonString.trim() === "") {
+    return "";
+  }
+  
+  try {
+    // Try to parse if it's a JSON array
+    let content = jsonString;
+    
+    // Check if it starts with [{"content": and extract the content
+    if (jsonString.startsWith('[{"content":"') || jsonString.startsWith('[{\"content\":\"')) {
+      const parsed = JSON.parse(jsonString);
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].content) {
+        content = parsed[0].content;
+      }
+    }
+    
+    // Replace \n with actual newlines
+    content = content.replace(/\\n/g, '\n');
+    
+    // Split by newlines and clean up
+    const lines = content.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+    
+    // Format as proper Gherkin
+    const formatted: string[] = [];
+    
+    for (const line of lines) {
+      // Check if line starts with Given/When/Then/And
+      if (line.match(/^(Given|When|Then|And|But)\s+/i)) {
+        formatted.push(line);
+      } else {
+        // If it doesn't start with keyword, add "And " prefix
+        formatted.push(`And ${line}`);
+      }
+    }
+    
+    return formatted.join('\n');
+  } catch (e) {
+    // If parsing fails, just clean up the string
+    return jsonString
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+      .replace(/^\[{"content":"/, '')
+      .replace(/"}]$/, '')
+      .trim();
+  }
+}
+
+/**
+ * Format Gherkin text for display (add proper indentation and structure)
+ */
+function formatGherkinForDisplay(text: string): string {
+  if (!text || text.trim() === "") {
+    return "";
+  }
+  
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  const formatted: string[] = [];
+  
+  for (const line of lines) {
+    if (line.match(/^Given\s+/i)) {
+      formatted.push(`Given ${line.substring(6)}`);
+    } else if (line.match(/^When\s+/i)) {
+      formatted.push(`When ${line.substring(5)}`);
+    } else if (line.match(/^Then\s+/i)) {
+      formatted.push(`Then ${line.substring(5)}`);
+    } else if (line.match(/^And\s+/i)) {
+      formatted.push(`  And ${line.substring(4)}`);
+    } else if (line.match(/^But\s+/i)) {
+      formatted.push(`  But ${line.substring(4)}`);
+    } else {
+      // If no keyword, treat as continuation
+      formatted.push(`  And ${line}`);
+    }
+  }
+  
+  return formatted.join('\n');
+}
+
+/**
  * Update bulk action toolbar visibility and count
  */
 function updateBulkActionToolbar() {
@@ -2882,7 +2967,11 @@ export function showCaseEditModal(
   idInput.value = String(caseId);
   titleInput.value = title || "";
   refsInput.value = refs || "";
-  bddInput.value = bddScenarios || "";
+  
+  // Parse and format BDD scenarios from JSON stringify format to Gherkin
+  const parsedBdd = bddScenarios ? parseJsonStringifyToGherkin(bddScenarios) : "";
+  const formattedBdd = parsedBdd ? formatGherkinForDisplay(parsedBdd) : "";
+  bddInput.value = formattedBdd;
 
   // Update breadcrumb with navigation context (Requirement 6.3)
   const breadcrumbPlanName = document.getElementById("caseEditBreadcrumbPlanName");

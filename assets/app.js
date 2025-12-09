@@ -1333,6 +1333,56 @@
   var availableCasesData = [];
   var currentTestId = null;
   var currentTestTitle = "";
+  function parseJsonStringifyToGherkin(jsonString) {
+    if (!jsonString || jsonString.trim() === "") {
+      return "";
+    }
+    try {
+      let content = jsonString;
+      if (jsonString.startsWith('[{"content":"') || jsonString.startsWith('[{"content":"')) {
+        const parsed = JSON.parse(jsonString);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].content) {
+          content = parsed[0].content;
+        }
+      }
+      content = content.replace(/\\n/g, "\n");
+      const lines = content.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+      const formatted = [];
+      for (const line of lines) {
+        if (line.match(/^(Given|When|Then|And|But)\s+/i)) {
+          formatted.push(line);
+        } else {
+          formatted.push(`And ${line}`);
+        }
+      }
+      return formatted.join("\n");
+    } catch (e) {
+      return jsonString.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/^\[{"content":"/, "").replace(/"}]$/, "").trim();
+    }
+  }
+  function formatGherkinForDisplay(text) {
+    if (!text || text.trim() === "") {
+      return "";
+    }
+    const lines = text.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+    const formatted = [];
+    for (const line of lines) {
+      if (line.match(/^Given\s+/i)) {
+        formatted.push(`Given ${line.substring(6)}`);
+      } else if (line.match(/^When\s+/i)) {
+        formatted.push(`When ${line.substring(5)}`);
+      } else if (line.match(/^Then\s+/i)) {
+        formatted.push(`Then ${line.substring(5)}`);
+      } else if (line.match(/^And\s+/i)) {
+        formatted.push(`  And ${line.substring(4)}`);
+      } else if (line.match(/^But\s+/i)) {
+        formatted.push(`  But ${line.substring(4)}`);
+      } else {
+        formatted.push(`  And ${line}`);
+      }
+    }
+    return formatted.join("\n");
+  }
   function updateBulkActionToolbar() {
     const toolbar = document.getElementById("runDetailsBulkToolbar");
     const countEl = document.getElementById("runDetailsBulkCount");
@@ -2280,7 +2330,9 @@ Note: This will only remove them from the run, not delete them from the project.
     idInput.value = String(caseId);
     titleInput.value = title || "";
     refsInput.value = refs || "";
-    bddInput.value = bddScenarios || "";
+    const parsedBdd = bddScenarios ? parseJsonStringifyToGherkin(bddScenarios) : "";
+    const formattedBdd = parsedBdd ? formatGherkinForDisplay(parsedBdd) : "";
+    bddInput.value = formattedBdd;
     const breadcrumbPlanName = document.getElementById("caseEditBreadcrumbPlanName");
     const breadcrumbRunName = document.getElementById("caseEditBreadcrumbRunName");
     const breadcrumbCaseTitle = document.getElementById("caseEditBreadcrumbCaseTitle");

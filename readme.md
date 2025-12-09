@@ -104,6 +104,15 @@ The application provides full CRUD (Create, Read, Update, Delete) operations for
 
 For detailed CRUD operation documentation, see [CRUD Operations Guide](CRUD_OPERATIONS_GUIDE.md).
 
+**BDD Scenarios Gherkin Formatting:**
+- Automatic conversion of JSON stringify format to readable Gherkin
+- Proper indentation for Given/When/Then/And/But keywords
+- Real-time formatting when editing test cases
+- No manual conversion needed - works automatically
+- Backward compatible with existing TestRail data
+
+For BDD scenarios documentation, see [Gherkin Parsing Guide](GHERKIN_PARSING.md) and [User Guide](USER_GUIDE_GHERKIN.md).
+
 ### Dashboard
 
 The dashboard provides a real-time overview of test plans and runs with statistics, filtering, and visual indicators:
@@ -288,6 +297,23 @@ Comprehensive documentation is available for all features:
   - Performance tuning
   - Cache configuration
   - Dashboard thresholds
+
+- **[Gherkin Parsing Guide](GHERKIN_PARSING.md)** - BDD scenarios formatting
+  - Automatic JSON stringify to Gherkin conversion
+  - Technical implementation details
+  - Supported formats and edge cases
+  - Troubleshooting guide
+
+- **[User Guide: Gherkin](USER_GUIDE_GHERKIN.md)** - How to use BDD scenarios
+  - Step-by-step usage instructions
+  - Before/after examples
+  - Writing good BDD scenarios
+  - Tips and best practices
+
+- **[Gherkin Examples](GHERKIN_EXAMPLES.md)** - Real-world BDD scenario examples
+  - 8 practical examples with transformations
+  - Login flows, API testing, error handling
+  - Mobile app and integration test scenarios
 
 ## Roadmap ideas
 - Optional per-run donut charts
