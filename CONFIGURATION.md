@@ -173,10 +173,10 @@ Control how many plans are displayed per page:
 
 ```bash
 # Default number of plans per page
-DASHBOARD_DEFAULT_PAGE_SIZE=25
+DASHBOARD_DEFAULT_PAGE_SIZE=15
 
 # Maximum number of plans per page (hard limit)
-DASHBOARD_MAX_PAGE_SIZE=25
+DASHBOARD_MAX_PAGE_SIZE=15
 ```
 
 **Recommendations:**
