@@ -2304,6 +2304,8 @@ Note: This will only remove them from the run, not delete them from the project.
     "image/jpeg",
     "image/gif",
     "video/mp4",
+    "video/mov",
+    "video/quicktime",
     "video/webm",
     "application/pdf"
   ];
@@ -2719,7 +2721,7 @@ Note: This will only remove them from the run, not delete them from the project.
     }
     clearFileValidationError();
     if (!validateFileType(file)) {
-      showFileValidationError("File type not allowed. Accepted types: PNG, JPG, GIF, MP4, WebM, PDF");
+      showFileValidationError("File type not allowed. Accepted types: PNG, JPG, GIF, MP4, MOV, WebM, PDF");
       return;
     }
     if (!validateFileSize(file)) {

@@ -3402,7 +3402,7 @@
           <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
             <li>Modal edit case akan muncul <b>di atas</b> modal run details</li>
             <li>Edit <b>Title</b> (required), <b>References</b>, dan <b>BDD Scenarios</b></li>
-            <li>Upload <b>Attachments</b>: drag & drop atau klik untuk browse (PNG, JPG, GIF, MP4, WebM, PDF, max 25MB)</li>
+            <li>Upload <b>Attachments</b>: drag & drop atau klik untuk browse (PNG, JPG, GIF, MP4, MOV, WebM, PDF, max 25MB)</li>
             <li>Klik <b>Save Changes</b> untuk menyimpan</li>
             <li>Klik <b>Cancel</b> untuk kembali ke run details tanpa menyimpan</li>
           </ul>
@@ -3806,12 +3806,12 @@
               Drag & drop files here or click to browse
             </p>
             <p style="margin: 0; font-size: 12px; color: var(--muted);">
-              Supported: PNG, JPG, GIF, MP4, WebM, PDF (max 25MB)
+              Supported: PNG, JPG, GIF, MP4, MOV, WebM, PDF (max 25MB)
             </p>
             <input 
               type="file" 
               id="caseEditFileInput" 
-              accept=".png,.jpg,.jpeg,.gif,.mp4,.webm,.pdf,image/png,image/jpeg,image/gif,video/mp4,video/webm,application/pdf"
+              accept=".png,.jpg,.jpeg,.gif,.mp4,.mov,.webm,.pdf,image/png,image/jpeg,image/gif,video/mp4,video/mov,video/webm,application/pdf"
               style="display: none;"
               aria-describedby="caseEditFileError"
             />
@@ -3819,7 +3819,7 @@
           
           <!-- File Validation Error -->
           <p id="caseEditFileError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
-            Invalid file. Please select a valid file type (PNG, JPG, GIF, MP4, WebM, PDF) under 25MB.
+            Invalid file. Please select a valid file type (PNG, JPG, GIF, MP4, MOV, WebM, PDF) under 25MB.
           </p>
           
           <!-- Upload Progress -->

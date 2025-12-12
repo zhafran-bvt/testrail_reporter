@@ -2919,6 +2919,8 @@ const ALLOWED_FILE_TYPES = [
   "image/jpeg",
   "image/gif",
   "video/mp4",
+  "video/mov",
+  "video/quicktime",
   "video/webm",
   "application/pdf",
 ];
@@ -3545,7 +3547,7 @@ async function handleFileUpload(file: File) {
 
   // Validate file type (Requirement 3.8)
   if (!validateFileType(file)) {
-    showFileValidationError("File type not allowed. Accepted types: PNG, JPG, GIF, MP4, WebM, PDF");
+    showFileValidationError("File type not allowed. Accepted types: PNG, JPG, GIF, MP4, MOV, WebM, PDF");
     return;
   }
 
