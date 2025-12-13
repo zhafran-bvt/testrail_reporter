@@ -10,8 +10,7 @@ from unittest.mock import patch
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-
-class TestReportGenerationIntegration(unittest.TestCase):
+class TestReportGenerationIntegration(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 15: Report generation integration**
     **Validates: Requirements 6.3**
@@ -127,12 +126,10 @@ class TestReportGenerationIntegration(unittest.TestCase):
             self.assertIn("path", data)
             self.assertTrue(data["path"].startswith("out/"))
 
-
 if __name__ == "__main__":
     unittest.main()
 
-
-class TestReportGenerationFlow(unittest.TestCase):
+class TestReportGenerationFlow(BaseAPITestCase):
     """Integration tests for report generation flow from dashboard."""
 
     def test_clicking_plan_generates_report_for_that_plan(self):

@@ -23,8 +23,7 @@ from app.dashboard_stats import (
 )
 from app.main import app
 
-
-class TestAPIFailureHandling(unittest.TestCase):
+class TestAPIFailureHandling(BaseAPITestCase):
     """Test API failure handling in dashboard endpoints."""
 
     def test_plans_endpoint_handles_timeout(self):
@@ -110,8 +109,7 @@ class TestAPIFailureHandling(unittest.TestCase):
             self.assertEqual(response.status_code, 500)
             self.assertIn("Invalid response", response.json()["detail"])
 
-
-class TestInvalidParameterHandling(unittest.TestCase):
+class TestInvalidParameterHandling(BaseAPITestCase):
     """Test invalid parameter handling in dashboard endpoints."""
 
     def test_plans_endpoint_rejects_negative_project_id(self):
@@ -181,8 +179,7 @@ class TestInvalidParameterHandling(unittest.TestCase):
             # Limit should be capped at 25
             self.assertEqual(data["limit"], 25)
 
-
-class TestDivisionByZeroHandling(unittest.TestCase):
+class TestDivisionByZeroHandling(BaseAPITestCase):
     """Test division by zero handling in statistics calculations."""
 
     def test_pass_rate_with_no_tests(self):
@@ -227,8 +224,7 @@ class TestDivisionByZeroHandling(unittest.TestCase):
         result = calculate_completion_rate(distribution)
         self.assertEqual(result, 80.0)
 
-
-class TestMissingFieldHandling(unittest.TestCase):
+class TestMissingFieldHandling(BaseAPITestCase):
     """Test missing field handling in statistics calculations."""
 
     def test_status_distribution_with_missing_status_id(self):
@@ -405,7 +401,6 @@ class TestMissingFieldHandling(unittest.TestCase):
                 data = response.json()
                 # Should only include valid plans (those with IDs)
                 self.assertEqual(len(data["plans"]), 2)
-
 
 if __name__ == "__main__":
     unittest.main()

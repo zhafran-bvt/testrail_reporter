@@ -25,7 +25,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-
 class TestManagementViewUserFlows:
     """End-to-end tests for complete Management view user workflows."""
 
@@ -413,7 +412,6 @@ class TestManagementViewUserFlows:
                 assert "runs" in refreshed_runs
                 assert isinstance(refreshed_runs["runs"], list)
 
-
 class TestManagementViewComplexFlows:
     """Tests for complex multi-step user flows."""
 
@@ -530,7 +528,6 @@ class TestManagementViewComplexFlows:
             assert "name" in plan
             assert "id" in plan
 
-
 class TestManagementViewHTMLStructure:
     """Tests for Management view HTML structure and components."""
 
@@ -606,7 +603,6 @@ class TestManagementViewHTMLStructure:
         # Verify button icons
         assert "✏️" in html or "edit" in html.lower()
         assert "🗑️" in html or "delete" in html.lower()
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

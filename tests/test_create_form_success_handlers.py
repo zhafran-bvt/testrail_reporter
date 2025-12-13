@@ -8,36 +8,11 @@ These tests verify that after successful entity creation:
 4. Form fields are cleared (Requirement 6.4)
 """
 
-import types
-import unittest
-from unittest.mock import Mock
-
-from fastapi.testclient import TestClient
-
-import app.main as main
+from tests.test_base import BaseAPITestCase
 
 
-class TestCreateFormSuccessHandlers(unittest.TestCase):
+class TestCreateFormSuccessHandlers(BaseAPITestCase):
     """Tests for create form success handlers."""
-
-    def setUp(self):
-        """Set up test client and mocks."""
-        self.client = TestClient(main.app)
-
-        # Create fake client
-        self.fake_client = types.SimpleNamespace()
-        self.fake_client.add_plan = Mock(return_value={"id": 123, "name": "Test Plan"})
-        self.fake_client.add_plan_entry = Mock(return_value={"id": 456, "name": "Test Run"})
-        self.fake_client.add_case = Mock(return_value={"id": 789, "title": "Test Case"})
-
-        # Patch the client
-        main._make_client = lambda: self.fake_client
-        main._write_enabled = lambda: True
-        main._default_suite_id = lambda: 1
-        main._default_section_id = lambda: 1
-        main._default_template_id = lambda: 1
-        main._default_type_id = lambda: 1
-        main._default_priority_id = lambda: 1
 
     def test_create_plan_returns_success_with_entity_name(self):
         """Test that creating a plan returns success with entity name for toast."""
@@ -51,8 +26,8 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         assert result["plan"]["id"] == 123
 
         # Verify the plan was created with the correct name
-        self.fake_client.add_plan.assert_called_once()
-        call_args = self.fake_client.add_plan.call_args
+        self.mock_client.add_plan.assert_called_once()
+        call_args = self.mock_client.add_plan.call_args
         assert call_args[0][1]["name"] == "Sprint 42 Testing"
 
     def test_create_run_returns_success_with_entity_name(self):
@@ -73,8 +48,8 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         assert result["run"]["id"] == 456
 
         # Verify the run was created with the correct name
-        self.fake_client.add_plan_entry.assert_called_once()
-        call_args = self.fake_client.add_plan_entry.call_args
+        self.mock_client.add_plan_entry.assert_called_once()
+        call_args = self.mock_client.add_plan_entry.call_args
         assert call_args[0][1]["name"] == "Regression Run"
 
     def test_create_case_returns_success_with_entity_name(self):
@@ -94,8 +69,8 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         assert result["case"]["id"] == 789
 
         # Verify the case was created with the correct title
-        self.fake_client.add_case.assert_called_once()
-        call_args = self.fake_client.add_case.call_args
+        self.mock_client.add_case.assert_called_once()
+        call_args = self.mock_client.add_case.call_args
         assert call_args[0][1]["title"] == "Login with valid credentials"
 
     def test_create_plan_with_minimal_data(self):
@@ -126,7 +101,7 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         assert "run" in result
 
         # Verify case_ids were passed correctly
-        call_args = self.fake_client.add_plan_entry.call_args
+        call_args = self.mock_client.add_plan_entry.call_args
         assert "case_ids" in call_args[0][1]
         assert call_args[0][1]["case_ids"] == [1, 2, 3, 4, 5]
 
@@ -145,7 +120,7 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         assert "case" in result
 
         # Verify BDD scenarios were formatted correctly
-        call_args = self.fake_client.add_case.call_args
+        call_args = self.mock_client.add_case.call_args
         assert "custom_testrail_bdd_scenario" in call_args[0][1]
         assert len(call_args[0][1]["custom_testrail_bdd_scenario"]) == 1
         assert "content" in call_args[0][1]["custom_testrail_bdd_scenario"][0]
@@ -211,7 +186,7 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         assert response2.status_code == 200
 
         # Verify both calls were made
-        assert self.fake_client.add_plan.call_count == 2
+        assert self.mock_client.add_plan.call_count == 2
 
     def test_create_plan_with_milestone(self):
         """Test that creating a plan with milestone works."""
@@ -224,7 +199,7 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         assert "plan" in result
 
         # Verify milestone was passed
-        call_args = self.fake_client.add_plan.call_args
+        call_args = self.mock_client.add_plan.call_args
         assert call_args[0][1].get("milestone_id") == 5
 
     def test_create_run_with_refs(self):
@@ -244,7 +219,7 @@ class TestCreateFormSuccessHandlers(unittest.TestCase):
         assert "run" in result
 
         # Verify refs were passed
-        call_args = self.fake_client.add_plan_entry.call_args
+        call_args = self.mock_client.add_plan_entry.call_args
         assert "refs" in call_args[0][1]
         assert call_args[0][1]["refs"] == "JIRA-123,JIRA-456"
 

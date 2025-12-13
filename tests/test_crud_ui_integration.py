@@ -5,35 +5,26 @@ These tests verify that the UI correctly handles edit and delete operations
 for plans, runs, and cases.
 """
 
-import types
-import unittest
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
-
-import app.main as main
+from tests.test_base import BaseAPITestCase
 
 
-class TestCRUDUIFlows(unittest.TestCase):
+class TestCRUDUIFlows(BaseAPITestCase):
     """Integration tests for CRUD UI flows."""
 
     def setUp(self):
         """Set up test client and mocks."""
-        self.client = TestClient(main.app)
-
-        # Create fake client
-        self.fake_client = types.SimpleNamespace()
-        self.fake_client.update_plan = Mock(return_value={"id": 123, "name": "Updated Plan"})
-        self.fake_client.update_run = Mock(return_value={"id": 456, "name": "Updated Run"})
-        self.fake_client.update_case = Mock(return_value={"id": 789, "title": "Updated Case"})
-        self.fake_client.get_run = Mock(side_effect=lambda run_id: {"id": run_id, "plan_id": None})
-        self.fake_client.delete_plan = Mock(return_value={})
-        self.fake_client.delete_run = Mock(return_value={})
-        self.fake_client.delete_case = Mock(return_value={})
-
-        # Patch the client
-        main._make_client = lambda: self.fake_client
-        main._write_enabled = lambda: True
+        super().setUp()
+        
+        # Override default mock responses for this test
+        self.mock_client.update_plan.return_value = {"id": 123, "name": "Updated Plan"}
+        self.mock_client.update_run.return_value = {"id": 456, "name": "Updated Run"}
+        self.mock_client.update_case.return_value = {"id": 789, "title": "Updated Case"}
+        self.mock_client.get_run.side_effect = lambda run_id: {"id": run_id, "plan_id": None}
+        self.mock_client.delete_plan.return_value = {}
+        self.mock_client.delete_run.return_value = {}
+        self.mock_client.delete_case.return_value = {}
 
     def test_edit_plan_updates_entity(self):
         """Test that editing a plan updates the entity."""
@@ -48,8 +39,8 @@ class TestCRUDUIFlows(unittest.TestCase):
         assert result["plan"]["id"] == plan_id
 
         # Verify the update was called with correct data
-        self.fake_client.update_plan.assert_called_once()
-        call_args = self.fake_client.update_plan.call_args
+        self.mock_client.update_plan.assert_called_once()
+        call_args = self.mock_client.update_plan.call_args
         assert call_args[0][0] == plan_id
         assert call_args[0][1]["name"] == "Updated Plan Name"
 
@@ -66,8 +57,8 @@ class TestCRUDUIFlows(unittest.TestCase):
         assert result["run"]["id"] == run_id
 
         # Verify the update was called with correct data
-        self.fake_client.update_run.assert_called_once()
-        call_args = self.fake_client.update_run.call_args
+        self.mock_client.update_run.assert_called_once()
+        call_args = self.mock_client.update_run.call_args
         assert call_args[0][0] == run_id
         assert call_args[0][1]["name"] == "Updated Run Name"
 
@@ -88,8 +79,8 @@ class TestCRUDUIFlows(unittest.TestCase):
         assert result["case"]["id"] == case_id
 
         # Verify the update was called with correct data
-        self.fake_client.update_case.assert_called_once()
-        call_args = self.fake_client.update_case.call_args
+        self.mock_client.update_case.assert_called_once()
+        call_args = self.mock_client.update_case.call_args
         assert call_args[0][0] == case_id
         assert call_args[0][1]["title"] == "Updated Case Title"
 
@@ -107,7 +98,7 @@ class TestCRUDUIFlows(unittest.TestCase):
         assert result["plan_id"] == plan_id
 
         # Verify deletion was called
-        self.fake_client.delete_plan.assert_called_once_with(plan_id)
+        self.mock_client.delete_plan.assert_called_once_with(plan_id)
 
     def test_delete_run_shows_confirmation_and_executes(self):
         """Test that deleting a run requires confirmation and executes deletion."""
@@ -123,7 +114,7 @@ class TestCRUDUIFlows(unittest.TestCase):
         assert result["run_id"] == run_id
 
         # Verify deletion was called
-        self.fake_client.delete_run.assert_called_once_with(run_id)
+        self.mock_client.delete_run.assert_called_once_with(run_id)
 
     def test_delete_case_shows_confirmation_and_executes(self):
         """Test that deleting a case requires confirmation and executes deletion."""
@@ -139,7 +130,7 @@ class TestCRUDUIFlows(unittest.TestCase):
         assert result["case_id"] == case_id
 
         # Verify deletion was called
-        self.fake_client.delete_case.assert_called_once_with(case_id)
+        self.mock_client.delete_case.assert_called_once_with(case_id)
 
     def test_cancel_delete_retains_entity(self):
         """Test that canceling deletion retains the entity."""
@@ -151,7 +142,7 @@ class TestCRUDUIFlows(unittest.TestCase):
         # and the entity would remain in the list
 
         # Verify delete was not called
-        self.fake_client.delete_plan.assert_not_called()
+        self.mock_client.delete_plan.assert_not_called()
 
     def test_edit_with_validation_error_displays_message(self):
         """Test that validation errors are displayed correctly."""
@@ -178,7 +169,7 @@ class TestCRUDUIFlows(unittest.TestCase):
 
         response_mock = Mock()
         response_mock.status_code = 404
-        self.fake_client.delete_plan = Mock(side_effect=requests.exceptions.HTTPError(response=response_mock))
+        self.mock_client.delete_plan = Mock(side_effect=requests.exceptions.HTTPError(response=response_mock))
 
         response = self.client.delete(f"/api/manage/plan/{plan_id}")
 
@@ -195,7 +186,7 @@ class TestCRUDUIFlows(unittest.TestCase):
         plan_id = 123
 
         # Mock get_plan to return current data
-        self.fake_client.get_plan = Mock(
+        self.mock_client.get_plan = Mock(
             return_value={
                 "id": plan_id,
                 "name": "Current Plan Name",
@@ -206,7 +197,7 @@ class TestCRUDUIFlows(unittest.TestCase):
 
         # In the UI, this data would be fetched and populated into the form
         # We verify the data structure is correct
-        plan_data = self.fake_client.get_plan(plan_id)
+        plan_data = self.mock_client.get_plan(plan_id)
 
         assert plan_data["id"] == plan_id
         assert "name" in plan_data
@@ -250,7 +241,7 @@ class TestCRUDUIFlows(unittest.TestCase):
         # 3. List refresh
 
         # Verify the deletion was executed
-        self.fake_client.delete_plan.assert_called_once()
+        self.mock_client.delete_plan.assert_called_once()
 
     def test_failed_edit_retains_form_data(self):
         """Test that failed edit would retain form data for correction."""
@@ -264,7 +255,7 @@ class TestCRUDUIFlows(unittest.TestCase):
 
         response_mock = Mock()
         response_mock.status_code = 502
-        self.fake_client.update_plan = Mock(side_effect=requests.exceptions.HTTPError(response=response_mock))
+        self.mock_client.update_plan = Mock(side_effect=requests.exceptions.HTTPError(response=response_mock))
 
         response = self.client.put(f"/api/manage/plan/{plan_id}", json=payload)
 
@@ -286,7 +277,7 @@ class TestCRUDUIFlows(unittest.TestCase):
 
         response_mock = Mock()
         response_mock.status_code = 502
-        self.fake_client.delete_plan = Mock(side_effect=requests.exceptions.HTTPError(response=response_mock))
+        self.mock_client.delete_plan = Mock(side_effect=requests.exceptions.HTTPError(response=response_mock))
 
         response = self.client.delete(f"/api/manage/plan/{plan_id}")
 
@@ -298,7 +289,6 @@ class TestCRUDUIFlows(unittest.TestCase):
         # 1. Remain in the list
         # 2. Display error message
         # 3. Allow user to retry
-
 
 if __name__ == "__main__":
     unittest.main()

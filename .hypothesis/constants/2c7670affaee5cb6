@@ -1,0 +1,4 @@
+# file: /Users/bvt-zhafran/testrail_daily_report/app/api/reports.py
+# hypothesis_version: 6.148.5
+
+[1000.0, 400, 404, 500, 502, '/api', '/report', '/report/queue/stats', '/report/{job_id}', '/reports/', 'Report job not found', 'api_call_count', 'api_calls', 'completed_at', 'created_at', 'duration_ms', 'error', 'generated_at', 'history_limit', 'id', 'latest_job', 'meta', 'params', 'path', 'payload', 'progress_updates', 'queue_position', 'queued', 'reports', 'running', 'size', 'stage', 'stage_payload', 'started_at', 'status', 'success', 'timestamp', 'updated_at', 'url']

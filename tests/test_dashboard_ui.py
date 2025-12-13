@@ -9,8 +9,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-
-class TestDashboardUIIntegration(unittest.TestCase):
+class TestDashboardUIIntegration(BaseAPITestCase):
     """Integration tests for dashboard UI functionality."""
 
     def setUp(self):
@@ -96,8 +95,7 @@ class TestDashboardUIIntegration(unittest.TestCase):
         # Verify it contains "Dashboard" text
         self.assertIn("Dashboard", dashboard_link_html)
 
-
-class TestDashboardVisualIndicators(unittest.TestCase):
+class TestDashboardVisualIndicators(BaseAPITestCase):
     """Test that visual indicators and color coding are properly implemented."""
 
     def setUp(self):
@@ -186,8 +184,7 @@ class TestDashboardVisualIndicators(unittest.TestCase):
         self.assertIn("> 20", js)  # Critical fail threshold
         self.assertIn("> 10", js)  # Critical block threshold
 
-
-class TestDashboardAPIAccessibility(unittest.TestCase):
+class TestDashboardAPIAccessibility(BaseAPITestCase):
     """Test that dashboard API endpoints are accessible."""
 
     def setUp(self):
@@ -225,8 +222,7 @@ class TestDashboardAPIAccessibility(unittest.TestCase):
         self.assertIn("status", data)
         self.assertEqual(data["status"], "success")
 
-
-class TestDashboardResponsiveDesign(unittest.TestCase):
+class TestDashboardResponsiveDesign(BaseAPITestCase):
     """Test that responsive design CSS is properly implemented."""
 
     def setUp(self):
@@ -322,7 +318,6 @@ class TestDashboardResponsiveDesign(unittest.TestCase):
 
     def test_print_styles_defined(self):
         """Test that print styles are defined for dashboard."""
-
 
 if __name__ == "__main__":
     unittest.main()

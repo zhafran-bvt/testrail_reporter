@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-
 class TestComprehensiveIntegration:
     """Integration tests that validate all modernization requirements working together."""
 

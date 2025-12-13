@@ -11,8 +11,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-
-class TestDeleteConfirmationDialog(unittest.TestCase):
+class TestDeleteConfirmationDialog(BaseAPITestCase):
     """Tests for delete confirmation dialog UI improvements."""
 
     def setUp(self):
@@ -153,8 +152,7 @@ class TestDeleteConfirmationDialog(unittest.TestCase):
         # Verify delete icon (trash) is used
         assert "🗑️" in html or "trash" in html.lower(), "Delete buttons should have trash icon"
 
-
-class TestDeleteConfirmationAccessibility(unittest.TestCase):
+class TestDeleteConfirmationAccessibility(BaseAPITestCase):
     """Tests for delete confirmation dialog accessibility."""
 
     def setUp(self):
@@ -190,8 +188,7 @@ class TestDeleteConfirmationAccessibility(unittest.TestCase):
         # Verify input has associated label
         assert 'for="deleteConfirmTypeInput"' in html, "Input should have associated label"
 
-
-class TestDeleteConfirmationResponsive(unittest.TestCase):
+class TestDeleteConfirmationResponsive(BaseAPITestCase):
     """Tests for delete confirmation dialog responsive design."""
 
     def setUp(self):
@@ -218,7 +215,6 @@ class TestDeleteConfirmationResponsive(unittest.TestCase):
         # Verify modal uses padding and spacing
         assert "padding:" in html, "Modal should use padding for spacing"
         assert "border-radius:" in html, "Modal should have rounded corners"
-
 
 if __name__ == "__main__":
     unittest.main()

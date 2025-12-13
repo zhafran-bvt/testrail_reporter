@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 
 import app.main as main_module
 
-
 class TestRemoveCasesFromRun:
     """Test suite for removing cases from run endpoint."""
 

@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 
 from app.core.dependencies import get_plans_cache, get_runs_cache, get_testrail_client, require_write_enabled
 
-
 class TestDependencyInjectionUsage:
     """Property 2: Dependency Injection Usage - For any API endpoint,
     dependencies should be injected via FastAPI's dependency system rather than using global variables."""

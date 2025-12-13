@@ -13,7 +13,6 @@ from hypothesis import strategies as st
 
 import app.main as main
 
-
 # Hypothesis strategies for generating test data
 @st.composite
 def gen_test_case(draw):
@@ -33,12 +32,10 @@ def gen_test_case(draw):
         "assignedto_id": draw(st.one_of(st.none(), st.integers(min_value=1, max_value=1000))),
     }
 
-
 @st.composite
 def gen_test_cases_list(draw, min_size=0, max_size=20):
     """Generate a list of test cases."""
     return draw(st.lists(gen_test_case(), min_size=min_size, max_size=max_size))
-
 
 @st.composite
 def gen_run_data(draw):
@@ -52,8 +49,7 @@ def gen_run_data(draw):
         "created_on": draw(st.integers(min_value=1000000000, max_value=2000000000)),
     }
 
-
-class TestCasesFetchProperties(unittest.TestCase):
+class TestCasesFetchProperties(BaseAPITestCase):
     """
     Property-based tests for fetching test cases for a run.
 
@@ -216,8 +212,7 @@ class TestCasesFetchProperties(unittest.TestCase):
             resp.status_code == 400 or resp.status_code == 422
         ), f"Expected 400 or 422 for negative run_id, got {resp.status_code}"
 
-
-class TestFileValidationProperties(unittest.TestCase):
+class TestFileValidationProperties(BaseAPITestCase):
     """
     Property-based tests for file attachment validation.
 
@@ -416,8 +411,7 @@ class TestFileValidationProperties(unittest.TestCase):
                 "size" not in detail and "25" not in detail and "mb" not in detail
             ), f"Valid size ({file_size_kb}KB) rejected: {result['detail']}"
 
-
-class TestRunEditModalProperties(unittest.TestCase):
+class TestRunEditModalProperties(BaseAPITestCase):
     """
     Property-based tests for run edit modal functionality.
 
@@ -560,12 +554,10 @@ class TestRunEditModalProperties(unittest.TestCase):
         # Verify payload contains the fields we sent
         assert result["payload"].get("name") == run_name.strip(), "payload.name should match"
 
-
 if __name__ == "__main__":
     unittest.main()
 
-
-class TestCaseEditModalProperties(unittest.TestCase):
+class TestCaseEditModalProperties(BaseAPITestCase):
     """
     Property-based tests for case edit modal functionality.
 
@@ -728,12 +720,10 @@ class TestCaseEditModalProperties(unittest.TestCase):
         assert result["attachment"]["content_type"] == valid_content_type, "content_type should match"
         assert result["attachment"]["size"] == file_size_kb * 1024, "size should match"
 
-
 if __name__ == "__main__":
     unittest.main()
 
-
-class TestCasesViewProperties(unittest.TestCase):
+class TestCasesViewProperties(BaseAPITestCase):
     """
     Property-based tests for test cases view functionality.
 
@@ -917,8 +907,7 @@ class TestCasesViewProperties(unittest.TestCase):
         # The frontend uses this data to know which run was being viewed
         # and can navigate back to the runs list accordingly
 
-
-class TestStatusBadgeMapping(unittest.TestCase):
+class TestStatusBadgeMapping(BaseAPITestCase):
     """
     Additional tests for status badge color mapping.
 

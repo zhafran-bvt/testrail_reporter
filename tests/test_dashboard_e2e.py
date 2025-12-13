@@ -25,7 +25,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-
 class TestDashboardEndToEnd:
     """End-to-end tests for complete dashboard workflow."""
 
@@ -395,7 +394,6 @@ class TestDashboardEndToEnd:
         assert "pass_rate_high" in config["visual_thresholds"]
         assert "pass_rate_medium" in config["visual_thresholds"]
 
-
 class TestDashboardBrowserCompatibility:
     """Tests for browser compatibility features."""
 
@@ -449,7 +447,6 @@ class TestDashboardBrowserCompatibility:
 
         # Check that fetch API is used (widely supported)
         assert "fetch(" in js_content
-
 
 class TestDashboardPerformance:
     """Tests for dashboard performance characteristics."""
@@ -512,7 +509,6 @@ class TestDashboardPerformance:
 
         # API should not be called again
         assert second_call_count == first_call_count
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

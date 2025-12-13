@@ -14,8 +14,7 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-
-class TestPlansSubsection(unittest.TestCase):
+class TestPlansSubsection(BaseAPITestCase):
     """Tests for Plans subsection functionality."""
 
     def setUp(self):
@@ -238,7 +237,6 @@ class TestPlansSubsection(unittest.TestCase):
         self.assertIn("classList.remove", js)
         self.assertIn("classList.add", js)
         self.assertIn("hidden", js)
-
 
 if __name__ == "__main__":
     unittest.main()

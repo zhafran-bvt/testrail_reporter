@@ -8,7 +8,6 @@ from hypothesis import strategies as st
 
 # We'll test against the new modular structure to ensure it maintains compatibility
 
-
 class TestBackwardCompatibilityPreservation:
     """Property 3: Backward Compatibility Preservation - For any existing API endpoint,
     the refactored system should maintain the same request/response contract and behavior."""

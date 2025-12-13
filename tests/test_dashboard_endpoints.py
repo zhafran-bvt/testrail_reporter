@@ -16,7 +16,6 @@ from app.dashboard_stats import PlanStatistics, RunStatistics
 
 DASHBOARD_MAX_LIMIT = 25
 
-
 # Hypothesis strategies for generating test data
 @st.composite
 def gen_plan_data(draw):
@@ -31,7 +30,6 @@ def gen_plan_data(draw):
         "entries": [],
     }
 
-
 @st.composite
 def gen_plans_list(draw):
     """Generate a list of plan data dictionaries."""
@@ -43,8 +41,7 @@ def gen_plans_list(draw):
         plans.append(plan)
     return plans
 
-
-class TestPlanListCompleteness(unittest.TestCase):
+class TestPlanListCompleteness(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 1: Plan list completeness**
     **Validates: Requirements 1.1**
@@ -137,8 +134,7 @@ class TestPlanListCompleteness(unittest.TestCase):
                 expected_has_more = (offset + min(limit, DASHBOARD_MAX_LIMIT)) < len(plans)
                 self.assertEqual(data["has_more"], expected_has_more)
 
-
-class TestRunListCompleteness(unittest.TestCase):
+class TestRunListCompleteness(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 6: Run list completeness for plan**
     **Validates: Requirements 2.1**
@@ -218,8 +214,7 @@ class TestRunListCompleteness(unittest.TestCase):
                 returned_run_ids = [r["run_id"] for r in data["runs"]]
                 self.assertEqual(sorted(returned_run_ids), sorted(run_ids))
 
-
-class TestPaginationLimitEnforcement(unittest.TestCase):
+class TestPaginationLimitEnforcement(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 11: Pagination limit enforcement**
     **Validates: Requirements 4.1**
@@ -299,8 +294,7 @@ class TestPaginationLimitEnforcement(unittest.TestCase):
                 self.assertEqual(len(data["plans"]), expected_count)
                 self.assertLessEqual(len(data["plans"]), effective_limit)
 
-
-class TestCacheOperations(unittest.TestCase):
+class TestCacheOperations(BaseAPITestCase):
     """Unit tests for cache operations."""
 
     def test_cache_miss_triggers_api_call(self):
@@ -433,8 +427,7 @@ class TestCacheOperations(unittest.TestCase):
         # Should have no errors
         self.assertEqual(len(errors), 0, f"Concurrent access errors: {errors}")
 
-
-class TestAPIEndpointEdgeCases(unittest.TestCase):
+class TestAPIEndpointEdgeCases(BaseAPITestCase):
     """Unit tests for API endpoint edge cases."""
 
     def test_plans_endpoint_with_valid_parameters(self):
@@ -513,8 +506,7 @@ class TestAPIEndpointEdgeCases(unittest.TestCase):
             self.assertEqual(response.status_code, 502)
             self.assertIn("Error connecting to TestRail API", response.json()["detail"])
 
-
-class TestCacheHitBehavior(unittest.TestCase):
+class TestCacheHitBehavior(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 12: Cache hit behavior**
     **Validates: Requirements 4.3, 4.4**
@@ -606,8 +598,7 @@ class TestCacheHitBehavior(unittest.TestCase):
                 self.assertEqual(data1["plans"], data2["plans"])
                 self.assertEqual(data1["total_count"], data2["total_count"])
 
-
-class TestCacheInvalidation(unittest.TestCase):
+class TestCacheInvalidation(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 13: Cache invalidation on refresh**
     **Validates: Requirements 5.1, 5.2**
@@ -703,8 +694,7 @@ class TestCacheInvalidation(unittest.TestCase):
                 # Verify API was called again
                 self.assertEqual(mock_tr_client.get_plans_for_project.call_count, call_count_before + 1)
 
-
-class TestDataUpdateAfterRefresh(unittest.TestCase):
+class TestDataUpdateAfterRefresh(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 14: Data update after refresh**
     **Validates: Requirements 5.4**
@@ -818,8 +808,7 @@ class TestDataUpdateAfterRefresh(unittest.TestCase):
                 if initial_plans != updated_plans or initial_plan_ids != updated_plan_ids:
                     self.assertNotEqual(initial_plan_ids, updated_plan_ids)
 
-
-class TestSearchFilterCorrectness(unittest.TestCase):
+class TestSearchFilterCorrectness(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 8: Search filter correctness**
     **Validates: Requirements 3.1**
@@ -913,8 +902,7 @@ class TestSearchFilterCorrectness(unittest.TestCase):
                     expected_count = min(len(expected_matching_plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
 
-
-class TestCompletionFilterCorrectness(unittest.TestCase):
+class TestCompletionFilterCorrectness(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 9: Completion filter correctness**
     **Validates: Requirements 3.2**
@@ -1010,8 +998,7 @@ class TestCompletionFilterCorrectness(unittest.TestCase):
                 self.assertEqual(args[0], project_id)
                 self.assertEqual(kwargs.get("is_completed"), is_completed_filter)
 
-
-class TestDateRangeFilterCorrectness(unittest.TestCase):
+class TestDateRangeFilterCorrectness(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 10: Date range filter correctness**
     **Validates: Requirements 3.3**
@@ -1113,8 +1100,7 @@ class TestDateRangeFilterCorrectness(unittest.TestCase):
                     expected_count = min(len(plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
 
-
-class TestFilterEdgeCases(unittest.TestCase):
+class TestFilterEdgeCases(BaseAPITestCase):
     """Unit tests for filter edge cases."""
 
     def test_empty_search_term_returns_all_results(self):
@@ -1325,8 +1311,7 @@ class TestFilterEdgeCases(unittest.TestCase):
                 self.assertIn("Alpha Test", plan_names)
                 self.assertIn("Alpha Production", plan_names)
 
-
-class TestRefreshErrorHandling(unittest.TestCase):
+class TestRefreshErrorHandling(BaseAPITestCase):
     """
     Unit tests for refresh error handling.
     **Validates: Requirements 5.5**
@@ -1462,7 +1447,6 @@ class TestRefreshErrorHandling(unittest.TestCase):
                 self.assertIn("detail", error_data)
                 # Now returns "Invalid response" error message
                 self.assertIn("Invalid response", error_data["detail"])
-
 
 if __name__ == "__main__":
     unittest.main()

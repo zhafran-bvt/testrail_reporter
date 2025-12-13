@@ -1,0 +1,4 @@
+# file: /Users/bvt-zhafran/testrail_daily_report/app/api/dataset.py
+# hypothesis_version: 6.148.5
+
+[100, 400, 404, 503, '/api/dataset', '/config/areas', '/config/labels', '/generate', '/health', '/jobs', '/jobs/{job_id}', 'Access to Healthcare', 'Education Level', 'Employment Status', 'Filter by status', 'Gender', 'H3', 'Household Income', 'Indonesia', 'Jakarta', 'Japan', 'Job not found', 'MULTIPOLYGON', 'Occupation', 'POINT', 'POLYGON', 'Vietnam', 'Yogyakarta', 'active_jobs', 'area_details', 'areas', 'bounds', 'completed', 'dataset', 'dataset_generator', 'demographic_labels', 'economic_labels', 'failed', 'geometry', 'geometry_types', 'h3_available', 'h3_res9', 'healthy', 'lat_max', 'lat_min', 'lon_max', 'lon_min', 'message', 'name', 'pending', 'realistic_labels', 'running', 'status', 'total_jobs', 'unavailable']

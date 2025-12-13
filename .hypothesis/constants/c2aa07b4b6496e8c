@@ -1,0 +1,4 @@
+# file: /Users/bvt-zhafran/testrail_daily_report/app/core/dependencies.py
+# hypothesis_version: 6.148.5
+
+[128, 256, 500, '/', 'TESTRAIL_API_KEY', 'TESTRAIL_BASE_URL', 'TESTRAIL_USER']

@@ -14,8 +14,7 @@ from hypothesis import strategies as st
 
 import app.main as main
 
-
-class TestPlanDeletionConfirmation(unittest.TestCase):
+class TestPlanDeletionConfirmation(BaseAPITestCase):
     """
     Property-based tests for plan deletion confirmation.
 
@@ -75,8 +74,7 @@ class TestPlanDeletionConfirmation(unittest.TestCase):
         assert result["success"] is True
         assert result["plan_id"] == plan_id
 
-
-class TestPlanDeletionSuccess(unittest.TestCase):
+class TestPlanDeletionSuccess(BaseAPITestCase):
     """
     Property-based tests for plan deletion success.
 
@@ -147,8 +145,7 @@ class TestPlanDeletionSuccess(unittest.TestCase):
         plan_ids = [p["id"] for p in remaining_plans]
         assert plan_id not in plan_ids, "Deleted plan should not appear in plan list"
 
-
-class TestRunDeletionConfirmation(unittest.TestCase):
+class TestRunDeletionConfirmation(BaseAPITestCase):
     """
     Property-based tests for run deletion confirmation.
 
@@ -204,8 +201,7 @@ class TestRunDeletionConfirmation(unittest.TestCase):
         assert result["success"] is True
         assert result["run_id"] == run_id
 
-
-class TestRunDeletionSuccess(unittest.TestCase):
+class TestRunDeletionSuccess(BaseAPITestCase):
     """
     Property-based tests for run deletion success.
 
@@ -283,8 +279,7 @@ class TestRunDeletionSuccess(unittest.TestCase):
                 run_ids.append(run["id"])
         assert run_id not in run_ids, "Deleted run should not appear in plan's run list"
 
-
-class TestCaseDeletionConfirmation(unittest.TestCase):
+class TestCaseDeletionConfirmation(BaseAPITestCase):
     """
     Property-based tests for case deletion confirmation.
 
@@ -339,8 +334,7 @@ class TestCaseDeletionConfirmation(unittest.TestCase):
         assert result["success"] is True
         assert result["case_id"] == case_id
 
-
-class TestCaseDeletionSuccess(unittest.TestCase):
+class TestCaseDeletionSuccess(BaseAPITestCase):
     """
     Property-based tests for case deletion success.
 
@@ -415,8 +409,7 @@ class TestCaseDeletionSuccess(unittest.TestCase):
         case_ids = [c["id"] for c in section_cases]
         assert case_id not in case_ids, "Deleted case should not appear in section's case list"
 
-
-class TestDeleteEndpointsUnit(unittest.TestCase):
+class TestDeleteEndpointsUnit(BaseAPITestCase):
     """Unit tests for delete endpoints covering specific scenarios."""
 
     def test_delete_plan_with_valid_id_returns_success(self):
@@ -659,7 +652,6 @@ class TestDeleteEndpointsUnit(unittest.TestCase):
 
         assert resp.status_code == 400
         assert "positive" in resp.json()["detail"].lower()
-
 
 if __name__ == "__main__":
     unittest.main()

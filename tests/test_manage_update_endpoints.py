@@ -14,7 +14,6 @@ from hypothesis import strategies as st
 
 import app.main as main
 
-
 # Hypothesis strategies for generating test data
 @st.composite
 def gen_plan_update_data(draw):
@@ -40,7 +39,6 @@ def gen_plan_update_data(draw):
         "milestone_id": draw(st.integers(min_value=1, max_value=1000)) if has_milestone else None,
     }
 
-
 @st.composite
 def gen_run_update_data(draw):
     """Generate random run update data."""
@@ -64,7 +62,6 @@ def gen_run_update_data(draw):
         "description": draw(st.text(min_size=0, max_size=500)) if has_description else None,
         "refs": draw(st.text(min_size=0, max_size=100)) if has_refs else None,
     }
-
 
 @st.composite
 def gen_case_update_data(draw):
@@ -111,8 +108,7 @@ def gen_case_update_data(draw):
 
     return result
 
-
-class TestPlanUpdateProperties(unittest.TestCase):
+class TestPlanUpdateProperties(BaseAPITestCase):
     """
     Property-based tests for plan update operations.
 
@@ -205,8 +201,7 @@ class TestPlanUpdateProperties(unittest.TestCase):
                 updated_plan["milestone_id"] == original_plan["milestone_id"]
             ), "Unchanged milestone_id should preserve original value"
 
-
-class TestPlanUpdateValidation(unittest.TestCase):
+class TestPlanUpdateValidation(BaseAPITestCase):
     """
     Property-based tests for plan update validation.
 
@@ -240,8 +235,7 @@ class TestPlanUpdateValidation(unittest.TestCase):
             # Should return validation error (422 for Pydantic validation)
             assert resp.status_code == 422, f"Empty name '{repr(empty_name)}' should return 422, got {resp.status_code}"
 
-
-class TestRunUpdateProperties(unittest.TestCase):
+class TestRunUpdateProperties(BaseAPITestCase):
     """
     Property-based tests for run update operations.
 
@@ -333,8 +327,7 @@ class TestRunUpdateProperties(unittest.TestCase):
         if update_data.get("refs") is None:
             assert updated_run["refs"] == original_run["refs"], "Unchanged refs should preserve original value"
 
-
-class TestRunUpdateValidation(unittest.TestCase):
+class TestRunUpdateValidation(BaseAPITestCase):
     """
     Property-based tests for run update validation.
 
@@ -368,8 +361,7 @@ class TestRunUpdateValidation(unittest.TestCase):
             # Should return validation error (422 for Pydantic validation)
             assert resp.status_code == 422, f"Empty name '{repr(empty_name)}' should return 422, got {resp.status_code}"
 
-
-class TestCaseUpdateProperties(unittest.TestCase):
+class TestCaseUpdateProperties(BaseAPITestCase):
     """
     Property-based tests for case update operations.
 
@@ -460,8 +452,7 @@ class TestCaseUpdateProperties(unittest.TestCase):
         if update_data.get("refs") is None:
             assert updated_case["refs"] == original_case["refs"], "Unchanged refs should preserve original value"
 
-
-class TestCaseUpdateValidation(unittest.TestCase):
+class TestCaseUpdateValidation(BaseAPITestCase):
     """
     Property-based tests for case update validation.
 
@@ -497,8 +488,7 @@ class TestCaseUpdateValidation(unittest.TestCase):
                 resp.status_code == 422
             ), f"Empty title '{repr(empty_title)}' should return 422, got {resp.status_code}"
 
-
-class TestUpdateEndpointsUnit(unittest.TestCase):
+class TestUpdateEndpointsUnit(BaseAPITestCase):
     """Unit tests for update endpoints covering specific scenarios."""
 
     def test_update_plan_with_valid_data_returns_updated_entity(self):
@@ -716,7 +706,6 @@ class TestUpdateEndpointsUnit(unittest.TestCase):
 
         assert resp.status_code == 404
         assert "not found" in resp.json()["detail"].lower()
-
 
 if __name__ == "__main__":
     unittest.main()

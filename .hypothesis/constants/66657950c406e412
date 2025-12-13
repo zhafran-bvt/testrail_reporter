@@ -1,0 +1,4 @@
+# file: /Users/bvt-zhafran/testrail_daily_report/app/services/testrail_client.py
+# hypothesis_version: 6.148.5
+
+[1.0, 429, 500, 502, 503, 504, 'DELETE', 'GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'TRACE', 'delete', 'endpoint', 'get', 'http://', 'https://', 'method', 'params', 'post', 'put', 'response', 'session']

@@ -4,8 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-
-class TestKeyboardNavigationFocusIndicators(unittest.TestCase):
+class TestKeyboardNavigationFocusIndicators(BaseAPITestCase):
     """Tests for keyboard navigation focus indicators (Requirement 11.5)"""
 
     def setUp(self):
@@ -104,8 +103,7 @@ class TestKeyboardNavigationFocusIndicators(unittest.TestCase):
         # Verify general button focus style exists
         self.assertIn("button:not(.panel-toggle):focus", html)
 
-
-class TestKeyboardNavigationEnterSpace(unittest.TestCase):
+class TestKeyboardNavigationEnterSpace(BaseAPITestCase):
     """Tests for Enter/Space keyboard support (Requirement 11.2)"""
 
     def setUp(self):
@@ -122,8 +120,7 @@ class TestKeyboardNavigationEnterSpace(unittest.TestCase):
         self.assertIn("e.key === ' '", html)
         self.assertIn("toggleCreateSection()", html)
 
-
-class TestKeyboardNavigationEscape(unittest.TestCase):
+class TestKeyboardNavigationEscape(BaseAPITestCase):
     """Tests for Escape key support (Requirements 11.3, 11.4)"""
 
     def setUp(self):
@@ -150,8 +147,7 @@ class TestKeyboardNavigationEscape(unittest.TestCase):
         self.assertIn("Escape", js)
         self.assertIn("hideDeleteConfirmation", js)
 
-
-class TestKeyboardNavigationTabOrder(unittest.TestCase):
+class TestKeyboardNavigationTabOrder(BaseAPITestCase):
     """Tests for logical Tab order (Requirement 11.1)"""
 
     def setUp(self):
@@ -192,8 +188,7 @@ class TestKeyboardNavigationTabOrder(unittest.TestCase):
         # Verify aria-label exists on close buttons
         self.assertIn('aria-label="Close"', html)
 
-
-class TestKeyboardNavigationFocusManagement(unittest.TestCase):
+class TestKeyboardNavigationFocusManagement(BaseAPITestCase):
     """Tests for focus management in modals and interactions"""
 
     def setUp(self):
@@ -218,7 +213,6 @@ class TestKeyboardNavigationFocusManagement(unittest.TestCase):
 
         # Verify focus management in expandCreateSection
         self.assertIn("toggleButton.focus()", html)
-
 
 if __name__ == "__main__":
     unittest.main()

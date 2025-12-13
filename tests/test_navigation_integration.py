@@ -12,8 +12,7 @@ from fastapi.testclient import TestClient
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-
-class TestNavigationIntegration(unittest.TestCase):
+class TestNavigationIntegration(BaseAPITestCase):
     """Property-based tests for navigation integration."""
 
     def setUp(self):
@@ -37,8 +36,7 @@ class TestNavigationIntegration(unittest.TestCase):
         other views are hidden.
         """
 
-
-class TestNavigationStatePreservation(unittest.TestCase):
+class TestNavigationStatePreservation(BaseAPITestCase):
     """Property-based tests for navigation state preservation."""
 
     def setUp(self):
@@ -109,8 +107,7 @@ class TestNavigationStatePreservation(unittest.TestCase):
         self.assertIn("dashboardState.sort.column", js)
         self.assertIn("dashboardState.sort.direction", js)
 
-
-class TestNavigationActiveHighlighting(unittest.TestCase):
+class TestNavigationActiveHighlighting(BaseAPITestCase):
     """Property-based tests for active navigation highlighting."""
 
     def setUp(self):
@@ -168,8 +165,7 @@ class TestNavigationActiveHighlighting(unittest.TestCase):
         remove_active_count = js.count('classList.remove("active")')
         self.assertGreaterEqual(remove_active_count, 4, "Should remove active from all navigation links")
 
-
-class TestNavigationDashboardInitialization(unittest.TestCase):
+class TestNavigationDashboardInitialization(BaseAPITestCase):
     """Test that dashboard is properly initialized when navigated to."""
 
     def setUp(self):
@@ -197,7 +193,6 @@ class TestNavigationDashboardInitialization(unittest.TestCase):
 
         # Verify init is called
         self.assertIn(".init()", js)
-
 
 if __name__ == "__main__":
     unittest.main()

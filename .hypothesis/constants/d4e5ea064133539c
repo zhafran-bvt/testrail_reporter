@@ -1,0 +1,4 @@
+# file: /Users/bvt-zhafran/testrail_daily_report/app/api/management.py
+# hypothesis_version: 6.148.5
+
+[400, 403, 404, 500, 502, ', ', '/api/manage', '/case', '/case/{case_id}', '/plan', '/plan/{plan_id}', '/run', '/run/{run_id}', 'action', 'added_count', 'assignedto_id', 'attachment', 'attachment_id', 'attachments', 'available_cases', 'case', 'case_id', 'case_ids', 'comment', 'content', 'content_type', 'count', 'created_on', 'custom_bdd_scenario', 'defects', 'delete_case', 'delete_plan', 'delete_run', 'description', 'dry_run', 'elapsed', 'entries', 'filename', 'id', 'include_all', 'management', 'message', 'milestone_id', 'name', 'payload', 'plan', 'plan_entry', 'plan_id', 'priority_id', 'project', 'refs', 'remaining_count', 'removed_count', 'result', 'run', 'run_id', 'runs', 'section_id', 'size', 'skipped_count', 'status_id', 'success', 'suite_id', 'target', 'template_id', 'title', 'total_available', 'total_count', 'type_id', 'version']
