@@ -18,7 +18,7 @@ try:
     import geopandas as gpd
     from shapely.ops import unary_union
 
-    from dataset_generator.file_generator import (
+    from dataset_generator.file_generator import (  # type: ignore
         BOUNDING_BOXES,
         H3_AVAILABLE,
         REALISTIC_LABELS,

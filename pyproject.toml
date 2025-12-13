@@ -23,7 +23,7 @@ warn_no_return = false
 warn_unreachable = false
 strict_equality = false
 show_error_codes = true
-exclude = [".venv", "node_modules", "dataset_generator"]
+exclude = ["dataset_generator"]
 
 # Ignore missing imports for third-party libraries without stubs
 [[tool.mypy.overrides]]
@@ -36,3 +36,14 @@ module = [
     "xlsxwriter.*",
 ]
 ignore_missing_imports = true
+
+# Ignore dataset_generator submodule completely
+[[tool.mypy.overrides]]
+module = "dataset_generator.*"
+ignore_missing_imports = true
+ignore_errors = true
+
+# Allow function signature mismatches for fallback functions
+[[tool.mypy.overrides]]
+module = "app.api.dashboard"
+disable_error_code = ["misc"]

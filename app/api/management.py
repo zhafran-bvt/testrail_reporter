@@ -20,7 +20,7 @@ def create_plan(
     payload: ManagePlan, _write_enabled=Depends(require_write_enabled), client=Depends(get_testrail_client)
 ):
     """Create a new test plan."""
-    body = {
+    body: Dict[str, Any] = {
         "name": payload.name,
         "description": payload.description,
     }
@@ -145,7 +145,7 @@ def update_plan(
     if payload.description is not None:
         body["description"] = payload.description
     if payload.milestone_id is not None:
-        body["milestone_id"] = payload.milestone_id
+        body["milestone_id"] = cast(int, payload.milestone_id)
 
     # If no fields to update, return error
     if not body:
