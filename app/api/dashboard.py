@@ -1,6 +1,7 @@
 """Dashboard API endpoints."""
 
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -152,9 +153,9 @@ def get_dashboard_plans(
             from app.dashboard_stats import calculate_plan_statistics
         except ImportError:
             # Fallback if dashboard_stats module not available
-            def calculate_plan_statistics(plan_id, client):
+            def calculate_plan_statistics(plan_id: int, client: Any) -> Any:
                 class MockStats:
-                    def __init__(self, plan_id, plan_name="Unknown Plan"):
+                    def __init__(self, plan_id: int, plan_name: str = "Unknown Plan"):
                         self.plan_id = plan_id
                         self.plan_name = plan_name
                         self.created_on = 0
@@ -162,7 +163,7 @@ def get_dashboard_plans(
                         self.updated_on = None
                         self.total_runs = 0
                         self.total_tests = 0
-                        self.status_distribution = {}
+                        self.status_distribution: Dict[str, int] = {}
                         self.pass_rate = 0.0
                         self.completion_rate = 0.0
                         self.failed_count = 0
@@ -319,9 +320,9 @@ def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashbo
             )
         except ImportError:
             # Fallback if dashboard_stats module not available
-            def calculate_plan_statistics(plan_id, client):
+            def calculate_plan_statistics(plan_id: int, client: Any) -> Any:
                 class MockStats:
-                    def __init__(self, plan_id):
+                    def __init__(self, plan_id: int):
                         self.plan_id = plan_id
                         self.plan_name = f"Plan {plan_id}"
                         self.created_on = 0
@@ -329,7 +330,7 @@ def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashbo
                         self.updated_on = None
                         self.total_runs = 0
                         self.total_tests = 0
-                        self.status_distribution = {}
+                        self.status_distribution: Dict[str, int] = {}
                         self.pass_rate = 0.0
                         self.completion_rate = 0.0
                         self.failed_count = 0
@@ -338,9 +339,9 @@ def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashbo
 
                 return MockStats(plan_id)
 
-            def calculate_run_statistics(run_id, client):
+            def calculate_run_statistics(run_id: int, client: Any) -> Any:
                 class MockRunStats:
-                    def __init__(self, run_id):
+                    def __init__(self, run_id: int):
                         self.run_id = run_id
                         self.run_name = f"Run {run_id}"
                         self.suite_name = None
@@ -505,9 +506,9 @@ def get_dashboard_runs(plan_id: int, stats_cache=Depends(get_dashboard_stats_cac
             from app.dashboard_stats import calculate_run_statistics
         except ImportError:
             # Fallback if dashboard_stats module not available
-            def calculate_run_statistics(run_id, client):
+            def calculate_run_statistics(run_id: int, client: Any) -> Any:
                 class MockRunStats:
-                    def __init__(self, run_id):
+                    def __init__(self, run_id: int):
                         self.run_id = run_id
                         self.run_name = f"Run {run_id}"
                         self.suite_name = None

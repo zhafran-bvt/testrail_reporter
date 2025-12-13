@@ -3,7 +3,7 @@
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 import requests
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
@@ -25,7 +25,7 @@ def create_plan(
         "description": payload.description,
     }
     if payload.milestone_id is not None:
-        body["milestone_id"] = payload.milestone_id
+        body["milestone_id"] = cast(int, payload.milestone_id)
 
     if payload.dry_run:
         return {"dry_run": True, "payload": body, "project": payload.project}
@@ -49,7 +49,7 @@ def create_run(payload: ManageRun, _write_enabled=Depends(require_write_enabled)
         )
 
     body: Dict[str, Any] = {
-        "suite_id": suite_id,
+        "suite_id": cast(int, suite_id),  # suite_id is guaranteed to be int here due to None check above
         "name": payload.name,
         "description": payload.description,
         "include_all": payload.include_all,

@@ -2,7 +2,7 @@
 
 import time
 from functools import wraps
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -16,8 +16,8 @@ class TestRailClientService:
     """Enhanced TestRail client with retry logic and connection pooling."""
 
     def __init__(self):
-        self._client = None
-        self._session = None
+        self._client: Optional[TestRailClient] = None
+        self._session: Optional[requests.Session] = None
 
     def get_client(self) -> TestRailClient:
         """Get TestRail client instance with connection pooling."""
@@ -26,12 +26,12 @@ class TestRailClientService:
 
             # Configure session with connection pooling and retry strategy
             if hasattr(self._client, "session"):
-                session = self._client.session
+                session = getattr(self._client, "session")
             else:
                 session = requests.Session()
                 # Try to add session to client, but don't fail if we can't
                 try:
-                    self._client.session = session
+                    setattr(self._client, "session", session)
                 except (AttributeError, TypeError):
                     # If we can't set the session on the client, store it separately
                     self._session = session
@@ -109,13 +109,13 @@ class TestRailClientService:
 
             try:
                 if method == "GET":
-                    result = self.with_retry(client.get, endpoint, params=params)
+                    result = self.with_retry(getattr(client, "get"), endpoint, params=params)
                 elif method == "POST":
-                    result = self.with_retry(client.post, endpoint, json=params)
+                    result = self.with_retry(getattr(client, "post"), endpoint, json=params)
                 elif method == "PUT":
-                    result = self.with_retry(client.put, endpoint, json=params)
+                    result = self.with_retry(getattr(client, "put"), endpoint, json=params)
                 elif method == "DELETE":
-                    result = self.with_retry(client.delete, endpoint)
+                    result = self.with_retry(getattr(client, "delete"), endpoint)
                 else:
                     raise ValueError(f"Unsupported HTTP method: {method}")
 

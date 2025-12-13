@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import requests
 from fastapi import HTTPException, Request
@@ -77,7 +77,9 @@ class ErrorHandler:
     @staticmethod
     def log_error(exc: Exception, context: Dict[str, Any]) -> str:
         """Log error with context and return correlation ID."""
-        correlation_id = context.get("correlation_id", str(uuid.uuid4()))
+        correlation_id = context.get("correlation_id")
+        if correlation_id is None:
+            correlation_id = str(uuid.uuid4())
 
         print(f"[ERROR] {correlation_id} - {type(exc).__name__}: {str(exc)} - " f"Context: {context}", flush=True)
 
@@ -86,7 +88,7 @@ class ErrorHandler:
     @staticmethod
     def format_validation_error(exc: ValidationError, correlation_id: str, timestamp: str) -> Dict[str, Any]:
         """Format Pydantic validation error into structured response."""
-        field_errors = {}
+        field_errors: Dict[str, List[str]] = {}
 
         for error in exc.errors():
             field_path = ".".join(str(loc) for loc in error["loc"])
@@ -106,7 +108,7 @@ class ErrorHandler:
 
     @staticmethod
     def create_http_exception(
-        status_code: int, detail: str, error_code: str = None, correlation_id: str = None
+        status_code: int, detail: str, error_code: Optional[str] = None, correlation_id: Optional[str] = None
     ) -> HTTPException:
         """Create HTTPException with structured detail."""
         if not correlation_id:

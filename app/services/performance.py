@@ -5,7 +5,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Dict, List
+from typing import Any, AsyncGenerator, Callable, Dict, List, cast
 
 from app.core.config import config
 from app.services.cache import TTLCache
@@ -20,7 +20,7 @@ class PerformanceService:
         self._cache_warming_lock = threading.Lock()
 
     async def stream_large_dataset(
-        self, data_generator: callable, chunk_size: int = 100, **kwargs
+        self, data_generator: Callable[..., Any], chunk_size: int = 100, **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Stream large datasets in chunks to maintain stable memory usage.
@@ -39,7 +39,7 @@ class PerformanceService:
 
         try:
             # Get data from generator
-            data = await asyncio.get_event_loop().run_in_executor(self._executor, data_generator, **kwargs)
+            data: List[Any] = await asyncio.get_event_loop().run_in_executor(self._executor, data_generator, **kwargs)
 
             # Stream data in chunks
             for i in range(0, len(data), chunk_size):
@@ -101,7 +101,7 @@ class PerformanceService:
                 self._cache_warming_active = False
 
     async def batch_process(
-        self, items: List[Any], processor: callable, batch_size: int = 10, max_concurrent: int = 3
+        self, items: List[Any], processor: Callable[[Any], Any], batch_size: int = 10, max_concurrent: int = 3
     ) -> List[Any]:
         """
         Process items in batches with concurrency control.
@@ -153,24 +153,25 @@ class PerformanceService:
         # Calculate optimal TTL based on access frequency
         optimizations = {}
         for key, frequency in sorted_patterns:
+            base_ttl: int = config.DASHBOARD_PLANS_CACHE_TTL
             if frequency > 100:  # High frequency
-                optimal_ttl = config.DASHBOARD_PLANS_CACHE_TTL * 2  # Longer TTL
+                optimal_ttl = base_ttl * 2  # Longer TTL
             elif frequency > 50:  # Medium frequency
-                optimal_ttl = config.DASHBOARD_PLANS_CACHE_TTL  # Default TTL
+                optimal_ttl = base_ttl  # Default TTL
             else:  # Low frequency
-                optimal_ttl = config.DASHBOARD_PLANS_CACHE_TTL // 2  # Shorter TTL
+                optimal_ttl = base_ttl // 2  # Shorter TTL
 
             optimizations[key] = {
                 "frequency": frequency,
                 "optimal_ttl": optimal_ttl,
-                "recommendation": "extend" if optimal_ttl > config.DASHBOARD_PLANS_CACHE_TTL else "reduce",
+                "recommendation": "extend" if optimal_ttl > base_ttl else "reduce",
             }
 
         return {
             "total_keys": len(optimizations),
-            "high_frequency": len([k for k, v in optimizations.items() if v["frequency"] > 100]),
-            "medium_frequency": len([k for k, v in optimizations.items() if 50 <= v["frequency"] <= 100]),
-            "low_frequency": len([k for k, v in optimizations.items() if v["frequency"] < 50]),
+            "high_frequency": len([k for k, v in optimizations.items() if cast(int, v["frequency"]) > 100]),
+            "medium_frequency": len([k for k, v in optimizations.items() if 50 <= cast(int, v["frequency"]) <= 100]),
+            "low_frequency": len([k for k, v in optimizations.items() if cast(int, v["frequency"]) < 50]),
             "optimizations": optimizations,
         }
 
