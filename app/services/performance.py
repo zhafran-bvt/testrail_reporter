@@ -211,7 +211,7 @@ class PerformanceService:
         try:
             import os
 
-            import psutil
+            import psutil  # type: ignore
 
             process = psutil.Process(os.getpid())
             return process.memory_info().rss

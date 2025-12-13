@@ -267,7 +267,7 @@ class TestMemoryEfficiency:
         import os
 
         try:
-            import psutil
+            import psutil  # type: ignore
 
             process = psutil.Process(os.getpid())
             return process.memory_info().rss  # Resident Set Size

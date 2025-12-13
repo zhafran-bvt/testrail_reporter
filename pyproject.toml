@@ -34,6 +34,7 @@ module = [
     "numba.*",
     "h3.*",
     "xlsxwriter.*",
+    "psutil.*",
 ]
 ignore_missing_imports = true
 
