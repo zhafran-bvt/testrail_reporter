@@ -185,7 +185,7 @@ class TestMemoryEfficiency:
 
         for chunk in generate_large_response():
             # Process chunk
-            processed_items = len(chunk["data"])
+            len(chunk["data"])
             processed_chunks += 1
 
             # Track memory during processing

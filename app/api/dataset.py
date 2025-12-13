@@ -16,6 +16,8 @@ sys.path.append(str(Path(__file__).parent.parent.parent.parent / "dataset_genera
 
 try:
     import geopandas as gpd
+    from shapely.ops import unary_union
+
     from dataset_generator.file_generator import (
         BOUNDING_BOXES,
         H3_AVAILABLE,
@@ -24,7 +26,6 @@ try:
         save_files_chunked,
         validate_generated_data,
     )
-    from shapely.ops import unary_union
 
     DATASET_GENERATOR_AVAILABLE = True
 except ImportError as e:

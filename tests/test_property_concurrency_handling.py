@@ -79,7 +79,7 @@ class TestConcurrencyHandling:
 
         # Verify requests actually ran concurrently (overlapping time windows)
         if len(start_times) >= 2 and len(end_times) >= 2:
-            earliest_start = min(start_times)
+            min(start_times)
             latest_start = max(start_times)
             earliest_end = min(end_times)
 

@@ -40,8 +40,8 @@ def validate_requirement_1_modularization():
 
     # Check models are separated
     try:
-        from app.models.requests import ManagePlan, ReportRequest
-        from app.models.responses import DashboardPlansResponse, ErrorResponse
+        from app.models.requests import ManagePlan, ReportRequest  # noqa: F401
+        from app.models.responses import DashboardPlansResponse, ErrorResponse  # noqa: F401
 
         print("   ✅ Request and response models properly separated")
     except ImportError as e:
@@ -50,9 +50,9 @@ def validate_requirement_1_modularization():
 
     # Check services are separated
     try:
-        from app.services.cache import TTLCache
-        from app.services.error_handler import ErrorHandler
-        from app.services.testrail_client import TestRailClientService
+        from app.services.cache import TTLCache  # noqa: F401
+        from app.services.error_handler import ErrorHandler  # noqa: F401
+        from app.services.testrail_client import TestRailClientService  # noqa: F401
 
         print("   ✅ Service layer properly separated")
     except ImportError as e:

@@ -5,6 +5,7 @@ Run this to verify your TestRail API credentials are working.
 """
 
 import os
+
 import requests
 from dotenv import load_dotenv
 
@@ -37,7 +38,7 @@ def test_testrail_connection():
 
         if response.status_code == 200:
             projects = response.json()
-            print(f"✅ Connection successful!")
+            print("✅ Connection successful!")
             print(f"📊 Found {len(projects)} projects:")
 
             for i, project in enumerate(projects[:5], 1):  # Show first 5 projects

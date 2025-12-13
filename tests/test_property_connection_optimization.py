@@ -103,7 +103,7 @@ class TestConnectionOptimization:
             mock_adapter_class.return_value = mock_adapter
 
             # Get client (should configure connection pool)
-            client = service.get_client()
+            service.get_client()
 
             # Verify HTTPAdapter was created with pool configuration
             mock_adapter_class.assert_called()
@@ -204,7 +204,7 @@ class TestConnectionOptimization:
         start_time = time.time()
 
         # Simulate getting plan data
-        plan_result = mock_client.get_plan(123)
+        mock_client.get_plan(123)
 
         # Simulate processing each run (this is where optimization matters)
         run_results = []
