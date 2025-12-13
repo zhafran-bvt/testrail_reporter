@@ -12,11 +12,14 @@ from fastapi.testclient import TestClient
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from tests.test_base import BaseAPITestCase
+
+
 class TestNavigationIntegration(BaseAPITestCase):
     """Property-based tests for navigation integration."""
 
     def setUp(self):
-        """Set up test client."""
+        """Set up test self.client."""
         from app.main import app
 
         self.client = TestClient(app)
@@ -36,11 +39,12 @@ class TestNavigationIntegration(BaseAPITestCase):
         other views are hidden.
         """
 
+
 class TestNavigationStatePreservation(BaseAPITestCase):
     """Property-based tests for navigation state preservation."""
 
     def setUp(self):
-        """Set up test client."""
+        """Set up test self.client."""
         from app.main import app
 
         self.client = TestClient(app)
@@ -107,11 +111,12 @@ class TestNavigationStatePreservation(BaseAPITestCase):
         self.assertIn("dashboardState.sort.column", js)
         self.assertIn("dashboardState.sort.direction", js)
 
+
 class TestNavigationActiveHighlighting(BaseAPITestCase):
     """Property-based tests for active navigation highlighting."""
 
     def setUp(self):
-        """Set up test client."""
+        """Set up test self.client."""
         from app.main import app
 
         self.client = TestClient(app)
@@ -165,11 +170,12 @@ class TestNavigationActiveHighlighting(BaseAPITestCase):
         remove_active_count = js.count('classList.remove("active")')
         self.assertGreaterEqual(remove_active_count, 4, "Should remove active from all navigation links")
 
+
 class TestNavigationDashboardInitialization(BaseAPITestCase):
     """Test that dashboard is properly initialized when navigated to."""
 
     def setUp(self):
-        """Set up test client."""
+        """Set up test self.client."""
         from app.main import app
 
         self.client = TestClient(app)
@@ -193,6 +199,7 @@ class TestNavigationDashboardInitialization(BaseAPITestCase):
 
         # Verify init is called
         self.assertIn(".init()", js)
+
 
 if __name__ == "__main__":
     unittest.main()

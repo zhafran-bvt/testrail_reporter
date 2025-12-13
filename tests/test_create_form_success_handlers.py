@@ -8,6 +8,8 @@ These tests verify that after successful entity creation:
 4. Form fields are cleared (Requirement 6.4)
 """
 
+import unittest
+
 from tests.test_base import BaseAPITestCase
 
 

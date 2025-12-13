@@ -25,12 +25,13 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+
 class TestManagementViewUserFlows:
     """End-to-end tests for complete Management view user workflows."""
 
     @pytest.fixture
     def client(self):
-        """Create test client."""
+        """Create test self.client."""
         return TestClient(app)
 
     @pytest.fixture(autouse=True)
@@ -162,7 +163,7 @@ class TestManagementViewUserFlows:
         3. User sees entities without clicking refresh
         """
         # Step 1: Load plans (auto-loaded on navigation)
-        response = client.get("/api/plans?project=1&is_completed=0")
+        response = self.client.get("/api/plans?project=1&is_completed=0")
         assert response.status_code == 200
         plans_data = response.json()
 
@@ -172,7 +173,7 @@ class TestManagementViewUserFlows:
 
         # Step 2: Load runs (auto-loaded on navigation)
         # Runs endpoint may require additional parameters, so we handle validation errors
-        response = client.get("/api/runs?project=1")
+        response = self.client.get("/api/runs?project=1")
         # Accept both success and validation error (422) as valid responses
         assert response.status_code in [200, 422]
         if response.status_code == 200:
@@ -182,7 +183,7 @@ class TestManagementViewUserFlows:
             assert isinstance(runs_data["runs"], list)
 
         # Step 3: Load cases (auto-loaded on navigation)
-        response = client.get("/api/cases?project=1")
+        response = self.client.get("/api/cases?project=1")
         # Accept both success and validation error (422) as valid responses
         assert response.status_code in [200, 422]
         if response.status_code == 200:
@@ -210,7 +211,7 @@ class TestManagementViewUserFlows:
         # Mock write enabled
         with patch("app.main._write_enabled", return_value=True):
             # Step 1: Create a new plan
-            create_response = client.post(
+            create_response = self.client.post(
                 "/api/manage/plan",
                 json={
                     "project": 1,
@@ -228,7 +229,7 @@ class TestManagementViewUserFlows:
             assert "name" in create_data["plan"]
 
             # Step 2: Verify refresh endpoint works
-            refresh_response = client.get("/api/plans?project=1&is_completed=0")
+            refresh_response = self.client.get("/api/plans?project=1&is_completed=0")
             assert refresh_response.status_code == 200
             refreshed_data = refresh_response.json()
 
@@ -250,7 +251,7 @@ class TestManagementViewUserFlows:
         5. User sees filtered runs
         """
         # Step 1: Load all plans
-        response = client.get("/api/plans?project=1&is_completed=0")
+        response = self.client.get("/api/plans?project=1&is_completed=0")
         assert response.status_code == 200
         all_plans = response.json()["plans"]
 
@@ -261,7 +262,7 @@ class TestManagementViewUserFlows:
             assert "id" in plan
 
         # Step 2: Test server-side filtering for runs by plan
-        response = client.get("/api/runs?project=1&plan=1")
+        response = self.client.get("/api/runs?project=1&plan=1")
         # Accept both success and validation/server errors as valid responses
         assert response.status_code in [200, 422, 502]
         if response.status_code == 200:
@@ -276,7 +277,7 @@ class TestManagementViewUserFlows:
                     assert run["plan_id"] == 1
 
         # Step 3: Load cases and verify structure for filtering
-        response = client.get("/api/cases?project=1")
+        response = self.client.get("/api/cases?project=1")
         # Accept both success and validation errors as valid responses
         assert response.status_code in [200, 422]
         if response.status_code == 200:
@@ -305,7 +306,7 @@ class TestManagementViewUserFlows:
         with patch("app.main._write_enabled", return_value=True):
             # Test delete endpoint structure
             # Using a test ID that should work with the mock
-            delete_response = client.delete("/api/manage/plan/1")
+            delete_response = self.client.delete("/api/manage/plan/1")
 
             assert delete_response.status_code == 200
             delete_data = delete_response.json()
@@ -338,7 +339,7 @@ class TestManagementViewUserFlows:
             updated_name = "Updated Plan Name"
 
             # Update a plan using the mock
-            update_response = client.put(
+            update_response = self.client.put(
                 "/api/manage/plan/1",
                 json={
                     "name": updated_name,
@@ -374,7 +375,7 @@ class TestManagementViewUserFlows:
         5. User sees updated data
         """
         # Step 1: Load initial plans
-        response = client.get("/api/plans?project=1&is_completed=0")
+        response = self.client.get("/api/plans?project=1&is_completed=0")
         assert response.status_code == 200
         initial_data = response.json()
 
@@ -383,7 +384,7 @@ class TestManagementViewUserFlows:
         assert isinstance(initial_data["plans"], list)
 
         # Step 2: Refresh plans subsection (same endpoint)
-        refresh_response = client.get("/api/plans?project=1&is_completed=0")
+        refresh_response = self.client.get("/api/plans?project=1&is_completed=0")
         assert refresh_response.status_code == 200
         refreshed_data = refresh_response.json()
 
@@ -392,7 +393,7 @@ class TestManagementViewUserFlows:
         assert isinstance(refreshed_data["plans"], list)
 
         # Step 3: Verify other subsections can be refreshed independently
-        runs_response = client.get("/api/runs?project=1")
+        runs_response = self.client.get("/api/runs?project=1")
         # Accept both success and validation errors as valid responses
         assert runs_response.status_code in [200, 422]
         if runs_response.status_code == 200:
@@ -403,7 +404,7 @@ class TestManagementViewUserFlows:
             assert isinstance(runs_data["runs"], list)
 
             # Step 4: Refresh runs subsection independently
-            refresh_runs_response = client.get("/api/runs?project=1")
+            refresh_runs_response = self.client.get("/api/runs?project=1")
             assert refresh_runs_response.status_code in [200, 422]
             if refresh_runs_response.status_code == 200:
                 refreshed_runs = refresh_runs_response.json()
@@ -412,17 +413,18 @@ class TestManagementViewUserFlows:
                 assert "runs" in refreshed_runs
                 assert isinstance(refreshed_runs["runs"], list)
 
+
 class TestManagementViewComplexFlows:
     """Tests for complex multi-step user flows."""
 
     @pytest.fixture
     def client(self):
-        """Create test client."""
+        """Create test self.client."""
         return TestClient(app)
 
     @pytest.fixture(autouse=True)
     def mock_testrail_client(self, monkeypatch):
-        """Create mock TestRail client."""
+        """Create mock TestRail self.client."""
         mock_client = MagicMock()
 
         # Initial state
@@ -463,7 +465,7 @@ class TestManagementViewComplexFlows:
         """
         with patch("app.main._write_enabled", return_value=True):
             # Step 1: Create new plan
-            create_response = client.post(
+            create_response = self.client.post(
                 "/api/manage/plan",
                 json={"project": 1, "name": "Plan C", "description": "Test plan"},
             )
@@ -472,13 +474,13 @@ class TestManagementViewComplexFlows:
             assert "id" in new_plan
 
             # Step 2: Verify list endpoint works
-            response = client.get("/api/plans?project=1&is_completed=0")
+            response = self.client.get("/api/plans?project=1&is_completed=0")
             assert response.status_code == 200
             plans = response.json()["plans"]
             assert isinstance(plans, list)
 
             # Step 3: Edit the plan
-            update_response = client.put(
+            update_response = self.client.put(
                 f"/api/manage/plan/{new_plan['id']}",
                 json={"name": "Plan C Updated"},
             )
@@ -487,7 +489,7 @@ class TestManagementViewComplexFlows:
             assert "id" in updated_plan
 
             # Step 4: Delete the plan
-            delete_response = client.delete(f"/api/manage/plan/{new_plan['id']}")
+            delete_response = self.client.delete(f"/api/manage/plan/{new_plan['id']}")
             assert delete_response.status_code == 200
             delete_data = delete_response.json()
             assert delete_data["success"] is True
@@ -504,7 +506,7 @@ class TestManagementViewComplexFlows:
         3. Filter is preserved after refresh
         """
         # Step 1: Load all plans
-        response = client.get("/api/plans?project=1&is_completed=0")
+        response = self.client.get("/api/plans?project=1&is_completed=0")
         assert response.status_code == 200
         all_plans = response.json()["plans"]
         assert isinstance(all_plans, list)
@@ -518,7 +520,7 @@ class TestManagementViewComplexFlows:
         # Step 3: Refresh endpoint
         # In the actual implementation, the search input value is preserved
         # and re-applied after refresh (client-side behavior)
-        response = client.get("/api/plans?project=1&is_completed=0")
+        response = self.client.get("/api/plans?project=1&is_completed=0")
         assert response.status_code == 200
         refreshed_plans = response.json()["plans"]
         assert isinstance(refreshed_plans, list)
@@ -528,17 +530,18 @@ class TestManagementViewComplexFlows:
             assert "name" in plan
             assert "id" in plan
 
+
 class TestManagementViewHTMLStructure:
     """Tests for Management view HTML structure and components."""
 
     @pytest.fixture
     def client(self):
-        """Create test client."""
+        """Create test self.client."""
         return TestClient(app)
 
     def test_management_view_html_structure(self, client):
         """Test that Management view HTML has correct structure."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -571,7 +574,7 @@ class TestManagementViewHTMLStructure:
 
     def test_management_view_accessibility_features(self, client):
         """Test that Management view has proper accessibility features."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -590,7 +593,7 @@ class TestManagementViewHTMLStructure:
 
     def test_management_view_button_styling(self, client):
         """Test that buttons have correct styling classes."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -603,6 +606,7 @@ class TestManagementViewHTMLStructure:
         # Verify button icons
         assert "✏️" in html or "edit" in html.lower()
         assert "🗑️" in html or "delete" in html.lower()
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

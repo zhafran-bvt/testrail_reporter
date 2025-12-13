@@ -25,12 +25,13 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+
 class TestDashboardEndToEnd:
     """End-to-end tests for complete dashboard workflow."""
 
     @pytest.fixture
     def client(self):
-        """Create test client."""
+        """Create test self.client."""
         return TestClient(app)
 
     @pytest.fixture
@@ -100,7 +101,7 @@ class TestDashboardEndToEnd:
         7. Refreshing the data
         """
         # Step 1: Load dashboard plans
-        response = client.get("/api/dashboard/plans?project=1")
+        response = self.client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data = response.json()
 
@@ -119,13 +120,13 @@ class TestDashboardEndToEnd:
         assert "status_distribution" in plan
 
         # Step 2: Apply search filter
-        response = client.get("/api/dashboard/plans?project=1&search=Sprint")
+        response = self.client.get("/api/dashboard/plans?project=1&search=Sprint")
         assert response.status_code == 200
         filtered_data = response.json()
         assert len(filtered_data["plans"]) <= len(data["plans"])
 
         # Step 3: Apply completion filter
-        response = client.get("/api/dashboard/plans?project=1&is_completed=0")
+        response = self.client.get("/api/dashboard/plans?project=1&is_completed=0")
         assert response.status_code == 200
         active_data = response.json()
         for plan in active_data["plans"]:
@@ -133,7 +134,7 @@ class TestDashboardEndToEnd:
 
         # Step 4: Get plan details with runs
         plan_id = data["plans"][0]["plan_id"]
-        response = client.get(f"/api/dashboard/plan/{plan_id}")
+        response = self.client.get(f"/api/dashboard/plan/{plan_id}")
         assert response.status_code == 200
         plan_detail = response.json()
 
@@ -151,20 +152,20 @@ class TestDashboardEndToEnd:
             assert "status_distribution" in run
 
         # Step 5: Clear cache (refresh)
-        response = client.post("/api/dashboard/cache/clear")
+        response = self.client.post("/api/dashboard/cache/clear")
         assert response.status_code == 200
         clear_data = response.json()
         assert clear_data["status"] == "success"
 
         # Step 6: Verify data reloads after cache clear
-        response = client.get("/api/dashboard/plans?project=1")
+        response = self.client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         refreshed_data = response.json()
         assert "plans" in refreshed_data
 
     def test_dashboard_html_structure(self, client):
         """Test that the dashboard HTML structure is complete and accessible."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -197,7 +198,7 @@ class TestDashboardEndToEnd:
 
     def test_dashboard_javascript_functionality(self, client):
         """Test that dashboard JavaScript module is loaded and functional."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -205,7 +206,7 @@ class TestDashboardEndToEnd:
         assert "dashboard.js" in html
 
         # Verify dashboard module functions are defined
-        response = client.get("/assets/dashboard.js")
+        response = self.client.get("/assets/dashboard.js")
         assert response.status_code == 200
         js_content = response.text
 
@@ -222,7 +223,7 @@ class TestDashboardEndToEnd:
 
     def test_dashboard_responsive_design(self, client):
         """Test that responsive design CSS is present and correct."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -243,7 +244,7 @@ class TestDashboardEndToEnd:
 
     def test_dashboard_visual_indicators(self, client):
         """Test that visual indicators and color coding are properly defined."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -271,7 +272,7 @@ class TestDashboardEndToEnd:
 
     def test_dashboard_accessibility_features(self, client):
         """Test that accessibility features are properly implemented."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -292,25 +293,25 @@ class TestDashboardEndToEnd:
     def test_dashboard_error_handling(self, client):
         """Test that error handling works correctly throughout the dashboard."""
         # Test invalid project ID
-        response = client.get("/api/dashboard/plans?project=-1")
+        response = self.client.get("/api/dashboard/plans?project=-1")
         assert response.status_code == 400
 
         # Test invalid plan ID
-        response = client.get("/api/dashboard/plan/-1")
+        response = self.client.get("/api/dashboard/plan/-1")
         assert response.status_code == 400
 
         # Test invalid date range
-        response = client.get("/api/dashboard/plans?project=1&created_after=1000&created_before=500")
+        response = self.client.get("/api/dashboard/plans?project=1&created_after=1000&created_before=500")
         assert response.status_code == 400
 
         # Test invalid is_completed value
-        response = client.get("/api/dashboard/plans?project=1&is_completed=5")
+        response = self.client.get("/api/dashboard/plans?project=1&is_completed=5")
         assert response.status_code == 400
 
     def test_dashboard_pagination(self, client, mock_testrail_client):
         """Test that pagination works correctly."""
         # Test first page
-        response = client.get("/api/dashboard/plans?project=1&limit=1&offset=0")
+        response = self.client.get("/api/dashboard/plans?project=1&limit=1&offset=0")
         assert response.status_code == 200
         data = response.json()
         assert data["limit"] == 1
@@ -318,7 +319,7 @@ class TestDashboardEndToEnd:
         assert len(data["plans"]) <= 1
 
         # Test second page
-        response = client.get("/api/dashboard/plans?project=1&limit=1&offset=1")
+        response = self.client.get("/api/dashboard/plans?project=1&limit=1&offset=1")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == 1
@@ -326,33 +327,33 @@ class TestDashboardEndToEnd:
     def test_dashboard_caching(self, client, mock_testrail_client):
         """Test that caching works correctly."""
         # Clear cache first to ensure clean state
-        client.post("/api/dashboard/cache/clear")
+        self.client.post("/api/dashboard/cache/clear")
 
         # First request should be a cache miss
-        response = client.get("/api/dashboard/plans?project=1")
+        response = self.client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data1 = response.json()
         assert data1["meta"]["cache"]["hit"] is False
 
         # Second request should be a cache hit
-        response = client.get("/api/dashboard/plans?project=1")
+        response = self.client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data2 = response.json()
         assert data2["meta"]["cache"]["hit"] is True
 
         # Clear cache
-        response = client.post("/api/dashboard/cache/clear")
+        response = self.client.post("/api/dashboard/cache/clear")
         assert response.status_code == 200
 
         # Next request should be a cache miss again
-        response = client.get("/api/dashboard/plans?project=1")
+        response = self.client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data3 = response.json()
         assert data3["meta"]["cache"]["hit"] is False
 
     def test_dashboard_statistics_accuracy(self, client, mock_testrail_client):
         """Test that statistics calculations are accurate."""
-        response = client.get("/api/dashboard/plans?project=1")
+        response = self.client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data = response.json()
 
@@ -375,7 +376,7 @@ class TestDashboardEndToEnd:
 
     def test_dashboard_config_endpoint(self, client):
         """Test that configuration endpoint returns correct values."""
-        response = client.get("/api/dashboard/config")
+        response = self.client.get("/api/dashboard/config")
         assert response.status_code == 200
         config = response.json()
 
@@ -394,17 +395,18 @@ class TestDashboardEndToEnd:
         assert "pass_rate_high" in config["visual_thresholds"]
         assert "pass_rate_medium" in config["visual_thresholds"]
 
+
 class TestDashboardBrowserCompatibility:
     """Tests for browser compatibility features."""
 
     @pytest.fixture
     def client(self):
-        """Create test client."""
+        """Create test self.client."""
         return TestClient(app)
 
     def test_css_vendor_prefixes(self, client):
         """Test that CSS includes necessary vendor prefixes for compatibility."""
-        response = client.get("/")
+        response = self.client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -419,7 +421,7 @@ class TestDashboardBrowserCompatibility:
 
     def test_javascript_es2020_compatibility(self, client):
         """Test that JavaScript uses ES2020 compatible features."""
-        response = client.get("/assets/dashboard.js")
+        response = self.client.get("/assets/dashboard.js")
         assert response.status_code == 200
         js_content = response.text
 
@@ -438,7 +440,7 @@ class TestDashboardBrowserCompatibility:
 
     def test_no_unsupported_features(self, client):
         """Test that code doesn't use unsupported or experimental features."""
-        response = client.get("/assets/dashboard.js")
+        response = self.client.get("/assets/dashboard.js")
         assert response.status_code == 200
         js_content = response.text
 
@@ -448,17 +450,18 @@ class TestDashboardBrowserCompatibility:
         # Check that fetch API is used (widely supported)
         assert "fetch(" in js_content
 
+
 class TestDashboardPerformance:
     """Tests for dashboard performance characteristics."""
 
     @pytest.fixture
     def client(self):
-        """Create test client."""
+        """Create test self.client."""
         return TestClient(app)
 
     @pytest.fixture
     def mock_testrail_client(self):
-        """Create mock TestRail client."""
+        """Create mock TestRail self.client."""
         with patch("app.main._make_client") as mock_make_client:
             mock_client = MagicMock()
             mock_client.get_plans_for_project.return_value = [
@@ -484,13 +487,13 @@ class TestDashboardPerformance:
     def test_pagination_limits_response_size(self, client, mock_testrail_client):
         """Test that pagination effectively limits response size."""
         # Request with small limit
-        response = client.get("/api/dashboard/plans?project=1&limit=10")
+        response = self.client.get("/api/dashboard/plans?project=1&limit=10")
         assert response.status_code == 200
         data = response.json()
         assert len(data["plans"]) <= 10
 
         # Request with large limit (should be capped at max)
-        response = client.get("/api/dashboard/plans?project=1&limit=1000")
+        response = self.client.get("/api/dashboard/plans?project=1&limit=1000")
         assert response.status_code == 200
         data = response.json()
         assert len(data["plans"]) <= 25  # Max page size
@@ -498,17 +501,18 @@ class TestDashboardPerformance:
     def test_cache_reduces_api_calls(self, client, mock_testrail_client):
         """Test that caching reduces API calls."""
         # First request
-        response = client.get("/api/dashboard/plans?project=1")
+        response = self.client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         first_call_count = mock_testrail_client.get_plans_for_project.call_count
 
         # Second request (should use cache)
-        response = client.get("/api/dashboard/plans?project=1")
+        response = self.client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         second_call_count = mock_testrail_client.get_plans_for_project.call_count
 
         # API should not be called again
         assert second_call_count == first_call_count
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -13,6 +13,8 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 import app.main as main
+from tests.test_base import BaseAPITestCase
+
 
 class TestPlanDeletionConfirmation(BaseAPITestCase):
     """
@@ -73,6 +75,7 @@ class TestPlanDeletionConfirmation(BaseAPITestCase):
         result = resp.json()
         assert result["success"] is True
         assert result["plan_id"] == plan_id
+
 
 class TestPlanDeletionSuccess(BaseAPITestCase):
     """
@@ -145,6 +148,7 @@ class TestPlanDeletionSuccess(BaseAPITestCase):
         plan_ids = [p["id"] for p in remaining_plans]
         assert plan_id not in plan_ids, "Deleted plan should not appear in plan list"
 
+
 class TestRunDeletionConfirmation(BaseAPITestCase):
     """
     Property-based tests for run deletion confirmation.
@@ -200,6 +204,7 @@ class TestRunDeletionConfirmation(BaseAPITestCase):
         result = resp.json()
         assert result["success"] is True
         assert result["run_id"] == run_id
+
 
 class TestRunDeletionSuccess(BaseAPITestCase):
     """
@@ -279,6 +284,7 @@ class TestRunDeletionSuccess(BaseAPITestCase):
                 run_ids.append(run["id"])
         assert run_id not in run_ids, "Deleted run should not appear in plan's run list"
 
+
 class TestCaseDeletionConfirmation(BaseAPITestCase):
     """
     Property-based tests for case deletion confirmation.
@@ -333,6 +339,7 @@ class TestCaseDeletionConfirmation(BaseAPITestCase):
         result = resp.json()
         assert result["success"] is True
         assert result["case_id"] == case_id
+
 
 class TestCaseDeletionSuccess(BaseAPITestCase):
     """
@@ -408,6 +415,7 @@ class TestCaseDeletionSuccess(BaseAPITestCase):
         section_cases = get_cases(1, section_id=section_id)
         case_ids = [c["id"] for c in section_cases]
         assert case_id not in case_ids, "Deleted case should not appear in section's case list"
+
 
 class TestDeleteEndpointsUnit(BaseAPITestCase):
     """Unit tests for delete endpoints covering specific scenarios."""
@@ -652,6 +660,7 @@ class TestDeleteEndpointsUnit(BaseAPITestCase):
 
         assert resp.status_code == 400
         assert "positive" in resp.json()["detail"].lower()
+
 
 if __name__ == "__main__":
     unittest.main()

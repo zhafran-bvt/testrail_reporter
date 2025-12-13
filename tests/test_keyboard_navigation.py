@@ -3,6 +3,8 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests.test_base import BaseAPITestCase
+
 
 class TestKeyboardNavigationFocusIndicators(BaseAPITestCase):
     """Tests for keyboard navigation focus indicators (Requirement 11.5)"""
@@ -103,6 +105,7 @@ class TestKeyboardNavigationFocusIndicators(BaseAPITestCase):
         # Verify general button focus style exists
         self.assertIn("button:not(.panel-toggle):focus", html)
 
+
 class TestKeyboardNavigationEnterSpace(BaseAPITestCase):
     """Tests for Enter/Space keyboard support (Requirement 11.2)"""
 
@@ -119,6 +122,7 @@ class TestKeyboardNavigationEnterSpace(BaseAPITestCase):
         self.assertIn("e.key === 'Enter'", html)
         self.assertIn("e.key === ' '", html)
         self.assertIn("toggleCreateSection()", html)
+
 
 class TestKeyboardNavigationEscape(BaseAPITestCase):
     """Tests for Escape key support (Requirements 11.3, 11.4)"""
@@ -146,6 +150,7 @@ class TestKeyboardNavigationEscape(BaseAPITestCase):
         # Verify Escape key handler for modals exists
         self.assertIn("Escape", js)
         self.assertIn("hideDeleteConfirmation", js)
+
 
 class TestKeyboardNavigationTabOrder(BaseAPITestCase):
     """Tests for logical Tab order (Requirement 11.1)"""
@@ -188,6 +193,7 @@ class TestKeyboardNavigationTabOrder(BaseAPITestCase):
         # Verify aria-label exists on close buttons
         self.assertIn('aria-label="Close"', html)
 
+
 class TestKeyboardNavigationFocusManagement(BaseAPITestCase):
     """Tests for focus management in modals and interactions"""
 
@@ -213,6 +219,7 @@ class TestKeyboardNavigationFocusManagement(BaseAPITestCase):
 
         # Verify focus management in expandCreateSection
         self.assertIn("toggleButton.focus()", html)
+
 
 if __name__ == "__main__":
     unittest.main()

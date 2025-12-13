@@ -12,11 +12,14 @@ import unittest
 
 from fastapi.testclient import TestClient
 
+from tests.test_base import BaseAPITestCase
+
+
 class TestCreateSectionToggle(BaseAPITestCase):
     """Integration tests for Create section toggle functionality."""
 
     def setUp(self):
-        """Set up test client."""
+        """Set up test self.client."""
         from app.main import app
 
         self.client = TestClient(app)
@@ -213,6 +216,7 @@ class TestCreateSectionToggle(BaseAPITestCase):
         self.assertIn("Create Test Plan", html)
         self.assertIn("Create Test Run", html)
         self.assertIn("Create Test Case", html)
+
 
 if __name__ == "__main__":
     unittest.main()

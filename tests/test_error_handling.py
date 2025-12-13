@@ -22,48 +22,44 @@ from app.dashboard_stats import (
     calculate_status_distribution,
 )
 from app.main import app
+from tests.test_base import BaseAPITestCase
+
 
 class TestAPIFailureHandling(BaseAPITestCase):
     """Test API failure handling in dashboard endpoints."""
 
     def test_plans_endpoint_handles_timeout(self):
         """Plans endpoint should handle API timeout gracefully."""
-        from app.main import _dashboard_plans_cache
 
-        _dashboard_plans_cache.clear()
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
             mock_tr_client.get_plans_for_project.side_effect = requests.exceptions.Timeout("Request timed out")
 
-            response = client.get("/api/dashboard/plans?project=1")
+            response = self.client.get("/api/dashboard/plans?project=1")
             self.assertEqual(response.status_code, 504)
             self.assertIn("timed out", response.json()["detail"].lower())
 
     def test_plans_endpoint_handles_connection_error(self):
         """Plans endpoint should handle connection errors gracefully."""
-        from app.main import _dashboard_plans_cache
 
-        _dashboard_plans_cache.clear()
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
             mock_tr_client.get_plans_for_project.side_effect = requests.exceptions.ConnectionError("Connection failed")
 
-            response = client.get("/api/dashboard/plans?project=1")
+            response = self.client.get("/api/dashboard/plans?project=1")
             self.assertEqual(response.status_code, 502)
             self.assertIn("connect", response.json()["detail"].lower())
 
     def test_plan_detail_endpoint_handles_timeout(self):
         """Plan detail endpoint should handle API timeout gracefully."""
-        from app.main import _dashboard_plan_detail_cache
 
-        _dashboard_plan_detail_cache.clear()
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
@@ -72,32 +68,28 @@ class TestAPIFailureHandling(BaseAPITestCase):
             with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
                 mock_calc_stats.side_effect = requests.exceptions.Timeout("Request timed out")
 
-                response = client.get("/api/dashboard/plan/1")
+                response = self.client.get("/api/dashboard/plan/1")
                 self.assertEqual(response.status_code, 504)
                 self.assertIn("timed out", response.json()["detail"].lower())
 
     def test_runs_endpoint_handles_connection_error(self):
         """Runs endpoint should handle connection errors gracefully."""
-        from app.main import _dashboard_stats_cache
 
-        _dashboard_stats_cache.clear()
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
             mock_tr_client.get_plan.side_effect = requests.exceptions.ConnectionError("Connection failed")
 
-            response = client.get("/api/dashboard/runs/1")
+            response = self.client.get("/api/dashboard/runs/1")
             self.assertEqual(response.status_code, 502)
             self.assertIn("connect", response.json()["detail"].lower())
 
     def test_plans_endpoint_handles_invalid_response_type(self):
         """Plans endpoint should handle invalid response data types."""
-        from app.main import _dashboard_plans_cache
 
-        _dashboard_plans_cache.clear()
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
@@ -105,79 +97,86 @@ class TestAPIFailureHandling(BaseAPITestCase):
             # Return invalid type (string instead of list)
             mock_tr_client.get_plans_for_project.return_value = "invalid"
 
-            response = client.get("/api/dashboard/plans?project=1")
+            response = self.client.get("/api/dashboard/plans?project=1")
             self.assertEqual(response.status_code, 500)
             self.assertIn("Invalid response", response.json()["detail"])
+
 
 class TestInvalidParameterHandling(BaseAPITestCase):
     """Test invalid parameter handling in dashboard endpoints."""
 
     def test_plans_endpoint_rejects_negative_project_id(self):
         """Plans endpoint should reject negative project IDs."""
-        client = TestClient(app)
-        response = client.get("/api/dashboard/plans?project=-1")
+
+        TestClient(app)
+        response = self.client.get("/api/dashboard/plans?project=-1")
         self.assertEqual(response.status_code, 400)
         self.assertIn("positive", response.json()["detail"].lower())
 
     def test_plans_endpoint_rejects_negative_offset(self):
         """Plans endpoint should reject negative offset."""
-        client = TestClient(app)
-        response = client.get("/api/dashboard/plans?project=1&offset=-5")
+
+        TestClient(app)
+        response = self.client.get("/api/dashboard/plans?project=1&offset=-5")
         self.assertEqual(response.status_code, 400)
         self.assertIn("non-negative", response.json()["detail"].lower())
 
     def test_plans_endpoint_rejects_invalid_is_completed(self):
         """Plans endpoint should reject invalid is_completed values."""
-        client = TestClient(app)
-        response = client.get("/api/dashboard/plans?project=1&is_completed=5")
+
+        TestClient(app)
+        response = self.client.get("/api/dashboard/plans?project=1&is_completed=5")
         self.assertEqual(response.status_code, 400)
         self.assertIn("0 or 1", response.json()["detail"])
 
     def test_plans_endpoint_rejects_negative_created_after(self):
         """Plans endpoint should reject negative created_after timestamp."""
-        client = TestClient(app)
-        response = client.get("/api/dashboard/plans?project=1&created_after=-100")
+
+        TestClient(app)
+        response = self.client.get("/api/dashboard/plans?project=1&created_after=-100")
         self.assertEqual(response.status_code, 400)
         self.assertIn("non-negative", response.json()["detail"].lower())
 
     def test_plans_endpoint_rejects_invalid_date_range(self):
         """Plans endpoint should reject invalid date ranges."""
-        client = TestClient(app)
-        response = client.get("/api/dashboard/plans?project=1&created_after=2000000000&created_before=1000000000")
+
+        TestClient(app)
+        response = self.client.get("/api/dashboard/plans?project=1&created_after=2000000000&created_before=1000000000")
         self.assertEqual(response.status_code, 400)
         self.assertIn("less than or equal", response.json()["detail"])
 
     def test_plan_detail_endpoint_rejects_negative_plan_id(self):
         """Plan detail endpoint should reject negative plan IDs."""
-        client = TestClient(app)
-        response = client.get("/api/dashboard/plan/-1")
+
+        TestClient(app)
+        response = self.client.get("/api/dashboard/plan/-1")
         self.assertEqual(response.status_code, 400)
         self.assertIn("positive", response.json()["detail"].lower())
 
     def test_runs_endpoint_rejects_negative_plan_id(self):
         """Runs endpoint should reject negative plan IDs."""
-        client = TestClient(app)
-        response = client.get("/api/dashboard/runs/-1")
+
+        TestClient(app)
+        response = self.client.get("/api/dashboard/runs/-1")
         self.assertEqual(response.status_code, 400)
         self.assertIn("positive", response.json()["detail"].lower())
 
     def test_plans_endpoint_caps_limit_at_25(self):
         """Plans endpoint should cap limit parameter at 25."""
-        from app.main import _dashboard_plans_cache
 
-        _dashboard_plans_cache.clear()
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
             mock_tr_client.get_plans_for_project.return_value = []
 
-            response = client.get("/api/dashboard/plans?project=1&limit=500")
+            response = self.client.get("/api/dashboard/plans?project=1&limit=500")
             self.assertEqual(response.status_code, 200)
             data = response.json()
             # Limit should be capped at 25
             self.assertEqual(data["limit"], 25)
+
 
 class TestDivisionByZeroHandling(BaseAPITestCase):
     """Test division by zero handling in statistics calculations."""
@@ -223,6 +222,7 @@ class TestDivisionByZeroHandling(BaseAPITestCase):
         distribution = {"Passed": 5, "Failed": 3, "Untested": 2}
         result = calculate_completion_rate(distribution)
         self.assertEqual(result, 80.0)
+
 
 class TestMissingFieldHandling(BaseAPITestCase):
     """Test missing field handling in statistics calculations."""
@@ -314,7 +314,7 @@ class TestMissingFieldHandling(BaseAPITestCase):
             calculate_run_statistics(-1, mock_client)
 
     def test_run_statistics_with_none_client(self):
-        """Run statistics should raise error for None client."""
+        """Run statistics should raise error for None self.client."""
         with self.assertRaises(ValueError):
             calculate_run_statistics(1, None)
 
@@ -325,7 +325,7 @@ class TestMissingFieldHandling(BaseAPITestCase):
             calculate_plan_statistics(0, mock_client)
 
     def test_plan_statistics_with_none_client(self):
-        """Plan statistics should raise error for None client."""
+        """Plan statistics should raise error for None self.client."""
         with self.assertRaises(ValueError):
             calculate_plan_statistics(1, None)
 
@@ -358,10 +358,8 @@ class TestMissingFieldHandling(BaseAPITestCase):
 
     def test_plans_endpoint_handles_malformed_plan_data(self):
         """Plans endpoint should handle malformed plan data gracefully."""
-        from app.main import _dashboard_plans_cache
 
-        _dashboard_plans_cache.clear()
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
@@ -396,11 +394,12 @@ class TestMissingFieldHandling(BaseAPITestCase):
 
                 mock_calc_stats.side_effect = create_stats
 
-                response = client.get("/api/dashboard/plans?project=1")
+                response = self.client.get("/api/dashboard/plans?project=1")
                 self.assertEqual(response.status_code, 200)
                 data = response.json()
                 # Should only include valid plans (those with IDs)
                 self.assertEqual(len(data["plans"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

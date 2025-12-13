@@ -10,6 +10,9 @@ from unittest.mock import patch
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from tests.test_base import BaseAPITestCase
+
+
 class TestReportGenerationIntegration(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 15: Report generation integration**
@@ -27,14 +30,14 @@ class TestReportGenerationIntegration(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock the report generation
         with patch("app.main.generate_report") as mock_generate:
             mock_generate.return_value = f"out/report_{plan_id}.html"
 
             # Call the synchronous report endpoint (which dashboard uses)
-            response = client.get(f"/api/report?project={project_id}&plan={plan_id}")
+            response = self.client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
             # Verify response
             self.assertEqual(response.status_code, 200)
@@ -62,14 +65,14 @@ class TestReportGenerationIntegration(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock the report generation
         with patch("app.main.generate_report") as mock_generate:
             mock_generate.return_value = f"out/report_{run_id}.html"
 
             # Call the synchronous report endpoint (which dashboard uses)
-            response = client.get(f"/api/report?project={project_id}&run={run_id}")
+            response = self.client.get(f"/api/report?project={project_id}&run={run_id}")
 
             # Verify response
             self.assertEqual(response.status_code, 200)
@@ -98,7 +101,7 @@ class TestReportGenerationIntegration(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock the report generation
         with patch("app.main.generate_report") as mock_generate:
@@ -111,7 +114,7 @@ class TestReportGenerationIntegration(BaseAPITestCase):
                 url = f"/api/report?project={project_id}&run={entity_id}"
 
             # Call the endpoint
-            response = client.get(url)
+            response = self.client.get(url)
 
             # Verify response
             self.assertEqual(response.status_code, 200)
@@ -126,8 +129,10 @@ class TestReportGenerationIntegration(BaseAPITestCase):
             self.assertIn("path", data)
             self.assertTrue(data["path"].startswith("out/"))
 
+
 if __name__ == "__main__":
     unittest.main()
+
 
 class TestReportGenerationFlow(BaseAPITestCase):
     """Integration tests for report generation flow from dashboard."""
@@ -138,7 +143,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         project_id = 1
         plan_id = 123
@@ -148,7 +153,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
             mock_generate.return_value = f"out/report_plan_{plan_id}.html"
 
             # Simulate clicking the plan report button (calls /api/report)
-            response = client.get(f"/api/report?project={project_id}&plan={plan_id}")
+            response = self.client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
             # Verify response
             self.assertEqual(response.status_code, 200)
@@ -171,7 +176,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         project_id = 1
         run_id = 456
@@ -181,7 +186,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
             mock_generate.return_value = f"out/report_run_{run_id}.html"
 
             # Simulate clicking the run report button (calls /api/report)
-            response = client.get(f"/api/report?project={project_id}&run={run_id}")
+            response = self.client.get(f"/api/report?project={project_id}&run={run_id}")
 
             # Verify response
             self.assertEqual(response.status_code, 200)
@@ -204,7 +209,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         project_id = 1
         plan_id = 789
@@ -216,7 +221,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
             mock_generate.return_value = f"out/{report_filename}"
 
             # Generate report
-            response = client.get(f"/api/report?project={project_id}&plan={plan_id}")
+            response = self.client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
             self.assertEqual(response.status_code, 200)
             data = response.json()
@@ -236,7 +241,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         project_id = 1
         plan_id = 999
@@ -247,7 +252,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
 
             # Attempt to generate report - exception will propagate as 500
             with self.assertRaises(ValueError):
-                client.get(f"/api/report?project={project_id}&plan={plan_id}")
+                self.client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
     def test_report_generation_with_api_error(self):
         """Test that TestRail API errors during report generation propagate."""
@@ -256,7 +261,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         project_id = 1
         plan_id = 888
@@ -268,7 +273,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
 
             # Attempt to generate report - exception will propagate
             with self.assertRaises(requests.exceptions.RequestException):
-                client.get(f"/api/report?project={project_id}&plan={plan_id}")
+                self.client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
     def test_multiple_report_generations(self):
         """Test that multiple reports can be generated sequentially."""
@@ -276,7 +281,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         project_id = 1
         plan_ids = [100, 200, 300]
@@ -287,7 +292,7 @@ class TestReportGenerationFlow(BaseAPITestCase):
                 mock_generate.return_value = f"out/report_plan_{plan_id}.html"
 
                 # Generate report for each plan
-                response = client.get(f"/api/report?project={project_id}&plan={plan_id}")
+                response = self.client.get(f"/api/report?project={project_id}&plan={plan_id}")
 
                 # Verify each response
                 self.assertEqual(response.status_code, 200)

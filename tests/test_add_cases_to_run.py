@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 import app.main as main_module
 
+
 class TestAddCasesToRun:
     """Test suite for adding cases to run endpoints."""
 

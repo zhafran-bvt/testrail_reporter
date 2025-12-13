@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.core.dependencies import get_plans_cache, get_runs_cache, get_testrail_client, require_write_enabled
 
+
 class TestDependencyInjectionUsage:
     """Property 2: Dependency Injection Usage - For any API endpoint,
     dependencies should be injected via FastAPI's dependency system rather than using global variables."""
@@ -28,8 +29,8 @@ class TestDependencyInjectionUsage:
                 "TESTRAIL_API_KEY": "test-key",
             },
         ):
-            client = TestClient(app)
-            response = client.get("/test-endpoint")
+            TestClient(app)
+            response = self.client.get("/test-endpoint")
 
             assert response.status_code == 200
             data = response.json()
@@ -49,8 +50,8 @@ class TestDependencyInjectionUsage:
                 "runs_cache_size": runs_cache.size(),
             }
 
-        client = TestClient(app)
-        response = client.get("/test-cache")
+        TestClient(app)
+        response = self.client.get("/test-cache")
 
         assert response.status_code == 200
         data = response.json()
@@ -67,8 +68,8 @@ class TestDependencyInjectionUsage:
         def test_write_endpoint(write_enabled=Depends(require_write_enabled)):
             return {"write_enabled": write_enabled}
 
-        client = TestClient(app)
-        response = client.post("/test-write")
+        TestClient(app)
+        response = self.client.post("/test-write")
 
         assert response.status_code == 200
         data = response.json()
@@ -135,11 +136,11 @@ class TestDependencyInjectionUsage:
             cache.set(("test2",), "value2")
             return {"endpoint": "2", "cache_size": cache.size()}
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Call both endpoints
-        response1 = client.get("/endpoint1")
-        response2 = client.get("/endpoint2")
+        response1 = self.client.get("/endpoint1")
+        response2 = self.client.get("/endpoint2")
 
         assert response1.status_code == 200
         assert response2.status_code == 200
@@ -162,8 +163,8 @@ class TestDependencyInjectionUsage:
 
         # Test without proper environment variables
         with patch.dict("os.environ", {}, clear=True):
-            client = TestClient(app)
-            response = client.get("/test-error")
+            TestClient(app)
+            response = self.client.get("/test-error")
 
             # Should get an error due to missing credentials
             assert response.status_code == 500

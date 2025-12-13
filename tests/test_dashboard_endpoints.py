@@ -13,8 +13,10 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from app.dashboard_stats import PlanStatistics, RunStatistics
+from tests.test_base import BaseAPITestCase
 
 DASHBOARD_MAX_LIMIT = 25
+
 
 # Hypothesis strategies for generating test data
 @st.composite
@@ -30,6 +32,7 @@ def gen_plan_data(draw):
         "entries": [],
     }
 
+
 @st.composite
 def gen_plans_list(draw):
     """Generate a list of plan data dictionaries."""
@@ -40,6 +43,7 @@ def gen_plans_list(draw):
         plan["id"] = i + 1  # Ensure unique IDs
         plans.append(plan)
     return plans
+
 
 class TestPlanListCompleteness(BaseAPITestCase):
     """
@@ -56,14 +60,8 @@ class TestPlanListCompleteness(BaseAPITestCase):
     )
     def test_all_plans_included_within_pagination(self, project_id, plans, limit, offset):
         """All plans for a project should be included in response (respecting pagination)."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Mock the TestRail client and statistics calculation
         with patch("app.main._make_client") as mock_make_client:
@@ -111,7 +109,7 @@ class TestPlanListCompleteness(BaseAPITestCase):
                 mock_tr_client.get_plans_for_project.side_effect = _mock_fetch
 
                 # Make API request
-                response = client.get(f"/api/dashboard/plans?project={project_id}&limit={limit}&offset={offset}")
+                response = self.client.get(f"/api/dashboard/plans?project={project_id}&limit={limit}&offset={offset}")
 
                 # Verify response
                 self.assertEqual(response.status_code, 200)
@@ -134,6 +132,7 @@ class TestPlanListCompleteness(BaseAPITestCase):
                 expected_has_more = (offset + min(limit, DASHBOARD_MAX_LIMIT)) < len(plans)
                 self.assertEqual(data["has_more"], expected_has_more)
 
+
 class TestRunListCompleteness(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 6: Run list completeness for plan**
@@ -147,14 +146,8 @@ class TestRunListCompleteness(BaseAPITestCase):
     )
     def test_all_runs_for_plan_returned(self, plan_id, num_runs):
         """All runs associated with a plan should be returned in the response."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_stats_cache, app
-
-        # Clear cache before test
-        _dashboard_stats_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Create mock plan data with runs
         plan_data = {
@@ -200,7 +193,7 @@ class TestRunListCompleteness(BaseAPITestCase):
                 mock_calc_stats.side_effect = create_mock_run_stats
 
                 # Make API request
-                response = client.get(f"/api/dashboard/runs/{plan_id}")
+                response = self.client.get(f"/api/dashboard/runs/{plan_id}")
 
                 # Verify response
                 self.assertEqual(response.status_code, 200)
@@ -213,6 +206,7 @@ class TestRunListCompleteness(BaseAPITestCase):
                 # Verify run IDs match
                 returned_run_ids = [r["run_id"] for r in data["runs"]]
                 self.assertEqual(sorted(returned_run_ids), sorted(run_ids))
+
 
 class TestPaginationLimitEnforcement(BaseAPITestCase):
     """
@@ -228,14 +222,8 @@ class TestPaginationLimitEnforcement(BaseAPITestCase):
     )
     def test_response_respects_limit_parameter(self, project_id, num_plans, requested_limit):
         """Response should contain at most the requested limit of items."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Create mock plans
         plans = []
@@ -280,7 +268,7 @@ class TestPaginationLimitEnforcement(BaseAPITestCase):
                 mock_calc_stats.side_effect = create_mock_stats
 
                 # Make API request
-                response = client.get(f"/api/dashboard/plans?project={project_id}&limit={requested_limit}")
+                response = self.client.get(f"/api/dashboard/plans?project={project_id}&limit={requested_limit}")
 
                 # Verify response
                 self.assertEqual(response.status_code, 200)
@@ -294,19 +282,14 @@ class TestPaginationLimitEnforcement(BaseAPITestCase):
                 self.assertEqual(len(data["plans"]), expected_count)
                 self.assertLessEqual(len(data["plans"]), effective_limit)
 
+
 class TestCacheOperations(BaseAPITestCase):
     """Unit tests for cache operations."""
 
     def test_cache_miss_triggers_api_call(self):
         """Cache miss should trigger API call."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache        client = TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
@@ -314,20 +297,14 @@ class TestCacheOperations(BaseAPITestCase):
             mock_tr_client.get_plans_for_project.return_value = []
 
             # First request should call API
-            response = client.get("/api/dashboard/plans?project=1")
+            response = self.client.get("/api/dashboard/plans?project=1")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(mock_tr_client.get_plans_for_project.call_count, 1)
 
     def test_cache_hit_returns_cached_data(self):
         """Cache hit should return cached data without API call."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache        client = TestClient(app)
 
         plans = [{"id": 1, "name": "Plan 1", "created_on": 1234567890, "is_completed": False}]
 
@@ -354,13 +331,13 @@ class TestCacheOperations(BaseAPITestCase):
                 )
 
                 # First request
-                response1 = client.get("/api/dashboard/plans?project=1")
+                response1 = self.client.get("/api/dashboard/plans?project=1")
                 self.assertEqual(response1.status_code, 200)
                 data1 = response1.json()
                 self.assertFalse(data1["meta"]["cache"]["hit"])
 
                 # Second request should use cache
-                response2 = client.get("/api/dashboard/plans?project=1")
+                response2 = self.client.get("/api/dashboard/plans?project=1")
                 self.assertEqual(response2.status_code, 200)
                 data2 = response2.json()
                 self.assertTrue(data2["meta"]["cache"]["hit"])
@@ -427,6 +404,7 @@ class TestCacheOperations(BaseAPITestCase):
         # Should have no errors
         self.assertEqual(len(errors), 0, f"Concurrent access errors: {errors}")
 
+
 class TestAPIEndpointEdgeCases(BaseAPITestCase):
     """Unit tests for API endpoint edge cases."""
 
@@ -436,14 +414,14 @@ class TestAPIEndpointEdgeCases(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
             mock_make_client.return_value = mock_tr_client
             mock_tr_client.get_plans_for_project.return_value = []
 
-            response = client.get("/api/dashboard/plans?project=1")
+            response = self.client.get("/api/dashboard/plans?project=1")
             self.assertEqual(response.status_code, 200)
 
     def test_plan_detail_endpoint_with_missing_plan(self):
@@ -452,7 +430,7 @@ class TestAPIEndpointEdgeCases(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
@@ -461,7 +439,7 @@ class TestAPIEndpointEdgeCases(BaseAPITestCase):
             # Mock get_plan to raise an exception
             mock_tr_client.get_plan.side_effect = Exception("Plan not found")
 
-            response = client.get("/api/dashboard/plan/99999")
+            response = self.client.get("/api/dashboard/plan/99999")
             # Now returns 404 for missing plans (ValueError caught and converted)
             self.assertEqual(response.status_code, 404)
 
@@ -471,7 +449,7 @@ class TestAPIEndpointEdgeCases(BaseAPITestCase):
 
         from app.main import app
 
-        client = TestClient(app)
+        TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
@@ -480,20 +458,14 @@ class TestAPIEndpointEdgeCases(BaseAPITestCase):
             # Mock get_plan to raise an exception
             mock_tr_client.get_plan.side_effect = Exception("Invalid plan ID")
 
-            response = client.get("/api/dashboard/runs/99999")
+            response = self.client.get("/api/dashboard/runs/99999")
             self.assertEqual(response.status_code, 500)
 
     def test_plans_endpoint_handles_api_failure(self):
         """Plans endpoint should handle TestRail API failures."""
         import requests
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache to ensure API is called
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache to ensure API is called        client = TestClient(app)
 
         with patch("app.main._make_client") as mock_make_client:
             mock_tr_client = Mock()
@@ -502,9 +474,10 @@ class TestAPIEndpointEdgeCases(BaseAPITestCase):
             # Mock API failure
             mock_tr_client.get_plans_for_project.side_effect = requests.exceptions.RequestException("API Error")
 
-            response = client.get("/api/dashboard/plans?project=1")
+            response = self.client.get("/api/dashboard/plans?project=1")
             self.assertEqual(response.status_code, 502)
             self.assertIn("Error connecting to TestRail API", response.json()["detail"])
+
 
 class TestCacheHitBehavior(BaseAPITestCase):
     """
@@ -519,14 +492,8 @@ class TestCacheHitBehavior(BaseAPITestCase):
     )
     def test_cached_data_returns_without_api_call(self, project_id, num_plans):
         """For any cached data that has not expired, subsequent requests should return cached value without API calls."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Create mock plans
         plans = []
@@ -571,7 +538,7 @@ class TestCacheHitBehavior(BaseAPITestCase):
                 mock_calc_stats.side_effect = create_mock_stats
 
                 # First request - should call API
-                response1 = client.get(f"/api/dashboard/plans?project={project_id}")
+                response1 = self.client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response1.status_code, 200)
                 data1 = response1.json()
 
@@ -583,7 +550,7 @@ class TestCacheHitBehavior(BaseAPITestCase):
                 first_stats_call_count = mock_calc_stats.call_count
 
                 # Second request - should use cache
-                response2 = client.get(f"/api/dashboard/plans?project={project_id}")
+                response2 = self.client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response2.status_code, 200)
                 data2 = response2.json()
 
@@ -598,6 +565,7 @@ class TestCacheHitBehavior(BaseAPITestCase):
                 self.assertEqual(data1["plans"], data2["plans"])
                 self.assertEqual(data1["total_count"], data2["total_count"])
 
+
 class TestCacheInvalidation(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 13: Cache invalidation on refresh**
@@ -611,14 +579,8 @@ class TestCacheInvalidation(BaseAPITestCase):
     )
     def test_cache_cleared_on_refresh(self, project_id, num_plans):
         """For any cached data, when refresh is triggered, cache should be cleared and new data fetched."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Create mock plans
         plans = []
@@ -663,19 +625,19 @@ class TestCacheInvalidation(BaseAPITestCase):
                 mock_calc_stats.side_effect = create_mock_stats
 
                 # First request - populate cache
-                response1 = client.get(f"/api/dashboard/plans?project={project_id}")
+                response1 = self.client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response1.status_code, 200)
                 data1 = response1.json()
                 self.assertFalse(data1["meta"]["cache"]["hit"])
 
                 # Second request - should hit cache
-                response2 = client.get(f"/api/dashboard/plans?project={project_id}")
+                response2 = self.client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response2.status_code, 200)
                 data2 = response2.json()
                 self.assertTrue(data2["meta"]["cache"]["hit"])
 
                 # Clear cache (refresh action)
-                clear_response = client.post("/api/dashboard/cache/clear")
+                clear_response = self.client.post("/api/dashboard/cache/clear")
                 self.assertEqual(clear_response.status_code, 200)
                 clear_data = clear_response.json()
                 self.assertEqual(clear_data["status"], "success")
@@ -684,7 +646,7 @@ class TestCacheInvalidation(BaseAPITestCase):
                 call_count_before = mock_tr_client.get_plans_for_project.call_count
 
                 # Third request after cache clear - should fetch fresh data
-                response3 = client.get(f"/api/dashboard/plans?project={project_id}")
+                response3 = self.client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response3.status_code, 200)
                 data3 = response3.json()
 
@@ -693,6 +655,7 @@ class TestCacheInvalidation(BaseAPITestCase):
 
                 # Verify API was called again
                 self.assertEqual(mock_tr_client.get_plans_for_project.call_count, call_count_before + 1)
+
 
 class TestDataUpdateAfterRefresh(BaseAPITestCase):
     """
@@ -708,14 +671,8 @@ class TestDataUpdateAfterRefresh(BaseAPITestCase):
     )
     def test_data_updated_after_refresh(self, project_id, initial_plans, updated_plans):
         """For any dashboard view, when refresh completes successfully, the displayed data should reflect the newly fetched data."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Create initial mock plans
         plans_v1 = []
@@ -779,7 +736,7 @@ class TestDataUpdateAfterRefresh(BaseAPITestCase):
                 mock_calc_stats.side_effect = create_mock_stats
 
                 # First request - get initial data
-                response1 = client.get(f"/api/dashboard/plans?project={project_id}")
+                response1 = self.client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response1.status_code, 200)
                 data1 = response1.json()
 
@@ -790,11 +747,11 @@ class TestDataUpdateAfterRefresh(BaseAPITestCase):
                     self.assertIn(i + 1, initial_plan_ids)
 
                 # Clear cache (refresh action)
-                clear_response = client.post("/api/dashboard/cache/clear")
+                clear_response = self.client.post("/api/dashboard/cache/clear")
                 self.assertEqual(clear_response.status_code, 200)
 
                 # Second request after refresh - should get updated data
-                response2 = client.get(f"/api/dashboard/plans?project={project_id}")
+                response2 = self.client.get(f"/api/dashboard/plans?project={project_id}")
                 self.assertEqual(response2.status_code, 200)
                 data2 = response2.json()
 
@@ -807,6 +764,7 @@ class TestDataUpdateAfterRefresh(BaseAPITestCase):
                 # Verify the data changed (unless both have same count and IDs by chance)
                 if initial_plans != updated_plans or initial_plan_ids != updated_plan_ids:
                     self.assertNotEqual(initial_plan_ids, updated_plan_ids)
+
 
 class TestSearchFilterCorrectness(BaseAPITestCase):
     """
@@ -824,14 +782,8 @@ class TestSearchFilterCorrectness(BaseAPITestCase):
     )
     def test_search_filter_only_includes_matching_plans(self, project_id, plans, search_term):
         """For any search term and list of plans, filtered results should only include plans whose names contain the search term (case-insensitive)."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -874,7 +826,7 @@ class TestSearchFilterCorrectness(BaseAPITestCase):
 
                     url += f"&search={quote(search_term)}"
 
-                response = client.get(url)
+                response = self.client.get(url)
 
                 # Verify response
                 self.assertEqual(response.status_code, 200)
@@ -902,6 +854,7 @@ class TestSearchFilterCorrectness(BaseAPITestCase):
                     expected_count = min(len(expected_matching_plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
 
+
 class TestCompletionFilterCorrectness(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 9: Completion filter correctness**
@@ -916,14 +869,8 @@ class TestCompletionFilterCorrectness(BaseAPITestCase):
     )
     def test_completion_filter_only_includes_matching_status(self, project_id, plans, is_completed_filter):
         """For any completion status filter value and list of plans, filtered results should only include plans matching that completion status."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -970,7 +917,7 @@ class TestCompletionFilterCorrectness(BaseAPITestCase):
                 if is_completed_filter is not None:
                     url += f"&is_completed={is_completed_filter}"
 
-                response = client.get(url)
+                response = self.client.get(url)
 
                 # Verify response
                 self.assertEqual(response.status_code, 200)
@@ -998,6 +945,7 @@ class TestCompletionFilterCorrectness(BaseAPITestCase):
                 self.assertEqual(args[0], project_id)
                 self.assertEqual(kwargs.get("is_completed"), is_completed_filter)
 
+
 class TestDateRangeFilterCorrectness(BaseAPITestCase):
     """
     **Feature: testrail-dashboard, Property 10: Date range filter correctness**
@@ -1018,14 +966,8 @@ class TestDateRangeFilterCorrectness(BaseAPITestCase):
     )
     def test_date_range_filter_only_includes_plans_in_range(self, project_id, plans, date_range):
         """For any date range (start, end) and list of plans, filtered results should only include plans with creation dates within that range (inclusive)."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -1067,7 +1009,7 @@ class TestDateRangeFilterCorrectness(BaseAPITestCase):
                     created_after, created_before = date_range
                     url += f"&created_after={created_after}&created_before={created_before}"
 
-                response = client.get(url)
+                response = self.client.get(url)
 
                 # Verify response
                 self.assertEqual(response.status_code, 200)
@@ -1100,19 +1042,14 @@ class TestDateRangeFilterCorrectness(BaseAPITestCase):
                     expected_count = min(len(plans), DASHBOARD_MAX_LIMIT)
                     self.assertEqual(len(data["plans"]), expected_count)
 
+
 class TestFilterEdgeCases(BaseAPITestCase):
     """Unit tests for filter edge cases."""
 
     def test_empty_search_term_returns_all_results(self):
         """Empty search term should return all results."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache        client = TestClient(app)
 
         plans = [
             {"id": 1, "name": "Plan Alpha", "created_on": 1234567890, "is_completed": False},
@@ -1148,28 +1085,20 @@ class TestFilterEdgeCases(BaseAPITestCase):
                 mock_calc_stats.side_effect = create_mock_stats
 
                 # Test with empty string
-                response = client.get("/api/dashboard/plans?project=1&search=")
+                response = self.client.get("/api/dashboard/plans?project=1&search=")
                 self.assertEqual(response.status_code, 200)
                 data = response.json()
                 self.assertEqual(len(data["plans"]), 3)
 
-                # Test with whitespace only
-                _dashboard_plans_cache.clear()
-                response = client.get("/api/dashboard/plans?project=1&search=%20%20")
+                # Test with whitespace only                response = self.client.get("/api/dashboard/plans?project=1&search=%20%20")
                 self.assertEqual(response.status_code, 200)
                 data = response.json()
                 self.assertEqual(len(data["plans"]), 3)
 
     def test_search_with_no_matches(self):
         """Search with no matches should return empty results."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache        client = TestClient(app)
 
         plans = [
             {"id": 1, "name": "Plan Alpha", "created_on": 1234567890, "is_completed": False},
@@ -1199,7 +1128,7 @@ class TestFilterEdgeCases(BaseAPITestCase):
                 )
 
                 # Search for non-existent term
-                response = client.get("/api/dashboard/plans?project=1&search=NonExistent")
+                response = self.client.get("/api/dashboard/plans?project=1&search=NonExistent")
                 self.assertEqual(response.status_code, 200)
                 data = response.json()
                 self.assertEqual(len(data["plans"]), 0)
@@ -1207,14 +1136,8 @@ class TestFilterEdgeCases(BaseAPITestCase):
 
     def test_invalid_date_ranges(self):
         """Invalid date ranges should still work (start > end is handled by filtering logic)."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache        client = TestClient(app)
 
         plans = [
             {"id": 1, "name": "Plan 1", "created_on": 1500000000, "is_completed": False},
@@ -1244,7 +1167,7 @@ class TestFilterEdgeCases(BaseAPITestCase):
                 )
 
                 # Test with start > end (now returns 400 error due to validation)
-                response = client.get(
+                response = self.client.get(
                     "/api/dashboard/plans?project=1&created_after=1700000000&created_before=1400000000"
                 )
                 self.assertEqual(response.status_code, 400)
@@ -1252,14 +1175,8 @@ class TestFilterEdgeCases(BaseAPITestCase):
 
     def test_combined_filters(self):
         """Multiple filters should be applied together."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache        client = TestClient(app)
 
         plans = [
             {"id": 1, "name": "Alpha Test", "created_on": 1500000000, "is_completed": False},
@@ -1298,7 +1215,7 @@ class TestFilterEdgeCases(BaseAPITestCase):
                 mock_calc_stats.side_effect = create_mock_stats
 
                 # Apply multiple filters: is_completed=0, search="Alpha", date range
-                response = client.get(
+                response = self.client.get(
                     "/api/dashboard/plans?project=1&is_completed=0&search=Alpha&created_after=1450000000&created_before=1650000000"
                 )
                 self.assertEqual(response.status_code, 200)
@@ -1311,6 +1228,7 @@ class TestFilterEdgeCases(BaseAPITestCase):
                 self.assertIn("Alpha Test", plan_names)
                 self.assertIn("Alpha Production", plan_names)
 
+
 class TestRefreshErrorHandling(BaseAPITestCase):
     """
     Unit tests for refresh error handling.
@@ -1319,14 +1237,8 @@ class TestRefreshErrorHandling(BaseAPITestCase):
 
     def test_refresh_with_api_failure_retains_old_data(self):
         """Test that when API fails during refresh, old cached data is retained."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Create initial mock plans
         initial_plans = [
@@ -1368,18 +1280,18 @@ class TestRefreshErrorHandling(BaseAPITestCase):
                 )
 
                 # First request - populate cache
-                response1 = client.get("/api/dashboard/plans?project=1")
+                response1 = self.client.get("/api/dashboard/plans?project=1")
                 self.assertEqual(response1.status_code, 200)
                 data1 = response1.json()
                 self.assertEqual(len(data1["plans"]), 1)
                 self.assertEqual(data1["plans"][0]["plan_name"], "Initial Plan 1")
 
                 # Clear cache (refresh action)
-                clear_response = client.post("/api/dashboard/cache/clear")
+                clear_response = self.client.post("/api/dashboard/cache/clear")
                 self.assertEqual(clear_response.status_code, 200)
 
                 # Second request after cache clear - API fails
-                response2 = client.get("/api/dashboard/plans?project=1")
+                response2 = self.client.get("/api/dashboard/plans?project=1")
 
                 # Should return error status
                 self.assertEqual(response2.status_code, 502)
@@ -1389,14 +1301,8 @@ class TestRefreshErrorHandling(BaseAPITestCase):
 
     def test_refresh_with_network_timeout_shows_error(self):
         """Test that network timeout during refresh shows appropriate error."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -1407,7 +1313,7 @@ class TestRefreshErrorHandling(BaseAPITestCase):
             mock_tr_client.get_plans_for_project.side_effect = requests.exceptions.Timeout("Request timed out")
 
             # Request should fail with timeout error
-            response = client.get("/api/dashboard/plans?project=1")
+            response = self.client.get("/api/dashboard/plans?project=1")
 
             # Should return 504 for timeout (not 502)
             self.assertEqual(response.status_code, 504)
@@ -1417,14 +1323,8 @@ class TestRefreshErrorHandling(BaseAPITestCase):
 
     def test_refresh_with_invalid_response_shows_error(self):
         """Test that invalid response during refresh shows appropriate error."""
-        from fastapi.testclient import TestClient
 
-        from app.main import _dashboard_plans_cache, app
-
-        # Clear cache before test
-        _dashboard_plans_cache.clear()
-
-        client = TestClient(app)
+        # Clear cache before test        client = TestClient(app)
 
         # Mock the TestRail client
         with patch("app.main._make_client") as mock_make_client:
@@ -1439,7 +1339,7 @@ class TestRefreshErrorHandling(BaseAPITestCase):
                 mock_calc_stats.side_effect = AttributeError("'str' object has no attribute 'get'")
 
                 # Request should fail
-                response = client.get("/api/dashboard/plans?project=1")
+                response = self.client.get("/api/dashboard/plans?project=1")
 
                 # Should return error status
                 self.assertEqual(response.status_code, 500)
@@ -1447,6 +1347,7 @@ class TestRefreshErrorHandling(BaseAPITestCase):
                 self.assertIn("detail", error_data)
                 # Now returns "Invalid response" error message
                 self.assertIn("Invalid response", error_data["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()

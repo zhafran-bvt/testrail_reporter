@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 
 # We'll test against the new modular structure to ensure it maintains compatibility
 
+
 class TestBackwardCompatibilityPreservation:
     """Property 3: Backward Compatibility Preservation - For any existing API endpoint,
     the refactored system should maintain the same request/response contract and behavior."""
@@ -22,14 +23,14 @@ class TestBackwardCompatibilityPreservation:
         app = FastAPI()
         app.include_router(reports_router)
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Test legacy GET /api/report endpoint
         with patch("app.api.reports.generate_report") as mock_generate:
             mock_generate.return_value = "/path/to/report.html"
 
             # Test with plan parameter (legacy format)
-            response = client.get("/api/report?project=1&plan=123")
+            response = self.client.get("/api/report?project=1&plan=123")
 
             # Should return the same format as before
             assert response.status_code == 200
@@ -47,7 +48,7 @@ class TestBackwardCompatibilityPreservation:
         app = FastAPI()
         app.include_router(dashboard_router)
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock dependencies to avoid actual TestRail calls
         with patch("app.api.dashboard.testrail_service") as mock_service, patch(
@@ -81,7 +82,7 @@ class TestBackwardCompatibilityPreservation:
                 mock_stats.untested_count = 0
                 mock_calc.return_value = mock_stats
 
-                response = client.get("/api/dashboard/plans?project=1")
+                response = self.client.get("/api/dashboard/plans?project=1")
 
         # Should maintain expected response structure
         assert response.status_code == 200
@@ -113,7 +114,7 @@ class TestBackwardCompatibilityPreservation:
         app = FastAPI()
         app.include_router(general_router)
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock dependencies
         with patch("app.core.dependencies.get_plans_cache") as mock_cache, patch(
@@ -138,7 +139,7 @@ class TestBackwardCompatibilityPreservation:
             if plan_id is not None:
                 params["is_completed"] = 0 if plan_id % 2 == 0 else 1
 
-            response = client.get("/api/plans", params=params)
+            response = self.client.get("/api/plans", params=params)
 
             # Should accept parameters and return expected format
             assert response.status_code == 200
@@ -157,7 +158,7 @@ class TestBackwardCompatibilityPreservation:
         app = FastAPI()
         app.include_router(management_router)
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock dependencies
         with patch("app.core.dependencies.get_testrail_client") as mock_get_client, patch(
@@ -172,7 +173,7 @@ class TestBackwardCompatibilityPreservation:
 
             plan_data = {"project": 1, "name": "Test Plan", "description": "Test Description", "dry_run": False}
 
-            response = client.post("/api/manage/plan", json=plan_data)
+            response = self.client.post("/api/manage/plan", json=plan_data)
 
             # Should maintain expected response format
             assert response.status_code == 200
@@ -190,7 +191,7 @@ class TestBackwardCompatibilityPreservation:
         app = FastAPI()
         app.include_router(management_router)
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Test validation error (should return structured error)
         invalid_plan_data = {
@@ -199,7 +200,7 @@ class TestBackwardCompatibilityPreservation:
             "dry_run": False,
         }
 
-        response = client.post("/api/manage/plan", json=invalid_plan_data)
+        response = self.client.post("/api/manage/plan", json=invalid_plan_data)
 
         # Should return validation error in expected format
         # Note: The actual status code may vary based on error handling middleware
@@ -223,7 +224,7 @@ class TestBackwardCompatibilityPreservation:
         app = FastAPI()
         app.include_router(health_router)
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock dependencies
         with patch("app.core.dependencies.get_plans_cache") as mock_plans_cache, patch(
@@ -244,7 +245,7 @@ class TestBackwardCompatibilityPreservation:
                     "latest_job": None,
                 }
 
-                response = client.get("/healthz")
+                response = self.client.get("/healthz")
 
         # Should maintain expected health check format
         assert response.status_code == 200
@@ -271,7 +272,7 @@ class TestBackwardCompatibilityPreservation:
         app = FastAPI()
         app.include_router(general_router)
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock cache dependencies
         with patch("app.core.dependencies.get_plans_cache") as mock_plans_cache, patch(
@@ -282,7 +283,7 @@ class TestBackwardCompatibilityPreservation:
             mock_plans_cache.return_value = mock_plans_cache_instance
             mock_runs_cache.return_value = mock_runs_cache_instance
 
-            response = client.post("/api/cache/clear")
+            response = self.client.post("/api/cache/clear")
 
         # Should maintain expected response format
         assert response.status_code == 200
@@ -305,7 +306,7 @@ class TestBackwardCompatibilityPreservation:
         app = FastAPI()
         app.include_router(reports_router)
 
-        client = TestClient(app)
+        TestClient(app)
 
         # Mock job manager
         with patch("app.api.reports.job_manager") as mock_job_manager:
@@ -331,7 +332,7 @@ class TestBackwardCompatibilityPreservation:
             # Test async report generation
             report_request = {"project": 1, "plan": 123, "run": None, "run_ids": None}
 
-            response = client.post("/api/report", json=report_request)
+            response = self.client.post("/api/report", json=report_request)
 
         # Should return 202 Accepted with job information
         assert response.status_code == 202

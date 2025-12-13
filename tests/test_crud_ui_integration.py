@@ -5,6 +5,7 @@ These tests verify that the UI correctly handles edit and delete operations
 for plans, runs, and cases.
 """
 
+import unittest
 from unittest.mock import Mock
 
 from tests.test_base import BaseAPITestCase
@@ -16,7 +17,7 @@ class TestCRUDUIFlows(BaseAPITestCase):
     def setUp(self):
         """Set up test client and mocks."""
         super().setUp()
-        
+
         # Override default mock responses for this test
         self.mock_client.update_plan.return_value = {"id": 123, "name": "Updated Plan"}
         self.mock_client.update_run.return_value = {"id": 456, "name": "Updated Run"}
@@ -289,6 +290,7 @@ class TestCRUDUIFlows(BaseAPITestCase):
         # 1. Remain in the list
         # 2. Display error message
         # 3. Allow user to retry
+
 
 if __name__ == "__main__":
     unittest.main()

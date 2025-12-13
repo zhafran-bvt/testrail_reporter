@@ -12,6 +12,8 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 import app.main as main
+from tests.test_base import BaseAPITestCase
+
 
 # Hypothesis strategies for generating test data
 @st.composite
@@ -32,10 +34,12 @@ def gen_test_case(draw):
         "assignedto_id": draw(st.one_of(st.none(), st.integers(min_value=1, max_value=1000))),
     }
 
+
 @st.composite
 def gen_test_cases_list(draw, min_size=0, max_size=20):
     """Generate a list of test cases."""
     return draw(st.lists(gen_test_case(), min_size=min_size, max_size=max_size))
+
 
 @st.composite
 def gen_run_data(draw):
@@ -48,6 +52,7 @@ def gen_run_data(draw):
         "is_completed": draw(st.booleans()),
         "created_on": draw(st.integers(min_value=1000000000, max_value=2000000000)),
     }
+
 
 class TestCasesFetchProperties(BaseAPITestCase):
     """
@@ -81,7 +86,7 @@ class TestCasesFetchProperties(BaseAPITestCase):
 
         The response should also include run_id, run_name, and count.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a fake client
         fake = types.SimpleNamespace()
@@ -118,7 +123,7 @@ class TestCasesFetchProperties(BaseAPITestCase):
         main_module._make_client = lambda: fake
 
         # Make the request
-        resp = client.get(f"/api/tests/{run_id}")
+        resp = self.client.get(f"/api/tests/{run_id}")
 
         # Verify response status
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
@@ -169,7 +174,7 @@ class TestCasesFetchProperties(BaseAPITestCase):
         For any run with no test cases, the endpoint should return an empty tests list
         with count=0.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         fake = types.SimpleNamespace()
         run_data["id"] = run_id
@@ -188,7 +193,7 @@ class TestCasesFetchProperties(BaseAPITestCase):
 
         main_module._make_client = lambda: fake
 
-        resp = client.get(f"/api/tests/{run_id}")
+        resp = self.client.get(f"/api/tests/{run_id}")
 
         assert resp.status_code == 200
         result = resp.json()
@@ -200,17 +205,18 @@ class TestCasesFetchProperties(BaseAPITestCase):
         """
         Test that invalid run_id (< 1) returns 400 error.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Test with 0
-        resp = client.get("/api/tests/0")
+        resp = self.client.get("/api/tests/0")
         assert resp.status_code == 400, f"Expected 400 for run_id=0, got {resp.status_code}"
 
         # Test with negative
-        resp = client.get("/api/tests/-1")
+        resp = self.client.get("/api/tests/-1")
         assert (
             resp.status_code == 400 or resp.status_code == 422
         ), f"Expected 400 or 422 for negative run_id, got {resp.status_code}"
+
 
 class TestFileValidationProperties(BaseAPITestCase):
     """
@@ -248,13 +254,13 @@ class TestFileValidationProperties(BaseAPITestCase):
         """
         from io import BytesIO
 
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a fake file with invalid content type
         file_content = b"fake file content"
         files = {"file": ("test_file.bin", BytesIO(file_content), invalid_content_type)}
 
-        resp = client.post(f"/api/manage/case/{case_id}/attachment", files=files)
+        resp = self.client.post(f"/api/manage/case/{case_id}/attachment", files=files)
 
         # Should be rejected with 400
         assert resp.status_code == 400, f"Expected 400 for invalid type {invalid_content_type}, got {resp.status_code}"
@@ -292,7 +298,7 @@ class TestFileValidationProperties(BaseAPITestCase):
         """
         from io import BytesIO
 
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a fake client that simulates successful upload
         fake = types.SimpleNamespace()
@@ -315,7 +321,7 @@ class TestFileValidationProperties(BaseAPITestCase):
         ext = ext_map.get(valid_content_type, ".bin")
         files = {"file": (f"test_file{ext}", BytesIO(file_content), valid_content_type)}
 
-        resp = client.post(f"/api/manage/case/{case_id}/attachment", files=files)
+        resp = self.client.post(f"/api/manage/case/{case_id}/attachment", files=files)
 
         # Should NOT be rejected for file type (may succeed or fail for other reasons)
         # If it's 400, it should NOT be about file type
@@ -343,7 +349,7 @@ class TestFileValidationProperties(BaseAPITestCase):
         """
         from io import BytesIO
 
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a file larger than 25MB
         # We use a smaller actual content but simulate the size check
@@ -356,7 +362,7 @@ class TestFileValidationProperties(BaseAPITestCase):
 
         files = {"file": ("large_file.png", BytesIO(file_content), "image/png")}
 
-        resp = client.post(f"/api/manage/case/{case_id}/attachment", files=files)
+        resp = self.client.post(f"/api/manage/case/{case_id}/attachment", files=files)
 
         # Should be rejected with 400
         assert resp.status_code == 400, f"Expected 400 for oversized file ({file_size_mb}MB)"
@@ -386,7 +392,7 @@ class TestFileValidationProperties(BaseAPITestCase):
         """
         from io import BytesIO
 
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a fake client that simulates successful upload
         fake = types.SimpleNamespace()
@@ -401,7 +407,7 @@ class TestFileValidationProperties(BaseAPITestCase):
 
         files = {"file": ("valid_file.png", BytesIO(file_content), "image/png")}
 
-        resp = client.post(f"/api/manage/case/{case_id}/attachment", files=files)
+        resp = self.client.post(f"/api/manage/case/{case_id}/attachment", files=files)
 
         # Should NOT be rejected for file size
         if resp.status_code == 400:
@@ -410,6 +416,7 @@ class TestFileValidationProperties(BaseAPITestCase):
             assert (
                 "size" not in detail and "25" not in detail and "mb" not in detail
             ), f"Valid size ({file_size_kb}KB) rejected: {result['detail']}"
+
 
 class TestRunEditModalProperties(BaseAPITestCase):
     """
@@ -436,7 +443,7 @@ class TestRunEditModalProperties(BaseAPITestCase):
         For any valid run update payload (non-empty name), submitting the edit
         form SHALL result in a PUT request to /api/manage/run/{run_id}.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a fake client that simulates successful update
         fake = types.SimpleNamespace()
@@ -466,7 +473,7 @@ class TestRunEditModalProperties(BaseAPITestCase):
             payload["refs"] = refs
 
         # Make the request
-        resp = client.put(f"/api/manage/run/{run_id}", json=payload)
+        resp = self.client.put(f"/api/manage/run/{run_id}", json=payload)
 
         # Verify response status - should succeed for valid payload
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
@@ -494,13 +501,13 @@ class TestRunEditModalProperties(BaseAPITestCase):
 
         Note: Backend validation. Frontend validation is tested separately.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # The backend should accept the request but the frontend should prevent it
         # For backend, we test that empty/whitespace names are handled
         payload = {"name": invalid_name}
 
-        resp = client.put(f"/api/manage/run/{run_id}", json=payload)
+        resp = self.client.put(f"/api/manage/run/{run_id}", json=payload)
 
         # Backend may accept whitespace names (validation is primarily frontend)
         # But if it rejects, it should be a 400 error
@@ -526,7 +533,7 @@ class TestRunEditModalProperties(BaseAPITestCase):
         This test verifies the dry_run feature which allows previewing changes without
         actually making them - similar to cancel behavior.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Build payload with dry_run=True
         payload = {
@@ -539,7 +546,7 @@ class TestRunEditModalProperties(BaseAPITestCase):
             payload["refs"] = refs
 
         # Make the request
-        resp = client.put(f"/api/manage/run/{run_id}", json=payload)
+        resp = self.client.put(f"/api/manage/run/{run_id}", json=payload)
 
         # Verify response status
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
@@ -554,8 +561,10 @@ class TestRunEditModalProperties(BaseAPITestCase):
         # Verify payload contains the fields we sent
         assert result["payload"].get("name") == run_name.strip(), "payload.name should match"
 
+
 if __name__ == "__main__":
     unittest.main()
+
 
 class TestCaseEditModalProperties(BaseAPITestCase):
     """
@@ -584,7 +593,7 @@ class TestCaseEditModalProperties(BaseAPITestCase):
 
         This test verifies the backend accepts valid case update payloads.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a fake client that simulates successful update
         fake = types.SimpleNamespace()
@@ -613,7 +622,7 @@ class TestCaseEditModalProperties(BaseAPITestCase):
             payload["custom_bdd_scenario"] = bdd_scenarios
 
         # Make the request
-        resp = client.put(f"/api/manage/case/{case_id}", json=payload)
+        resp = self.client.put(f"/api/manage/case/{case_id}", json=payload)
 
         # Verify response status - should succeed for valid payload
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
@@ -641,13 +650,13 @@ class TestCaseEditModalProperties(BaseAPITestCase):
 
         Note: Backend validation. Frontend validation is tested separately.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # The backend should accept the request but the frontend should prevent it
         # For backend, we test that empty/whitespace titles are handled
         payload = {"title": invalid_title}
 
-        resp = client.put(f"/api/manage/case/{case_id}", json=payload)
+        resp = self.client.put(f"/api/manage/case/{case_id}", json=payload)
 
         # Backend may accept whitespace titles (validation is primarily frontend)
         # But if it rejects, it should be a 400 error
@@ -683,7 +692,7 @@ class TestCaseEditModalProperties(BaseAPITestCase):
         """
         from io import BytesIO
 
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a fake client that simulates successful upload
         # The TestRail API returns {"attachment_id": <id>}
@@ -707,7 +716,7 @@ class TestCaseEditModalProperties(BaseAPITestCase):
         ext = ext_map.get(valid_content_type, ".bin")
         files = {"file": (f"test_file{ext}", BytesIO(file_content), valid_content_type)}
 
-        resp = client.post(f"/api/manage/case/{case_id}/attachment", files=files)
+        resp = self.client.post(f"/api/manage/case/{case_id}/attachment", files=files)
 
         # Should succeed for valid file
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
@@ -720,8 +729,10 @@ class TestCaseEditModalProperties(BaseAPITestCase):
         assert result["attachment"]["content_type"] == valid_content_type, "content_type should match"
         assert result["attachment"]["size"] == file_size_kb * 1024, "size should match"
 
+
 if __name__ == "__main__":
     unittest.main()
+
 
 class TestCasesViewProperties(BaseAPITestCase):
     """
@@ -748,7 +759,7 @@ class TestCasesViewProperties(BaseAPITestCase):
         For any test case returned from the API, the rendered card SHALL contain
         the case's title, status badge, and references (if present).
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         fake = types.SimpleNamespace()
         run_data["id"] = run_id
@@ -767,7 +778,7 @@ class TestCasesViewProperties(BaseAPITestCase):
 
         main_module._make_client = lambda: fake
 
-        resp = client.get(f"/api/tests/{run_id}")
+        resp = self.client.get(f"/api/tests/{run_id}")
 
         assert resp.status_code == 200
         result = resp.json()
@@ -835,7 +846,7 @@ class TestCasesViewProperties(BaseAPITestCase):
         For any run being viewed in the cases view, the run's name SHALL be
         displayed as a header above the test cases list.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         fake = types.SimpleNamespace()
         run_data["id"] = run_id
@@ -854,7 +865,7 @@ class TestCasesViewProperties(BaseAPITestCase):
 
         main_module._make_client = lambda: fake
 
-        resp = client.get(f"/api/tests/{run_id}")
+        resp = self.client.get(f"/api/tests/{run_id}")
 
         assert resp.status_code == 200
         result = resp.json()
@@ -874,7 +885,7 @@ class TestCasesViewProperties(BaseAPITestCase):
         Note: This is primarily a frontend test. Here we verify the API structure
         supports the navigation pattern by ensuring the endpoint returns proper data.
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a fake client
         fake = types.SimpleNamespace()
@@ -895,7 +906,7 @@ class TestCasesViewProperties(BaseAPITestCase):
         main_module._make_client = lambda: fake
 
         # Fetch test cases for a run
-        resp = client.get("/api/tests/1")
+        resp = self.client.get("/api/tests/1")
 
         assert resp.status_code == 200
         result = resp.json()
@@ -906,6 +917,7 @@ class TestCasesViewProperties(BaseAPITestCase):
 
         # The frontend uses this data to know which run was being viewed
         # and can navigate back to the runs list accordingly
+
 
 class TestStatusBadgeMapping(BaseAPITestCase):
     """
@@ -933,7 +945,7 @@ class TestStatusBadgeMapping(BaseAPITestCase):
         - 4 = "Retest" (yellow badge)
         - 5 = "Failed" (red badge)
         """
-        client = TestClient(main.app)
+        TestClient(main.app)
 
         # Create a test case with the specific status_id
         test_case = {
@@ -963,7 +975,7 @@ class TestStatusBadgeMapping(BaseAPITestCase):
 
         main_module._make_client = lambda: fake
 
-        resp = client.get(f"/api/tests/{run_id}")
+        resp = self.client.get(f"/api/tests/{run_id}")
 
         assert resp.status_code == 200
         result = resp.json()

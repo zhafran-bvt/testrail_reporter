@@ -10,12 +10,14 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests.test_base import BaseAPITestCase
+
 
 class TestDeleteConfirmationDialog(BaseAPITestCase):
     """Tests for delete confirmation dialog UI improvements."""
 
     def setUp(self):
-        """Set up test client."""
+        """Set up test self.client."""
         self.client = TestClient(app)
 
     def test_delete_modal_structure_exists(self):
@@ -152,11 +154,12 @@ class TestDeleteConfirmationDialog(BaseAPITestCase):
         # Verify delete icon (trash) is used
         assert "🗑️" in html or "trash" in html.lower(), "Delete buttons should have trash icon"
 
+
 class TestDeleteConfirmationAccessibility(BaseAPITestCase):
     """Tests for delete confirmation dialog accessibility."""
 
     def setUp(self):
-        """Set up test client."""
+        """Set up test self.client."""
         self.client = TestClient(app)
 
     def test_delete_modal_has_aria_attributes(self):
@@ -188,11 +191,12 @@ class TestDeleteConfirmationAccessibility(BaseAPITestCase):
         # Verify input has associated label
         assert 'for="deleteConfirmTypeInput"' in html, "Input should have associated label"
 
+
 class TestDeleteConfirmationResponsive(BaseAPITestCase):
     """Tests for delete confirmation dialog responsive design."""
 
     def setUp(self):
-        """Set up test client."""
+        """Set up test self.client."""
         self.client = TestClient(app)
 
     def test_delete_modal_has_max_width(self):
@@ -215,6 +219,7 @@ class TestDeleteConfirmationResponsive(BaseAPITestCase):
         # Verify modal uses padding and spacing
         assert "padding:" in html, "Modal should use padding for spacing"
         assert "border-radius:" in html, "Modal should have rounded corners"
+
 
 if __name__ == "__main__":
     unittest.main()
