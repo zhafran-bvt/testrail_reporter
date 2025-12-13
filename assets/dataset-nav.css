@@ -1,0 +1,211 @@
+/* Dataset Generator Navigation Styles */
+/* This ensures the existing menu item works correctly */
+
+/* The dataset link already exists in HTML, just ensure it's styled properly */
+#linkDataset {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+    border-radius: 12px !important;
+    color: #0f172a !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    margin-bottom: 8px !important;
+    transition: background .12s ease, color .12s ease !important;
+    cursor: pointer !important;
+}
+
+#linkDataset:hover {
+    background: #e2f3f3 !important;
+    color: #0f766e !important;
+}
+
+#linkDataset.active {
+    background: #0f766e !important;
+    color: #fff !important;
+}
+
+#linkDataset svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+/* Dataset content is now injected into .content div, inheriting its layout */
+
+#datasetView.hidden {
+    display: none !important;
+}
+
+/* Ensure the nav-shell grid layout works correctly */
+.nav-shell {
+    display: grid !important;
+    grid-template-columns: 220px 1fr !important;
+    min-height: calc(100vh - 70px) !important;
+}
+
+/* Dataset content styling when injected into .content div */
+.content code {
+    background: rgba(0, 0, 0, 0.1) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-family: 'Consolas', 'Monaco', monospace !important;
+    font-size: 13px !important;
+}
+
+/* Ensure buttons in dataset content are styled properly */
+.content button {
+    transition: all 0.15s ease !important;
+}
+
+.content button:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Dataset form specific styles */
+#datasetGenerationForm .form-section {
+    padding: 24px !important;
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    margin-bottom: 20px !important;
+}
+
+[data-theme="dark"] #datasetGenerationForm .form-section,
+[data-bs-theme="dark"] #datasetGenerationForm .form-section {
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+#datasetGenerationForm .form-section h3 {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+#datasetGenerationForm .form-group {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+#datasetGenerationForm input,
+#datasetGenerationForm select {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+#datasetGenerationForm input:focus,
+#datasetGenerationForm select:focus {
+    outline: none !important;
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px var(--ring) !important;
+}
+
+#datasetGenerationForm input[type="checkbox"] {
+    accent-color: var(--primary) !important;
+    cursor: pointer !important;
+}
+
+#datasetGenerationForm label {
+    cursor: pointer !important;
+}
+
+#datasetGenerationForm small {
+    margin-top: 4px !important;
+    display: block !important;
+}
+
+/* Improve form grid layout for wider screens */
+#datasetGenerationForm .form-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+    gap: 20px !important;
+}
+
+/* Better spacing for form sections */
+#datasetGenerationForm .form-section:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Improve checkbox layout */
+#datasetGenerationForm .form-section:nth-child(3) .form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+}
+
+/* Form grid responsive behavior */
+@media (max-width: 1024px) {
+    #datasetGenerationForm .form-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+    }
+    
+    #datasetGenerationForm .form-section:nth-child(3) .form-grid {
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+    }
+}
+
+@media (max-width: 768px) {
+    #datasetGenerationForm .form-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    #datasetGenerationForm .form-section:nth-child(3) .form-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .content .card {
+        max-width: 100% !important;
+        padding: 20px !important;
+    }
+    
+    #datasetGenerationForm .form-section {
+        padding: 16px !important;
+    }
+    
+    #datasetGenerationForm .form-actions {
+        flex-direction: column !important;
+    }
+    
+    #datasetGenerationForm .form-actions button {
+        width: 100% !important;
+    }
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Success/Error message styling */
+#datasetGenerationResults a {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+}
+
+#datasetGenerationResults pre {
+    max-height: 200px !important;
+    overflow-y: auto !important;
+    background: rgba(255, 255, 255, 0.5) !important;
+    padding: 8px !important;
+    border-radius: 4px !important;
+}
+
+/* Form validation styles */
+#datasetGenerationForm input:invalid {
+    border-color: #ef4444 !important;
+}
+
+#datasetGenerationForm input:invalid:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Disabled button styles */
+#datasetGenerationForm button:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+#datasetGenerationForm button:disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}

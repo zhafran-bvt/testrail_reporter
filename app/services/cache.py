@@ -9,7 +9,7 @@ from typing import Any
 
 class TTLCache:
     """Thread-safe TTL cache implementation."""
-    
+
     def __init__(self, ttl_seconds: int = 120, maxsize: int = 128):
         self.ttl = ttl_seconds
         self.maxsize = max(1, maxsize)

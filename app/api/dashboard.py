@@ -1,11 +1,12 @@
 """Dashboard API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
 from concurrent.futures import ThreadPoolExecutor
 
-from app.models.responses import DashboardPlansResponse, DashboardPlanDetail, DashboardRunsResponse
-from app.core.dependencies import get_dashboard_plans_cache, get_dashboard_plan_detail_cache, get_dashboard_stats_cache
+from fastapi import APIRouter, Depends, HTTPException
+
 from app.core.config import config
+from app.core.dependencies import get_dashboard_plan_detail_cache, get_dashboard_plans_cache, get_dashboard_stats_cache
+from app.models.responses import DashboardPlanDetail, DashboardPlansResponse, DashboardRunsResponse
 from app.services.cache import cache_meta
 from app.services.testrail_client import testrail_service
 
@@ -21,7 +22,7 @@ def get_dashboard_plans(
     created_after: int | None = None,
     created_before: int | None = None,
     search: str | None = None,
-    plans_cache=Depends(get_dashboard_plans_cache)
+    plans_cache=Depends(get_dashboard_plans_cache),
 ):
     """
     Get paginated list of test plans with aggregated statistics for the dashboard.
@@ -167,6 +168,7 @@ def get_dashboard_plans(
                         self.failed_count = 0
                         self.blocked_count = 0
                         self.untested_count = 0
+
                 return MockStats(plan_id)
 
         def calculate_stats_for_plan(plan):
@@ -242,21 +244,23 @@ def get_dashboard_plans(
                         print(f"Warning: Failed to get stats for plan {plan_id}: {e}", flush=True)
                         # Add plan with minimal stats if calculation fails
                         if isinstance(plan, dict) and plan.get("id"):
-                            plans_with_stats.append({
-                                "plan_id": plan["id"],
-                                "plan_name": plan.get("name", f"Plan {plan['id']}"),
-                                "created_on": plan.get("created_on", 0),
-                                "is_completed": plan.get("is_completed", False),
-                                "updated_on": plan.get("updated_on"),
-                                "total_runs": 0,
-                                "total_tests": 0,
-                                "status_distribution": {},
-                                "pass_rate": 0.0,
-                                "completion_rate": 0.0,
-                                "failed_count": 0,
-                                "blocked_count": 0,
-                                "untested_count": 0,
-                            })
+                            plans_with_stats.append(
+                                {
+                                    "plan_id": plan["id"],
+                                    "plan_name": plan.get("name", f"Plan {plan['id']}"),
+                                    "created_on": plan.get("created_on", 0),
+                                    "is_completed": plan.get("is_completed", False),
+                                    "updated_on": plan.get("updated_on"),
+                                    "total_runs": 0,
+                                    "total_tests": 0,
+                                    "status_distribution": {},
+                                    "pass_rate": 0.0,
+                                    "completion_rate": 0.0,
+                                    "failed_count": 0,
+                                    "blocked_count": 0,
+                                    "untested_count": 0,
+                                }
+                            )
 
         has_more = (len(collected) > limit) or (not source_exhausted)
         estimated_total = not source_exhausted or len(collected) > limit
@@ -287,10 +291,7 @@ def get_dashboard_plans(
 
 
 @router.get("/plan/{plan_id}", response_model=DashboardPlanDetail)
-def get_dashboard_plan_detail(
-    plan_id: int,
-    plan_detail_cache=Depends(get_dashboard_plan_detail_cache)
-):
+def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashboard_plan_detail_cache)):
     """
     Get detailed information for a specific test plan including all runs and their statistics.
     """
@@ -334,8 +335,9 @@ def get_dashboard_plan_detail(
                         self.failed_count = 0
                         self.blocked_count = 0
                         self.untested_count = 0
+
                 return MockStats(plan_id)
-            
+
             def calculate_run_statistics(run_id, client):
                 class MockRunStats:
                     def __init__(self, run_id):
@@ -348,6 +350,7 @@ def get_dashboard_plan_detail(
                         self.pass_rate = 0.0
                         self.completion_rate = 0.0
                         self.updated_on = None
+
                 return MockRunStats(run_id)
 
         try:
@@ -433,9 +436,7 @@ def get_dashboard_plan_detail(
         }
 
         # Cache the response
-        expires_at = plan_detail_cache.set(
-            cache_key, response_data, ttl_seconds=config.DASHBOARD_PLAN_DETAIL_CACHE_TTL
-        )
+        expires_at = plan_detail_cache.set(cache_key, response_data, ttl_seconds=config.DASHBOARD_PLAN_DETAIL_CACHE_TTL)
         response_data["meta"] = cache_meta(False, expires_at)
 
         return response_data
@@ -448,10 +449,7 @@ def get_dashboard_plan_detail(
 
 
 @router.get("/runs/{plan_id}", response_model=DashboardRunsResponse)
-def get_dashboard_runs(
-    plan_id: int,
-    stats_cache=Depends(get_dashboard_stats_cache)
-):
+def get_dashboard_runs(plan_id: int, stats_cache=Depends(get_dashboard_stats_cache)):
     """
     Get list of runs for a specific plan with statistics.
     """
@@ -519,6 +517,7 @@ def get_dashboard_runs(
                         self.pass_rate = 0.0
                         self.completion_rate = 0.0
                         self.updated_on = None
+
                 return MockRunStats(run_id)
 
         runs_with_stats = []
@@ -590,7 +589,7 @@ def get_dashboard_config():
 def clear_dashboard_cache(
     plans_cache=Depends(get_dashboard_plans_cache),
     plan_detail_cache=Depends(get_dashboard_plan_detail_cache),
-    stats_cache=Depends(get_dashboard_stats_cache)
+    stats_cache=Depends(get_dashboard_stats_cache),
 ):
     """
     Clear all dashboard caches to force fresh data fetch from TestRail.

@@ -1,6 +1,5 @@
 """Request models for API endpoints."""
 
-from typing import Any
 from pydantic import BaseModel, field_validator, model_validator
 
 
@@ -112,9 +111,63 @@ class UpdateCase(BaseModel):
 
 class AddTestResult(BaseModel):
     """Model for adding a test result."""
+
     status_id: int
     comment: str | None = None
     elapsed: str | None = None
     defects: str | None = None
     version: str | None = None
     assignedto_id: int | None = None
+
+
+class DatasetConfig(BaseModel):
+    """Configuration for dataset generation."""
+
+    rows: int = 1000
+    columns: int = 10
+    geometry_type: str = "POINT"
+    format_type: str = "WKT"
+    area: str = "Jakarta"
+    include_demographic: bool = True
+    include_economic: bool = True
+    use_spatial_clustering: bool = False
+    geojson_path: str | None = None
+    filename_prefix: str | None = None
+
+    @field_validator("rows")
+    @classmethod
+    def validate_rows(cls, v):
+        if not (1 <= v <= 1000000):
+            raise ValueError("Rows must be between 1 and 1,000,000")
+        return v
+
+    @field_validator("columns")
+    @classmethod
+    def validate_columns(cls, v):
+        if not (3 <= v <= 29):
+            raise ValueError("Columns must be between 3 and 29")
+        return v
+
+    @field_validator("geometry_type")
+    @classmethod
+    def validate_geometry_type(cls, v):
+        valid_types = ["POINT", "POLYGON", "MULTIPOLYGON", "H3"]
+        if v.upper() not in valid_types:
+            raise ValueError(f"Geometry type must be one of: {valid_types}")
+        return v.upper()
+
+    @field_validator("format_type")
+    @classmethod
+    def validate_format_type(cls, v):
+        valid_formats = ["WKT", "GEOJSON"]
+        if v.upper() not in valid_formats:
+            raise ValueError(f"Format type must be one of: {valid_formats}")
+        return v.upper()
+
+    @field_validator("area")
+    @classmethod
+    def validate_area(cls, v):
+        valid_areas = ["Jakarta", "Yogyakarta", "Indonesia", "Japan", "Vietnam"]
+        if v not in valid_areas:
+            raise ValueError(f"Area must be one of: {valid_areas}")
+        return v

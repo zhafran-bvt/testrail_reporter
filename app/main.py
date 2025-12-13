@@ -12,16 +12,16 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from testrail_daily_report import generate_report, log_memory
-from app.core.middleware import ErrorHandlingMiddleware, RequestLoggingMiddleware
-from app.utils.helpers import web_worker_count, report_worker_config
-
 # Import API routers
 from app.api.dashboard import router as dashboard_router
+from app.api.dataset import router as dataset_router
+from app.api.general import router as general_router
+from app.api.health import router as health_router
 from app.api.management import router as management_router
 from app.api.reports import router as reports_router
-from app.api.health import router as health_router
-from app.api.general import router as general_router
+from app.core.middleware import ErrorHandlingMiddleware, RequestLoggingMiddleware
+from app.utils.helpers import report_worker_config, web_worker_count
+from testrail_daily_report import generate_report, log_memory
 
 # Ensure local .env overrides host/env settings to avoid stale provider configs
 load_dotenv(override=True)
@@ -49,6 +49,7 @@ class NoCacheStaticFiles(StaticFiles):
 
 
 app.mount("/reports", NoCacheStaticFiles(directory="out"), name="reports")
+app.mount("/output", NoCacheStaticFiles(directory="output"), name="output")
 if Path("assets").exists():
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
 
@@ -60,6 +61,7 @@ app.include_router(management_router)
 app.include_router(reports_router)
 app.include_router(health_router)
 app.include_router(general_router)
+app.include_router(dataset_router)
 
 # Keepalive and memory logging threads
 _keepalive_thread: threading.Thread | None = None
@@ -144,7 +146,7 @@ def on_startup():
     report_workers = f"{report_worker_count} (max {report_worker_max})"
     if report_worker_requested != report_worker_count:
         report_workers = f"{report_workers} (requested {report_worker_requested})"
-    
+
     run_workers = os.getenv("RUN_WORKERS", "2")
     attachment_workers = os.getenv("ATTACHMENT_WORKERS", "2")
     web_workers = web_worker_count()
@@ -186,7 +188,7 @@ def index(request: Request):
     logo_url = "/assets/Bvt.jpg"
 
     from app.core.config import config
-    
+
     return templates.TemplateResponse(
         "index.html",
         {
@@ -213,12 +215,12 @@ def generate(
     plan: int | None = int(plan_param) if plan_param.strip() else None
     run: int | None = int(run_param) if run_param.strip() else None
     selected_run_ids = [int(x) for x in run_ids] if run_ids else None
-    
+
     if selected_run_ids and plan is None:
         raise HTTPException(status_code=400, detail="Run selection requires a plan")
     if (plan is None and run is None) or (plan is not None and run is not None):
         raise HTTPException(status_code=400, detail="Provide exactly one of plan or run")
-    
+
     try:
         path = generate_report(project=project, plan=plan, run=run, run_ids=selected_run_ids)
     except requests.exceptions.RequestException as e:
@@ -228,7 +230,7 @@ def generate(
     except Exception as e:
         # Catch any other unexpected errors
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
-    
+
     url = "/reports/" + Path(path).name
     return RedirectResponse(url=url, status_code=303)
 

@@ -1,0 +1,3 @@
+[submodule "dataset_generator"]
+	path = dataset_generator
+	url = https://github.com/zhafran-bvt/dataset_generator.git

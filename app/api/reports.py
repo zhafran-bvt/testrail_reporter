@@ -1,22 +1,21 @@
 """Reports API endpoints for report generation."""
 
-import uuid
 import threading
 import time
-from datetime import datetime, timezone
-from dataclasses import dataclass, field
+import uuid
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Form, Body, status
-from fastapi.responses import RedirectResponse
 import requests
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 
-from app.models.requests import ReportRequest
-from app.core.dependencies import get_testrail_client
 from app.core.config import config
+from app.core.dependencies import get_testrail_client
+from app.models.requests import ReportRequest
 from app.utils.helpers import report_worker_config
 from testrail_client import capture_telemetry
 from testrail_daily_report import generate_report
@@ -27,6 +26,7 @@ router = APIRouter(prefix="/api", tags=["reports"])
 @dataclass(slots=True)
 class ReportJob:
     """Report generation job."""
+
     id: str
     params: Dict[str, Any]
     status: str = "queued"
@@ -55,7 +55,7 @@ class ReportJob:
 
 class ReportJobManager:
     """Manager for report generation jobs with streaming support."""
-    
+
     def __init__(self, max_workers: int = 2, max_history: int = 50):
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.jobs: Dict[str, ReportJob] = {}
@@ -202,18 +202,12 @@ class ReportJobManager:
 
 # Initialize job manager with configuration
 report_worker_count, _, _ = report_worker_config()
-job_manager = ReportJobManager(
-    max_workers=report_worker_count,
-    max_history=config.REPORT_JOB_HISTORY
-)
+job_manager = ReportJobManager(max_workers=report_worker_count, max_history=config.REPORT_JOB_HISTORY)
 
 
 @router.get("/report")
 def report_alias(
-    project: int = 1,
-    plan: int | None = None,
-    run: int | None = None,
-    client=Depends(get_testrail_client)
+    project: int = 1, plan: int | None = None, run: int | None = None, client=Depends(get_testrail_client)
 ):
     """Alias for /api/report (synchronous legacy endpoint)."""
     return report_sync(project=project, plan=plan, run=run, client=client)
@@ -225,14 +219,14 @@ def report_sync(
     plan: int | None = None,
     run: int | None = None,
     run_ids: list[int] | None = None,
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Generate report synchronously (legacy endpoint)."""
     if run_ids and plan is None:
         raise HTTPException(status_code=400, detail="Run selection requires a plan")
     if (plan is None and run is None) or (plan is not None and run is not None):
         raise HTTPException(status_code=400, detail="Provide exactly one of plan or run")
-    
+
     try:
         path = generate_report(project=project, plan=plan, run=run, run_ids=run_ids)
         url = "/reports/" + Path(path).name

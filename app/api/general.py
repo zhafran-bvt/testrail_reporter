@@ -2,10 +2,11 @@
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List
-from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.dependencies import get_testrail_client, get_plans_cache, get_runs_cache
+import requests
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.core.dependencies import get_plans_cache, get_runs_cache, get_testrail_client
 from app.services.cache import cache_meta
 from testrail_client import get_plan, get_plans_for_project
 from testrail_daily_report import env_or_die
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/api", tags=["general"])
 # Default status mapping for test cases
 DEFAULT_STATUS_MAP = {
     1: "Passed",
-    2: "Blocked", 
+    2: "Blocked",
     3: "Untested",
     4: "Retest",
     5: "Failed",
@@ -23,11 +24,7 @@ DEFAULT_STATUS_MAP = {
 
 
 @router.get("/plans")
-def get_plans(
-    project: int = 1,
-    is_completed: int | None = None,
-    plans_cache=Depends(get_plans_cache)
-):
+def get_plans(project: int = 1, is_completed: int | None = None, plans_cache=Depends(get_plans_cache)):
     """List plans for a project, optionally filter by completion (0 or 1)."""
     cache_key = ("plans", project, is_completed)
     cached = plans_cache.get(cache_key)
@@ -36,19 +33,20 @@ def get_plans(
         data = payload.copy()
         data["meta"] = cache_meta(True, expires_at)
         return data
-    
+
     try:
         base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
         user = env_or_die("TESTRAIL_USER")
         api_key = env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
         raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
-    
+
     import requests
+
     session = requests.Session()
     session.auth = (user, api_key)
     plans = get_plans_for_project(session, base_url, project_id=project, is_completed=is_completed)
-    
+
     # return concise info
     slim = [
         {
@@ -67,11 +65,7 @@ def get_plans(
 
 
 @router.get("/runs")
-def get_runs(
-    plan: int | None = None,
-    project: int = 1,
-    runs_cache=Depends(get_runs_cache)
-):
+def get_runs(plan: int | None = None, project: int = 1, runs_cache=Depends(get_runs_cache)):
     """Return runs for a plan. If no plan is provided, return an empty list instead of 422."""
     # Gracefully handle missing plan so client-side refreshes don't 422
     if plan is None:
@@ -96,22 +90,23 @@ def get_runs(
         data = payload.copy()
         data["meta"] = cache_meta(True, expires_at)
         return data
-    
+
     try:
         base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
         user = env_or_die("TESTRAIL_USER")
         api_key = env_or_die("TESTRAIL_API_KEY")
     except SystemExit:
         raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
-    
+
     import requests
+
     session = requests.Session()
     session.auth = (user, api_key)
     try:
         plan_obj = get_plan(session, base_url, plan)
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=502, detail=f"Error fetching plan runs: {e}")
-    
+
     runs = []
     for entry in plan_obj.get("entries", []):
         suite_name = entry.get("name")
@@ -147,6 +142,7 @@ def get_run(run_id: int, client=Depends(get_testrail_client)):
         raise HTTPException(status_code=500, detail="Server missing TestRail credentials")
 
     import requests
+
     session = requests.Session()
     session.auth = (user, api_key)
 
@@ -230,19 +226,12 @@ def get_tests_for_run(run_id: int, client=Depends(get_testrail_client)):
 
 
 @router.post("/cache/clear")
-def clear_cache(
-    plans_cache=Depends(get_plans_cache),
-    runs_cache=Depends(get_runs_cache)
-):
+def clear_cache(plans_cache=Depends(get_plans_cache), runs_cache=Depends(get_runs_cache)):
     """Clear the plans and runs cache for the reporter page."""
     plans_cache.clear()
     runs_cache.clear()
 
-    return {
-        "success": True,
-        "message": "Cache cleared successfully",
-        "cleared_at": datetime.now().isoformat()
-    }
+    return {"success": True, "message": "Cache cleared successfully", "cleared_at": datetime.now().isoformat()}
 
 
 @router.get("/cases")
@@ -251,7 +240,7 @@ def get_cases(
     suite_id: int | None = None,
     section_id: int | None = None,
     filters: str | None = None,
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Get test cases for a project/suite/section."""
     try:
@@ -275,7 +264,7 @@ def get_cases(
         raise HTTPException(status_code=502, detail=f"Error fetching cases: {e}")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to load cases: {exc}")
-    
+
     slim = []
     for c in cases:
         cid = c.get("id")

@@ -1,27 +1,23 @@
 """Management API endpoints for CRUD operations."""
 
-import time
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Dict, List
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Body
-import requests
 
-from app.models.requests import (
-    ManagePlan, ManageRun, ManageCase, UpdatePlan, UpdateRun, UpdateCase, AddTestResult
-)
-from app.core.dependencies import get_testrail_client, require_write_enabled
+import requests
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile
+
 from app.core.config import config
-from app.services.error_handler import ErrorHandler
+from app.core.dependencies import get_testrail_client, require_write_enabled
+from app.models.requests import AddTestResult, ManageCase, ManagePlan, ManageRun, UpdateCase, UpdatePlan, UpdateRun
 
 router = APIRouter(prefix="/api/manage", tags=["management"])
 
 
 @router.post("/plan")
 def create_plan(
-    payload: ManagePlan,
-    _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    payload: ManagePlan, _write_enabled=Depends(require_write_enabled), client=Depends(get_testrail_client)
 ):
     """Create a new test plan."""
     body = {
@@ -30,10 +26,10 @@ def create_plan(
     }
     if payload.milestone_id is not None:
         body["milestone_id"] = payload.milestone_id
-    
+
     if payload.dry_run:
         return {"dry_run": True, "payload": body, "project": payload.project}
-    
+
     try:
         created = client.add_plan(payload.project, body)
         return {"plan": created}
@@ -44,31 +40,26 @@ def create_plan(
 
 
 @router.post("/run")
-def create_run(
-    payload: ManageRun,
-    _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
-):
+def create_run(payload: ManageRun, _write_enabled=Depends(require_write_enabled), client=Depends(get_testrail_client)):
     """Create a new test run."""
     suite_id = config.DEFAULT_SUITE_ID
     if suite_id is None:
         raise HTTPException(
-            status_code=400,
-            detail="DEFAULT_SUITE_ID is required to create runs when suite_id is omitted"
+            status_code=400, detail="DEFAULT_SUITE_ID is required to create runs when suite_id is omitted"
         )
-    
+
     body: Dict[str, Any] = {
         "suite_id": suite_id,
         "name": payload.name,
         "description": payload.description,
-        "include_all": payload.include_all
+        "include_all": payload.include_all,
     }
-    
+
     if payload.refs:
         body["refs"] = payload.refs
     if payload.case_ids:
         body["case_ids"] = payload.case_ids
-    
+
     if payload.dry_run:
         target = "plan_entry" if payload.plan_id else "run"
         return {
@@ -78,7 +69,7 @@ def create_run(
             "project": payload.project,
             "plan_id": payload.plan_id,
         }
-    
+
     try:
         if payload.plan_id:
             created = client.add_plan_entry(payload.plan_id, body)
@@ -93,20 +84,18 @@ def create_run(
 
 @router.post("/case")
 def create_case(
-    payload: ManageCase,
-    _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    payload: ManageCase, _write_enabled=Depends(require_write_enabled), client=Depends(get_testrail_client)
 ):
     """Create a new test case."""
     section_id = config.DEFAULT_SECTION_ID
     if section_id is None:
         raise HTTPException(status_code=400, detail="DEFAULT_SECTION_ID is required to create cases")
-    
+
     body: Dict[str, Any] = {
         "title": payload.title,
         "refs": payload.refs,
     }
-    
+
     # Add default template, type, and priority if configured
     if config.DEFAULT_TEMPLATE_ID is not None:
         body["template_id"] = config.DEFAULT_TEMPLATE_ID
@@ -114,20 +103,20 @@ def create_case(
         body["type_id"] = config.DEFAULT_TYPE_ID
     if config.DEFAULT_PRIORITY_ID is not None:
         body["priority_id"] = config.DEFAULT_PRIORITY_ID
-    
+
     # Convert BDD text into array of {content: ...}
     bdd_text = payload.bdd_scenarios or ""
     steps = [line.strip() for line in bdd_text.splitlines() if line.strip()]
     if steps:
         combined = "\n".join(steps)
         body["custom_testrail_bdd_scenario"] = [{"content": combined}]
-    
+
     # Remove None fields
     body = {k: v for k, v in body.items() if v is not None}
-    
+
     if payload.dry_run:
         return {"dry_run": True, "payload": body, "section_id": section_id}
-    
+
     try:
         created = client.add_case(section_id, body)
         return {"case": created}
@@ -142,7 +131,7 @@ def update_plan(
     plan_id: int,
     payload: UpdatePlan,
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Update an existing test plan."""
     # Validate plan_id
@@ -184,10 +173,7 @@ def update_plan(
 
 @router.put("/run/{run_id}")
 def update_run(
-    run_id: int,
-    payload: UpdateRun,
-    _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    run_id: int, payload: UpdateRun, _write_enabled=Depends(require_write_enabled), client=Depends(get_testrail_client)
 ):
     """Update an existing test run."""
     # Validate run_id
@@ -275,10 +261,7 @@ def update_run(
 
 
 @router.get("/case/{case_id}")
-def get_case(
-    case_id: int,
-    client=Depends(get_testrail_client)
-):
+def get_case(case_id: int, client=Depends(get_testrail_client)):
     """Get details for a specific test case."""
     # Validate case_id
     if case_id < 1:
@@ -330,7 +313,7 @@ def update_case(
     case_id: int,
     payload: UpdateCase,
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Update an existing test case."""
     # Validate case_id
@@ -381,7 +364,7 @@ async def add_case_attachment(
     case_id: int,
     file: UploadFile = File(...),
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Upload a file attachment to a test case."""
     # Validate case_id
@@ -444,10 +427,7 @@ async def add_case_attachment(
 
 
 @router.get("/case/{case_id}/attachments")
-def get_case_attachments(
-    case_id: int,
-    client=Depends(get_testrail_client)
-):
+def get_case_attachments(case_id: int, client=Depends(get_testrail_client)):
     """Get list of attachments for a test case."""
     # Validate case_id
     if case_id < 1:
@@ -499,7 +479,7 @@ def delete_plan(
     plan_id: int,
     dry_run: bool = False,
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Delete a test plan from TestRail."""
     # Validate plan_id
@@ -529,7 +509,7 @@ def delete_run(
     run_id: int,
     dry_run: bool = False,
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Delete a test run from TestRail."""
     # Validate run_id
@@ -596,7 +576,7 @@ def delete_case(
     case_id: int,
     dry_run: bool = False,
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Delete a test case from TestRail."""
     # Validate case_id
@@ -626,7 +606,7 @@ async def add_test_result(
     test_id: int,
     payload: AddTestResult,
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Add a test result for a test."""
     # Validate test_id
@@ -669,7 +649,7 @@ async def add_result_attachment(
     result_id: int,
     file: UploadFile = File(...),
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Upload a file attachment to a test result."""
     # Validate result_id
@@ -736,7 +716,7 @@ def remove_cases_from_run(
     run_id: int,
     case_ids: List[int] = Body(..., embed=True),
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Remove test cases from a test run."""
     # Validate run_id
@@ -823,7 +803,7 @@ def add_cases_to_run(
     run_id: int,
     case_ids: List[int] = Body(..., embed=True),
     _write_enabled=Depends(require_write_enabled),
-    client=Depends(get_testrail_client)
+    client=Depends(get_testrail_client),
 ):
     """Add test cases to an existing test run."""
     # Validate run_id
@@ -925,10 +905,7 @@ def add_cases_to_run(
 
 @router.get("/run/{run_id}/available_cases")
 def get_available_cases_for_run(
-    run_id: int,
-    project: int = 1,
-    suite_id: int | None = None,
-    client=Depends(get_testrail_client)
+    run_id: int, project: int = 1, suite_id: int | None = None, client=Depends(get_testrail_client)
 ):
     """Get test cases that are available to add to a run (not already in the run)."""
     # Validate run_id

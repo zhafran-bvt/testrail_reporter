@@ -38,8 +38,7 @@ def report_worker_config() -> tuple[int, int, int]:
     resolved = max(1, min(requested, configured_max))
     if resolved != requested:
         print(
-            f"INFO: REPORT_WORKERS limited to {resolved} "
-            f"(requested {requested}, max {configured_max}).",
+            f"INFO: REPORT_WORKERS limited to {resolved} " f"(requested {requested}, max {configured_max}).",
             flush=True,
         )
     return resolved, requested, configured_max
