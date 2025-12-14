@@ -16,7 +16,7 @@ def test_manage_plan_requires_write_flag(monkeypatch):
         return {"id": 999, "name": payload["name"]}
 
     fake.add_plan = add_plan
-    
+
     # Override dependencies
     main.app.dependency_overrides[get_testrail_client] = lambda: fake
     main.app.dependency_overrides[require_write_enabled] = lambda: True
@@ -39,7 +39,7 @@ def test_manage_plan_creates_with_fake_client(monkeypatch):
         return {"id": 123}
 
     fake.add_plan = add_plan
-    
+
     # Override dependencies
     main.app.dependency_overrides[get_testrail_client] = lambda: fake
     main.app.dependency_overrides[require_write_enabled] = lambda: True
@@ -68,13 +68,14 @@ def test_manage_run_targets_plan_entry(monkeypatch):
         return {"id": 55}
 
     fake.add_plan_entry = add_plan_entry
-    
+
     # Override dependencies
     main.app.dependency_overrides[get_testrail_client] = lambda: fake
     main.app.dependency_overrides[require_write_enabled] = lambda: True
 
     # Mock config values
     from app.core.config import config
+
     monkeypatch.setattr(config, "DEFAULT_SUITE_ID", 1)
 
     try:
@@ -101,13 +102,14 @@ def test_manage_case_calls_client(monkeypatch):
         return {"id": 777}
 
     fake.add_case = add_case
-    
+
     # Override dependencies
     main.app.dependency_overrides[get_testrail_client] = lambda: fake
     main.app.dependency_overrides[require_write_enabled] = lambda: True
 
     # Mock config values
     from app.core.config import config
+
     monkeypatch.setattr(config, "DEFAULT_SECTION_ID", 6)
     monkeypatch.setattr(config, "DEFAULT_TEMPLATE_ID", 4)
     monkeypatch.setattr(config, "DEFAULT_TYPE_ID", 7)
