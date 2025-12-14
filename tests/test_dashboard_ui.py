@@ -202,9 +202,9 @@ class TestDashboardAPIAccessibility(BaseAPITestCase):
         """Test that /api/dashboard/plans endpoint is accessible."""
         from unittest.mock import Mock, patch
 
-        with patch("app.main._make_client") as mock_make_client:
+        with patch("app.core.dependencies.get_testrail_client") as mock_get_client:
             mock_tr_client = Mock()
-            mock_make_client.return_value = mock_tr_client
+            mock_get_client.return_value = mock_tr_client
             mock_tr_client.get_plans_for_project.return_value = []
 
             response = self.client.get("/api/dashboard/plans?project=1")
