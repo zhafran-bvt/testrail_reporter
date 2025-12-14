@@ -49,6 +49,8 @@ class NoCacheStaticFiles(StaticFiles):
 
 
 app.mount("/reports", NoCacheStaticFiles(directory="out"), name="reports")
+# Ensure output directory exists and mount it
+Path("output").mkdir(exist_ok=True)
 app.mount("/output", NoCacheStaticFiles(directory="output"), name="output")
 if Path("assets").exists():
     app.mount("/assets", StaticFiles(directory="assets"), name="assets")
