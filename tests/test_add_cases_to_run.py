@@ -8,15 +8,12 @@ from unittest.mock import Mock
 from fastapi.testclient import TestClient
 
 import app.main as main_module
+from app.core.dependencies import get_testrail_client, require_write_enabled
+from tests.test_base import BaseAPITestCase
 
 
-class TestAddCasesToRun:
+class TestAddCasesToRun(BaseAPITestCase):
     """Test suite for adding cases to run endpoints."""
-
-    def setup_method(self):
-        """Setup test client and mock."""
-        self.client = TestClient(main_module.app)
-        main_module._write_enabled = lambda: True
 
     def test_add_cases_to_run_success(self):
         """Test successfully adding cases to a run."""
@@ -32,12 +29,10 @@ class TestAddCasesToRun:
 
         updated_run = {"id": run_id, "name": "Test Run"}
 
-        fake = types.SimpleNamespace()
-        fake.get_tests_for_run = Mock(return_value=current_tests)
-        fake.get_run = Mock(return_value={"id": run_id, "plan_id": None})
-        fake.update_run = Mock(return_value=updated_run)
-
-        main_module._make_client = lambda: fake
+        # Use the mock client from BaseAPITestCase
+        self.mock_client.get_tests_for_run.return_value = current_tests
+        self.mock_client.get_run.return_value = {"id": run_id, "plan_id": None}
+        self.mock_client.update_run.return_value = updated_run
 
         # Make the request
         resp = self.client.post(f"/api/manage/run/{run_id}/add_cases", json={"case_ids": case_ids_to_add})
@@ -52,8 +47,8 @@ class TestAddCasesToRun:
         assert data["skipped_count"] == 0
 
         # Verify update_run was called with correct combined case IDs
-        fake.update_run.assert_called_once()
-        call_args = fake.update_run.call_args
+        self.mock_client.update_run.assert_called_once()
+        call_args = self.mock_client.update_run.call_args
         assert call_args[0][0] == run_id
         assert set(call_args[0][1]["case_ids"]) == {1, 2, 3, 4, 5, 6}
 
@@ -68,12 +63,10 @@ class TestAddCasesToRun:
             {"id": 103, "case_id": 3, "title": "Test 3"},
         ]
 
-        fake = types.SimpleNamespace()
-        fake.get_tests_for_run = Mock(return_value=current_tests)
-        fake.get_run = Mock(return_value={"id": run_id, "plan_id": None})
-        fake.update_run = Mock(return_value={"id": run_id})
-
-        main_module._make_client = lambda: fake
+        # Use the mock client from BaseAPITestCase
+        self.mock_client.get_tests_for_run.return_value = current_tests
+        self.mock_client.get_run.return_value = {"id": run_id, "plan_id": None}
+        self.mock_client.update_run.return_value = {"id": run_id}
 
         resp = self.client.post(f"/api/manage/run/{run_id}/add_cases", json={"case_ids": case_ids_to_add})
 
@@ -88,12 +81,10 @@ class TestAddCasesToRun:
         run_id = 123
         case_ids_to_add = [1, 2, 3]
 
-        fake = types.SimpleNamespace()
-        fake.get_tests_for_run = Mock(return_value=[])
-        fake.get_run = Mock(return_value={"id": run_id, "plan_id": None})
-        fake.update_run = Mock(return_value={"id": run_id})
-
-        main_module._make_client = lambda: fake
+        # Use the mock client from BaseAPITestCase
+        self.mock_client.get_tests_for_run.return_value = []
+        self.mock_client.get_run.return_value = {"id": run_id, "plan_id": None}
+        self.mock_client.update_run.return_value = {"id": run_id}
 
         resp = self.client.post(f"/api/manage/run/{run_id}/add_cases", json={"case_ids": case_ids_to_add})
 
@@ -140,11 +131,10 @@ class TestAddCasesToRun:
             {"id": 4, "title": "Case 4"},
         ]
 
-        fake = types.SimpleNamespace()
-        fake.get_tests_for_run = Mock(return_value=current_tests)
-        fake.get_cases = Mock(return_value=all_cases)
+        self.mock_client.get_tests_for_run = Mock(return_value=current_tests)
+        self.mock_client.get_cases = Mock(return_value=all_cases)
 
-        main_module._make_client = lambda: fake
+        # Use self.mock_client from BaseAPITestCase
 
         resp = self.client.get(f"/api/manage/run/{run_id}/available_cases?project=1")
 
@@ -172,11 +162,10 @@ class TestAddCasesToRun:
             {"id": 2, "title": "Case 2"},
         ]
 
-        fake = types.SimpleNamespace()
-        fake.get_tests_for_run = Mock(return_value=current_tests)
-        fake.get_cases = Mock(return_value=all_cases)
+        self.mock_client.get_tests_for_run = Mock(return_value=current_tests)
+        self.mock_client.get_cases = Mock(return_value=all_cases)
 
-        main_module._make_client = lambda: fake
+        # Use self.mock_client from BaseAPITestCase
 
         resp = self.client.get(f"/api/manage/run/{run_id}/available_cases?project=1")
 
