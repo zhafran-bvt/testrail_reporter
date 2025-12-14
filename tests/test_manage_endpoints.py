@@ -1,4 +1,3 @@
-import types
 from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
