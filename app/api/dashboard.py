@@ -6,7 +6,12 @@ from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.config import config
-from app.core.dependencies import get_dashboard_plan_detail_cache, get_dashboard_plans_cache, get_dashboard_stats_cache
+from app.core.dependencies import (
+    get_dashboard_plan_detail_cache,
+    get_dashboard_plans_cache,
+    get_dashboard_stats_cache,
+    get_testrail_client,
+)
 from app.models.responses import DashboardPlanDetail, DashboardPlansResponse, DashboardRunsResponse
 from app.services.cache import cache_meta
 from app.services.testrail_client import testrail_service
@@ -24,6 +29,7 @@ def get_dashboard_plans(
     created_before: int | None = None,
     search: str | None = None,
     plans_cache=Depends(get_dashboard_plans_cache),
+    client=Depends(get_testrail_client),
 ):
     """
     Get paginated list of test plans with aggregated statistics for the dashboard.
@@ -69,7 +75,7 @@ def get_dashboard_plans(
         return data
 
     try:
-        client = testrail_service.get_client()
+        base_client = client or testrail_service.get_client()
 
         def _apply_search_and_date(plans: list[dict]) -> list[dict]:
             filtered = []
@@ -112,7 +118,7 @@ def get_dashboard_plans(
 
         while len(collected) < needed:
             try:
-                batch = client.get_plans_for_project(
+                batch = base_client.get_plans_for_project(
                     project,
                     is_completed=is_completed,
                     created_after=created_after,
@@ -185,8 +191,7 @@ def get_dashboard_plans(
 
             try:
                 # Create a new client for this thread
-                thread_client = testrail_service.get_client()
-                stats = calculate_plan_statistics(plan_id, thread_client)
+                stats = calculate_plan_statistics(plan_id, base_client)
 
                 # Convert to dict format
                 return {
@@ -292,7 +297,11 @@ def get_dashboard_plans(
 
 
 @router.get("/plan/{plan_id}", response_model=DashboardPlanDetail)
-def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashboard_plan_detail_cache)):
+def get_dashboard_plan_detail(
+    plan_id: int,
+    plan_detail_cache=Depends(get_dashboard_plan_detail_cache),
+    client=Depends(get_testrail_client),
+):
     """
     Get detailed information for a specific test plan including all runs and their statistics.
     """
@@ -310,7 +319,7 @@ def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashbo
         return data
 
     try:
-        client = testrail_service.get_client()
+        base_client = client or testrail_service.get_client()
 
         # Calculate plan statistics
         try:
@@ -355,7 +364,7 @@ def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashbo
                 return MockRunStats(run_id)
 
         try:
-            plan_stats = calculate_plan_statistics(plan_id, client)
+            plan_stats = calculate_plan_statistics(plan_id, base_client)
         except ValueError as e:
             print(f"Error: Invalid data for plan {plan_id}: {e}", flush=True)
             raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found or contains invalid data")
@@ -379,7 +388,7 @@ def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashbo
 
         # Get all runs for the plan
         try:
-            plan_data = client.get_plan(plan_id)
+            plan_data = base_client.get_plan(plan_id)
         except Exception as e:
             print(f"Error: Failed to fetch plan data for {plan_id}: {e}", flush=True)
             raise HTTPException(status_code=502, detail=f"Error fetching plan data from TestRail API: {str(e)}")
@@ -412,7 +421,7 @@ def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashbo
         runs_with_stats = []
         for run_id in run_ids:
             try:
-                run_stats = calculate_run_statistics(run_id, client)
+                run_stats = calculate_run_statistics(run_id, base_client)
 
                 # Convert to dict format
                 run_dict = {
@@ -450,7 +459,11 @@ def get_dashboard_plan_detail(plan_id: int, plan_detail_cache=Depends(get_dashbo
 
 
 @router.get("/runs/{plan_id}", response_model=DashboardRunsResponse)
-def get_dashboard_runs(plan_id: int, stats_cache=Depends(get_dashboard_stats_cache)):
+def get_dashboard_runs(
+    plan_id: int,
+    stats_cache=Depends(get_dashboard_stats_cache),
+    client=Depends(get_testrail_client),
+):
     """
     Get list of runs for a specific plan with statistics.
     """
@@ -468,11 +481,11 @@ def get_dashboard_runs(plan_id: int, stats_cache=Depends(get_dashboard_stats_cac
         return data
 
     try:
-        client = testrail_service.get_client()
+        base_client = client or testrail_service.get_client()
 
         # Get all runs for the plan
         try:
-            plan_data = client.get_plan(plan_id)
+            plan_data = base_client.get_plan(plan_id)
         except Exception as e:
             print(f"Error: Failed to fetch plan data for {plan_id}: {e}", flush=True)
             raise HTTPException(status_code=502, detail=f"Error fetching plan data from TestRail API: {str(e)}")
@@ -524,7 +537,7 @@ def get_dashboard_runs(plan_id: int, stats_cache=Depends(get_dashboard_stats_cac
         runs_with_stats = []
         for run_id in run_ids:
             try:
-                run_stats = calculate_run_statistics(run_id, client)
+                run_stats = calculate_run_statistics(run_id, base_client)
 
                 # Convert to dict format
                 run_dict = {
