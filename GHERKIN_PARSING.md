@@ -146,8 +146,58 @@ Potential improvements:
 2. Test the parser with `test_gherkin_parsing.html`
 3. Verify the input matches expected JSON stringify format
 
+## Examples
+
+### Example 1: Basic Login Scenario
+
+**Before (JSON Stringify Format)**
+```json
+[{"content":"Given user is on login page\\nWhen user enters valid credentials\\nAnd user clicks login button\\nThen user is redirected to dashboard"}]
+```
+
+**After (Formatted Gherkin)**
+```gherkin
+Given user is on login page
+When user enters valid credentials
+  And user clicks login button
+Then user is redirected to dashboard
+```
+
+### Example 2: Complex API Testing Scenario
+
+**Before (JSON Stringify Format)**
+```json
+[{"content":"Given API endpoint is available\\nAnd authentication token is valid\\nWhen POST request is sent with valid payload\\nThen response status is 200\\nAnd response contains expected data\\nAnd database is updated"}]
+```
+
+**After (Formatted Gherkin)**
+```gherkin
+Given API endpoint is available
+  And authentication token is valid
+When POST request is sent with valid payload
+Then response status is 200
+  And response contains expected data
+  And database is updated
+```
+
+### Example 3: Error Handling with But Keyword
+
+**Before (JSON Stringify Format)**
+```json
+[{"content":"Given user has admin privileges\\nWhen user tries to delete a test run\\nBut the run has test results\\nThen system shows warning message\\nAnd deletion is prevented"}]
+```
+
+**After (Formatted Gherkin)**
+```gherkin
+Given user has admin privileges
+When user tries to delete a test run
+  But the run has test results
+Then system shows warning message
+  And deletion is prevented
+```
+
 ## Related Documentation
 
 - [API Documentation](API_DOCUMENTATION.md)
 - [CRUD Operations Guide](CRUD_OPERATIONS_GUIDE.md)
-- [Test Result Attachments](TEST_RESULT_ATTACHMENTS.md)
+- [User Guide: Gherkin Formatting](USER_GUIDE_GHERKIN.md)

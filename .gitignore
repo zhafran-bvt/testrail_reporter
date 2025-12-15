@@ -22,7 +22,10 @@ venv/
 
 # Output
 out/
+output/
 server.log
+validation_reports/
+test_output/
 
 # Frontend build artifacts
 tsconfig.tsbuildinfo
