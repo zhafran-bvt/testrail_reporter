@@ -130,7 +130,6 @@ class TestPlanUpdateProperties(BaseAPITestCase):
         update_data=gen_plan_update_data(),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_plan_update_field_persistence(self, plan_id, update_data):
         """
         **Feature: testrail-dashboard, Property 25: Plan update field persistence**
@@ -261,7 +260,6 @@ class TestRunUpdateProperties(BaseAPITestCase):
         update_data=gen_run_update_data(),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_run_update_field_persistence(self, run_id, update_data):
         """
         **Feature: testrail-dashboard, Property 29: Run update field persistence**
@@ -391,7 +389,6 @@ class TestCaseUpdateProperties(BaseAPITestCase):
         update_data=gen_case_update_data(),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_case_update_field_persistence(self, case_id, update_data):
         """
         **Feature: testrail-dashboard, Property 33: Case update field persistence**
@@ -509,8 +506,6 @@ class TestUpdateEndpointsUnit(BaseAPITestCase):
     """Unit tests for update endpoints covering specific scenarios."""
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_update_plan_with_valid_data_returns_updated_entity(self):
         """Test that updating a plan with valid data returns the updated entity."""
         client = TestClient(main.app)
@@ -540,8 +535,6 @@ class TestUpdateEndpointsUnit(BaseAPITestCase):
         assert result["plan"]["description"] == "New description"
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_update_plan_with_invalid_id_returns_404(self):
         """Test that updating a non-existent plan returns 404."""
         client = TestClient(main.app)
@@ -589,8 +582,6 @@ class TestUpdateEndpointsUnit(BaseAPITestCase):
         assert result["payload"]["name"] == "Test Plan"
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_update_plan_partial_update_preserves_unchanged_fields(self):
         """Test that partial updates preserve unchanged fields."""
         client = TestClient(main.app)
@@ -626,8 +617,6 @@ class TestUpdateEndpointsUnit(BaseAPITestCase):
         assert result["plan"]["milestone_id"] == 42
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_update_run_with_valid_data_returns_updated_entity(self):
         """Test that updating a run with valid data returns the updated entity."""
         client = TestClient(main.app)
@@ -658,8 +647,6 @@ class TestUpdateEndpointsUnit(BaseAPITestCase):
         assert result["run"]["refs"] == "JIRA-123"
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_update_run_with_invalid_id_returns_404(self):
         """Test that updating a non-existent run returns 404."""
         client = TestClient(main.app)
@@ -687,8 +674,6 @@ class TestUpdateEndpointsUnit(BaseAPITestCase):
         assert "not found" in resp.json()["detail"].lower()
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_update_case_with_valid_data_returns_updated_entity(self):
         """Test that updating a case with valid data returns the updated entity."""
         client = TestClient(main.app)
@@ -718,8 +703,6 @@ class TestUpdateEndpointsUnit(BaseAPITestCase):
         assert result["case"]["refs"] == "TEST-456"
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_update_case_with_invalid_id_returns_404(self):
         """Test that updating a non-existent case returns 404."""
         client = TestClient(main.app)

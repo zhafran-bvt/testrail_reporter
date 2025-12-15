@@ -36,7 +36,6 @@ class TestPlanDeletionConfirmation(BaseAPITestCase):
         plan_id=st.integers(min_value=1, max_value=10000),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_plan_deletion_requires_explicit_call(self, plan_id):
         """
         **Feature: testrail-dashboard, Property 27: Plan deletion confirmation requirement**
@@ -59,7 +58,6 @@ class TestPlanDeletionConfirmation(BaseAPITestCase):
         fake.delete_plan = delete_plan
 
         # Patch the client
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
@@ -95,7 +93,6 @@ class TestPlanDeletionSuccess(BaseAPITestCase):
         plan_id=st.integers(min_value=1, max_value=10000),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_plan_deletion_success_removes_plan(self, plan_id):
         """
         **Feature: testrail-dashboard, Property 28: Plan deletion success removes plan**
@@ -128,7 +125,6 @@ class TestPlanDeletionSuccess(BaseAPITestCase):
         fake.get_plans_for_project = get_plans_for_project
 
         # Patch the client
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
@@ -169,7 +165,6 @@ class TestRunDeletionConfirmation(BaseAPITestCase):
         run_id=st.integers(min_value=1, max_value=10000),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_run_deletion_requires_explicit_call(self, run_id):
         """
         **Feature: testrail-dashboard, Property 31: Run deletion confirmation requirement**
@@ -193,7 +188,6 @@ class TestRunDeletionConfirmation(BaseAPITestCase):
         fake.get_run = lambda rid: {"id": rid, "plan_id": None}
 
         # Patch the client
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
@@ -229,7 +223,6 @@ class TestRunDeletionSuccess(BaseAPITestCase):
         run_id=st.integers(min_value=1, max_value=10000),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_run_deletion_success_removes_run(self, plan_id, run_id):
         """
         **Feature: testrail-dashboard, Property 32: Run deletion success removes run**
@@ -265,7 +258,6 @@ class TestRunDeletionSuccess(BaseAPITestCase):
         fake.get_run = lambda rid: {"id": rid, "plan_id": None}
 
         # Patch the client
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
@@ -309,7 +301,6 @@ class TestCaseDeletionConfirmation(BaseAPITestCase):
         case_id=st.integers(min_value=1, max_value=10000),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_case_deletion_requires_explicit_call(self, case_id):
         """
         **Feature: testrail-dashboard, Property 35: Case deletion confirmation requirement**
@@ -332,7 +323,6 @@ class TestCaseDeletionConfirmation(BaseAPITestCase):
         fake.delete_case = delete_case
 
         # Patch the client
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
@@ -368,7 +358,6 @@ class TestCaseDeletionSuccess(BaseAPITestCase):
         case_id=st.integers(min_value=1, max_value=10000),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_case_deletion_success_removes_case(self, section_id, case_id):
         """
         **Feature: testrail-dashboard, Property 36: Case deletion success removes case**
@@ -404,7 +393,6 @@ class TestCaseDeletionSuccess(BaseAPITestCase):
         fake.get_cases = get_cases
 
         # Patch the client
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
@@ -442,8 +430,6 @@ class TestDeleteEndpointsUnit(BaseAPITestCase):
             return {}
 
         fake.delete_plan = delete_plan
-
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
@@ -496,8 +482,6 @@ class TestDeleteEndpointsUnit(BaseAPITestCase):
 
         fake.delete_plan = delete_plan
 
-        import app.main as main_module
-
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
 
@@ -526,8 +510,6 @@ class TestDeleteEndpointsUnit(BaseAPITestCase):
 
         fake.delete_run = delete_run
         fake.get_run = lambda rid: {"id": rid, "plan_id": None}
-
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase
@@ -580,8 +562,6 @@ class TestDeleteEndpointsUnit(BaseAPITestCase):
             return {}
 
         fake.delete_case = delete_case
-
-        import app.main as main_module
 
         # Use self.mock_client from BaseAPITestCase
         # Write enabled via BaseAPITestCase

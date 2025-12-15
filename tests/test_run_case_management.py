@@ -72,7 +72,6 @@ class TestCasesFetchProperties(BaseAPITestCase):
         tests=gen_test_cases_list(min_size=0, max_size=20),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_tests_endpoint_returns_required_fields(self, run_id, run_data, tests):
         """
         **Feature: test-run-case-management, Property 6: Test Cases Fetch on Run Click**
@@ -438,7 +437,6 @@ class TestRunEditModalProperties(BaseAPITestCase):
         refs=st.one_of(st.none(), st.text(min_size=0, max_size=100)),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_run_update_api_accepts_valid_payload(self, run_id, run_name, description, refs):
         """
         **Feature: test-run-case-management, Property 2: Run Update API Integration**
@@ -588,7 +586,6 @@ class TestCaseEditModalProperties(BaseAPITestCase):
         bdd_scenarios=st.one_of(st.none(), st.text(min_size=0, max_size=500)),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_case_update_api_accepts_valid_payload(self, case_id, title, refs, bdd_scenarios):
         """
         **Feature: test-run-case-management, Property 8: Case Edit Modal**
@@ -688,7 +685,6 @@ class TestCaseEditModalProperties(BaseAPITestCase):
         attachment_id=st.integers(min_value=1, max_value=100000),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_attachment_upload_success(self, case_id, valid_content_type, file_size_kb, attachment_id):
         """
         **Feature: test-run-case-management, Property 18: Attachment Upload Success**
@@ -847,7 +843,6 @@ class TestCasesViewProperties(BaseAPITestCase):
         run_data=gen_run_data(),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_run_name_header_display(self, run_id, run_data):
         """
         **Feature: test-run-case-management, Property 15: Run Name Header Display**
@@ -944,7 +939,6 @@ class TestStatusBadgeMapping(BaseAPITestCase):
         status_id=st.sampled_from([1, 2, 3, 4, 5]),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_api_returns_correct_status_name(self, run_id, run_data, status_id):
         """
         **Feature: test-run-case-management, Property 13: Status Badge Color Mapping**

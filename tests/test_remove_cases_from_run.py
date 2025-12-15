@@ -5,7 +5,6 @@ This module tests the new functionality to remove test cases from a run
 without deleting them from the project.
 """
 
-import unittest
 from unittest.mock import Mock
 
 from tests.test_base import BaseAPITestCase

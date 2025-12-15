@@ -2,13 +2,8 @@
 Tests for adding test cases to a test run.
 """
 
-import types
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
-
-import app.main as main_module
-from app.core.dependencies import get_testrail_client, require_write_enabled
 from tests.test_base import BaseAPITestCase
 
 

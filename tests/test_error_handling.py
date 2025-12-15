@@ -29,8 +29,6 @@ class TestAPIFailureHandling(BaseAPITestCase):
     """Test API failure handling in dashboard endpoints."""
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_plans_endpoint_handles_timeout(self):
         """Plans endpoint should handle API timeout gracefully."""
         self.mock_client.get_plans_for_project.side_effect = requests.exceptions.Timeout("Request timed out")
@@ -40,8 +38,6 @@ class TestAPIFailureHandling(BaseAPITestCase):
         self.assertIn("timed out", response.json()["detail"].lower())
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_plans_endpoint_handles_connection_error(self):
         """Plans endpoint should handle connection errors gracefully."""
         self.mock_client.get_plans_for_project.side_effect = requests.exceptions.ConnectionError("Connection failed")
@@ -51,8 +47,6 @@ class TestAPIFailureHandling(BaseAPITestCase):
         self.assertIn("connect", response.json()["detail"].lower())
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_plan_detail_endpoint_handles_timeout(self):
         """Plan detail endpoint should handle API timeout gracefully."""
         with patch("app.dashboard_stats.calculate_plan_statistics") as mock_calc_stats:
@@ -63,8 +57,6 @@ class TestAPIFailureHandling(BaseAPITestCase):
             self.assertIn("timed out", response.json()["detail"].lower())
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_runs_endpoint_handles_connection_error(self):
         """Runs endpoint should handle connection errors gracefully."""
         self.mock_client.get_plan.side_effect = requests.exceptions.ConnectionError("Connection failed")
@@ -74,8 +66,6 @@ class TestAPIFailureHandling(BaseAPITestCase):
         self.assertIn("connect", response.json()["detail"].lower())
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_plans_endpoint_handles_invalid_response_type(self):
         """Plans endpoint should handle invalid response data types."""
         # Return invalid type (string instead of list)
@@ -335,8 +325,6 @@ class TestMissingFieldHandling(BaseAPITestCase):
         self.assertEqual(stats.completion_rate, 0.0)
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_plans_endpoint_handles_malformed_plan_data(self):
         """Plans endpoint should handle malformed plan data gracefully."""
         # Return plans with missing/invalid fields

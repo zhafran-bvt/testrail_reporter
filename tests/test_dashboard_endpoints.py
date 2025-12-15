@@ -59,7 +59,6 @@ class TestPlanListCompleteness(BaseAPITestCase):
         offset=st.integers(min_value=0, max_value=10),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_all_plans_included_within_pagination(self, project_id, plans, limit, offset):
         """All plans for a project should be included in response (respecting pagination)."""
 
@@ -147,7 +146,6 @@ class TestRunListCompleteness(BaseAPITestCase):
         num_runs=st.integers(min_value=0, max_value=10),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_all_runs_for_plan_returned(self, plan_id, num_runs):
         """All runs associated with a plan should be returned in the response."""
 
@@ -225,7 +223,6 @@ class TestPaginationLimitEnforcement(BaseAPITestCase):
         requested_limit=st.integers(min_value=1, max_value=300),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_response_respects_limit_parameter(self, project_id, num_plans, requested_limit):
         """Response should contain at most the requested limit of items."""
 
@@ -293,8 +290,6 @@ class TestCacheOperations(BaseAPITestCase):
     """Unit tests for cache operations."""
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_cache_miss_triggers_api_call(self):
         """Cache miss should trigger API call."""
 
@@ -311,8 +306,6 @@ class TestCacheOperations(BaseAPITestCase):
             self.assertEqual(mock_tr_client.get_plans_for_project.call_count, 1)
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_cache_hit_returns_cached_data(self):
         """Cache hit should return cached data without API call."""
 
@@ -358,8 +351,6 @@ class TestCacheOperations(BaseAPITestCase):
                 self.assertEqual(mock_tr_client.get_plans_for_project.call_count, 1)
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_cache_expiration(self):
         """Cache should expire after TTL."""
         import time
@@ -386,8 +377,6 @@ class TestCacheOperations(BaseAPITestCase):
         self.assertIsNone(result)
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_concurrent_cache_access(self):
         """Cache should handle concurrent access safely."""
         import threading
@@ -452,8 +441,6 @@ class TestAPIEndpointEdgeCases(BaseAPITestCase):
         self.assertEqual(response.status_code, 502)
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_plans_endpoint_handles_api_failure(self):
         """Plans endpoint should handle TestRail API failures."""
         import requests
@@ -478,7 +465,6 @@ class TestCacheHitBehavior(BaseAPITestCase):
         num_plans=st.integers(min_value=1, max_value=10),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_cached_data_returns_without_api_call(self, project_id, num_plans):
         """For any cached data that has not expired, subsequent requests should return cached value without API calls."""
 
@@ -567,7 +553,6 @@ class TestCacheInvalidation(BaseAPITestCase):
         num_plans=st.integers(min_value=1, max_value=10),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_cache_cleared_on_refresh(self, project_id, num_plans):
         """For any cached data, when refresh is triggered, cache should be cleared and new data fetched."""
 
@@ -661,7 +646,6 @@ class TestDataUpdateAfterRefresh(BaseAPITestCase):
         updated_plans=st.integers(min_value=1, max_value=5),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_data_updated_after_refresh(self, project_id, initial_plans, updated_plans):
         """For any dashboard view, when refresh completes successfully, the displayed data should reflect the newly fetched data."""
 
@@ -774,7 +758,6 @@ class TestSearchFilterCorrectness(BaseAPITestCase):
         ),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_search_filter_only_includes_matching_plans(self, project_id, plans, search_term):
         """For any search term and list of plans, filtered results should only include plans whose names contain the search term (case-insensitive)."""
 
@@ -863,7 +846,6 @@ class TestCompletionFilterCorrectness(BaseAPITestCase):
         is_completed_filter=st.one_of(st.none(), st.integers(min_value=0, max_value=1)),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_completion_filter_only_includes_matching_status(self, project_id, plans, is_completed_filter):
         """For any completion status filter value and list of plans, filtered results should only include plans matching that completion status."""
 
@@ -962,7 +944,6 @@ class TestDateRangeFilterCorrectness(BaseAPITestCase):
         ),
     )
     @unittest.skip("Temporarily skipped for deployment")
-
     def test_date_range_filter_only_includes_plans_in_range(self, project_id, plans, date_range):
         """For any date range (start, end) and list of plans, filtered results should only include plans with creation dates within that range (inclusive)."""
 
@@ -1046,8 +1027,6 @@ class TestFilterEdgeCases(BaseAPITestCase):
     """Unit tests for filter edge cases."""
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_empty_search_term_returns_all_results(self):
         """Empty search term should return all results."""
 
@@ -1098,8 +1077,6 @@ class TestFilterEdgeCases(BaseAPITestCase):
                 self.assertEqual(len(data["plans"]), 3)
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_search_with_no_matches(self):
         """Search with no matches should return empty results."""
 
@@ -1140,8 +1117,6 @@ class TestFilterEdgeCases(BaseAPITestCase):
                 self.assertEqual(data["total_count"], 0)
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_invalid_date_ranges(self):
         """Invalid date ranges should still work (start > end is handled by filtering logic)."""
 
@@ -1182,8 +1157,6 @@ class TestFilterEdgeCases(BaseAPITestCase):
                 self.assertIn("less than or equal", response.json()["detail"])
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_combined_filters(self):
         """Multiple filters should be applied together."""
 
@@ -1247,8 +1220,6 @@ class TestRefreshErrorHandling(BaseAPITestCase):
     """
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_refresh_with_api_failure_retains_old_data(self):
         """Test that when API fails during refresh, old cached data is retained."""
 
@@ -1314,8 +1285,6 @@ class TestRefreshErrorHandling(BaseAPITestCase):
                 self.assertIn("Error connecting to TestRail API", error_data["detail"])
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_refresh_with_network_timeout_shows_error(self):
         """Test that network timeout during refresh shows appropriate error."""
 
@@ -1339,8 +1308,6 @@ class TestRefreshErrorHandling(BaseAPITestCase):
             self.assertIn("timed out", error_data["detail"].lower())
 
     @unittest.skip("Temporarily skipped for deployment")
-
-
     def test_refresh_with_invalid_response_shows_error(self):
         """Test that invalid response during refresh shows appropriate error."""
 
