@@ -37,7 +37,7 @@ class TestDashboardEndToEnd:
     @pytest.fixture
     def mock_testrail_client(self):
         """Create mock TestRail client with realistic data."""
-        with patch("app.main._make_client") as mock_make_client:
+        with patch("app.core.dependencies.get_testrail_client") as mock_make_client:
             mock_client = MagicMock()
 
             # Mock plans data
@@ -462,7 +462,7 @@ class TestDashboardPerformance:
     @pytest.fixture
     def mock_testrail_client(self):
         """Create mock TestRail self.client."""
-        with patch("app.main._make_client") as mock_make_client:
+        with patch("app.core.dependencies.get_testrail_client") as mock_make_client:
             mock_client = MagicMock()
             mock_client.get_plans_for_project.return_value = [
                 {

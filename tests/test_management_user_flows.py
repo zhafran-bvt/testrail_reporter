@@ -147,7 +147,7 @@ class TestManagementViewUserFlows:
         mock_client.delete_case.return_value = {}
 
         # Patch the client maker
-        monkeypatch.setattr("app.main._make_client", lambda: mock_client)
+        monkeypatch.setattr("app.core.dependencies.get_testrail_client", lambda: mock_client)
 
         return mock_client
 
@@ -446,7 +446,7 @@ class TestManagementViewComplexFlows:
         mock_client.update_plan.return_value = {"id": 1, "name": "Plan A Updated"}
 
         # Patch the client maker
-        monkeypatch.setattr("app.main._make_client", lambda: mock_client)
+        monkeypatch.setattr("app.core.dependencies.get_testrail_client", lambda: mock_client)
 
         return mock_client
 
