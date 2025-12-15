@@ -20,6 +20,7 @@ def _resolve_testrail_client():
     """
     return dependencies.get_testrail_client()
 
+
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 
