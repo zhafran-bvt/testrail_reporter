@@ -3,7 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 import app.core.dependencies as dependencies
 from app.core.config import config
@@ -13,11 +13,17 @@ from app.services.cache import cache_meta
 from app.services.testrail_client import testrail_service
 
 
-def _resolve_testrail_client():
+def _resolve_testrail_client(request: Request):
     """
-    Resolve TestRail client via dependencies module so test patches on
-    app.core.dependencies.get_testrail_client are honored.
+    Resolve TestRail client with support for FastAPI dependency overrides and runtime patching.
+
+    Tests can override app.core.dependencies.get_testrail_client via dependency_overrides
+    or monkeypatching; this resolver checks overrides first and otherwise calls the
+    dependency module directly.
     """
+    override = request.app.dependency_overrides.get(dependencies.get_testrail_client)
+    if override:
+        return override()
     return dependencies.get_testrail_client()
 
 
