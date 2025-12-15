@@ -5,16 +5,20 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
+import app.core.dependencies as dependencies
 from app.core.config import config
-from app.core.dependencies import (
-    get_dashboard_plan_detail_cache,
-    get_dashboard_plans_cache,
-    get_dashboard_stats_cache,
-    get_testrail_client,
-)
+from app.core.dependencies import get_dashboard_plan_detail_cache, get_dashboard_plans_cache, get_dashboard_stats_cache
 from app.models.responses import DashboardPlanDetail, DashboardPlansResponse, DashboardRunsResponse
 from app.services.cache import cache_meta
 from app.services.testrail_client import testrail_service
+
+
+def _resolve_testrail_client():
+    """
+    Resolve TestRail client via dependencies module so test patches on
+    app.core.dependencies.get_testrail_client are honored.
+    """
+    return dependencies.get_testrail_client()
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -29,7 +33,7 @@ def get_dashboard_plans(
     created_before: int | None = None,
     search: str | None = None,
     plans_cache=Depends(get_dashboard_plans_cache),
-    client=Depends(get_testrail_client),
+    client=Depends(_resolve_testrail_client),
 ):
     """
     Get paginated list of test plans with aggregated statistics for the dashboard.
@@ -300,7 +304,7 @@ def get_dashboard_plans(
 def get_dashboard_plan_detail(
     plan_id: int,
     plan_detail_cache=Depends(get_dashboard_plan_detail_cache),
-    client=Depends(get_testrail_client),
+    client=Depends(_resolve_testrail_client),
 ):
     """
     Get detailed information for a specific test plan including all runs and their statistics.
@@ -462,7 +466,7 @@ def get_dashboard_plan_detail(
 def get_dashboard_runs(
     plan_id: int,
     stats_cache=Depends(get_dashboard_stats_cache),
-    client=Depends(get_testrail_client),
+    client=Depends(_resolve_testrail_client),
 ):
     """
     Get list of runs for a specific plan with statistics.
