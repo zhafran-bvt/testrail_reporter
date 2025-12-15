@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/app/core/middleware.py
-# hypothesis_version: 6.148.5
-
-[500, 'X-Correlation-ID', 'Z', 'correlation_id', 'detail', 'error_code', 'timestamp', 'unknown']

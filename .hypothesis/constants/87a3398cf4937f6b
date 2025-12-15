@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/app/services/cache.py
-# hypothesis_version: 6.148.5
-
-[120, 128, 'cache', 'expires_at', 'hit', 'maxsize', 'seconds_remaining', 'size', 'ttl_seconds']

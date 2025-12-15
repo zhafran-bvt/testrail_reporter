@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/app/api/general.py
-# hypothesis_version: 6.148.5
-
-[400, 404, 500, 502, '/', '/api', '/cache/clear', '/cases', '/plans', '/run/{run_id}', '/runs', '/tests/{run_id}', '/users', 'Blocked', 'Failed', 'Passed', 'Retest', 'TESTRAIL_API_KEY', 'TESTRAIL_BASE_URL', 'TESTRAIL_USER', 'Unknown', 'Untested', 'cache', 'case_id', 'cases', 'cases:section_id', 'cleared_at', 'count', 'created_on', 'description', 'entries', 'expires_at', 'filters', 'general', 'hit', 'id', 'is_completed', 'message', 'meta', 'name', 'plan_id', 'plans', 'priority_id', 'refs', 'run', 'run_id', 'run_name', 'runs', 'seconds_remaining', 'section_id', 'status_id', 'status_name', 'success', 'suite_name', 'tests', 'title', 'updated_on', 'users', 'values']

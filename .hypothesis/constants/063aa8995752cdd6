@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/app/dashboard_stats.py
-# hypothesis_version: 6.148.5
-
-[0.0, 100.0, 'Blocked', 'Failed', 'Passed', 'Retest', 'Unknown', 'Untested', 'created_on', 'entries', 'id', 'is_completed', 'name', 'run_name', 'runs', 'status_id', 'suite_name', 'updated_on']

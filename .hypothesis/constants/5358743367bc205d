@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/app/main.py
-# hypothesis_version: 6.148.5
-
-[200, 240, 303, 307, 400, 500, 502, '#15736E', '#1A8A85', '#F8F9FA', '/', '/assets', '/assets/Bvt.jpg', '/generate', '/output', '/reports', '/reports/', '/ui', '0', '0.1.0', '2', '240', '60', 'ATTACHMENT_WORKERS', 'BRAND_BG', 'BRAND_BG2', 'BRAND_PRIMARY', 'BRAND_PRIMARY_600', 'Cache-Control', 'Expires', 'KEEPALIVE_INTERVAL', 'KEEPALIVE_URL', 'MEM_LOG_INTERVAL', 'Pragma', 'RUN_WORKERS', 'TestRail Reporter', 'assets', 'bg', 'bg2', 'brand', 'cache_bust', 'default_project', 'default_section_id', 'default_suite_id', 'heartbeat', 'index.html', 'keepalive-thread', 'logo_url', 'memlog-thread', 'no-cache', 'out', 'output', 'primary', 'primary_600', 'reports', 'request', 'shutdown', 'startup', 'templates']

@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/app/api/health.py
-# hypothesis_version: 6.148.5
-
-[500, 503, '/health/cache', '/health/detailed', '/health/testrail', '/healthz', 'api_version', 'backoff_seconds', 'base_url', 'cache', 'checks', 'connection_error', 'details', 'error', 'health', 'healthy', 'http', 'http_error', 'ok', 'plans', 'queue', 'queued', 'report_queue', 'retries', 'running', 'runs', 'size', 'stats', 'status', 'status_count', 'testrail', 'timeout_seconds', 'timestamp', 'unavailable', 'unhealthy', 'v2']

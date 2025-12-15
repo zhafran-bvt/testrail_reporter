@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/app/core/config.py
-# hypothesis_version: 6.148.5
-
-[120, 128, 180, 240, 300, 1024, '1', '2', '4', '69', '7', 'DEFAULT_PRIORITY_ID', 'DEFAULT_SECTION_ID', 'DEFAULT_SUITE_ID', 'DEFAULT_TEMPLATE_ID', 'DEFAULT_TYPE_ID', 'GIF', 'JPG', 'KEEPALIVE_INTERVAL', 'MEM_LOG_INTERVAL', 'MOV', 'MP4', 'PDF', 'PLANS_CACHE_MAXSIZE', 'PLANS_CACHE_TTL', 'PNG', 'REPORT_JOB_HISTORY', 'REPORT_WORKERS', 'REPORT_WORKERS_MAX', 'RUNS_CACHE_MAXSIZE', 'RUNS_CACHE_TTL', 'WebM', 'application/pdf', 'image/gif', 'image/jpeg', 'image/png', 'video/mov', 'video/mp4', 'video/quicktime', 'video/webm']

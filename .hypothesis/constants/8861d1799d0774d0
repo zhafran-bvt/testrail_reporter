@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/testrail_client.py
-# hypothesis_version: 6.148.5
-
-[0.5, 1.0, 1.6, 1.8, 20.0, 1000.0, 250, 403, 404, 429, 500, 600, 1024, '&', '.bin', '3', 'Content-Type', 'GET', 'POST', 'Retry-After', 'api_calls', 'attachment', 'attachments', 'cases', 'elapsed_ms', 'email', 'endpoint', 'entries', 'error', 'get_priorities', 'get_statuses', 'get_users', 'id', 'items', 'kind', 'message', 'n/a', 'name', 'ok', 'plans', 'rb', 'results', 'runs', 'short_name', 'status', 'tests', 'timestamp', 'wb']

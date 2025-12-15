@@ -1,4 +1,0 @@
-# file: /Users/bvt-zhafran/testrail_daily_report/app/api/dashboard.py
-# hypothesis_version: 6.148.5
-
-[0.0, 400, 404, 500, 502, '/api/dashboard', '/cache/clear', '/config', '/plan/{plan_id}', '/plans', '/runs/{plan_id}', 'Unknown Plan', '_estimated_total', 'blocked_count', 'cache', 'cleared_caches', 'completion_rate', 'created_on', 'dashboard', 'dashboard_plans', 'dashboard_runs', 'dashboard_stats', 'default_page_size', 'entries', 'estimated_total', 'failed_count', 'has_more', 'id', 'is_completed', 'limit', 'max_page_size', 'message', 'meta', 'name', 'offset', 'pagination', 'pass_rate', 'pass_rate_high', 'pass_rate_medium', 'plan', 'plan_detail_ttl', 'plan_id', 'plan_name', 'plans', 'plans_ttl', 'run_id', 'run_name', 'run_stats_ttl', 'runs', 'stats_ttl', 'status', 'status_distribution', 'success', 'suite_name', 'total_count', 'total_runs', 'total_tests', 'unknown', 'untested_count', 'updated_on', 'visual_thresholds']
