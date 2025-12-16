@@ -416,22 +416,39 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: d
     combined_distribution: dict[str, int] = {}
     latest_updated_on: int | None = None
 
-    # Prefer lightweight aggregation from run summary counts to avoid per-run test fetches
+    # Prefer lightweight aggregation from run summary counts, but fallback to fetching tests if absent
     for run in run_summaries:
-        passed = int(run.get("passed_count") or 0)
-        blocked = int(run.get("blocked_count") or 0)
-        untested = int(run.get("untested_count") or 0)
-        retest = int(run.get("retest_count") or 0)
-        failed = int(run.get("failed_count") or 0)
+        run_id = run.get("id")
+        has_summary_counts = any(k in run for k in ("passed_count", "blocked_count", "untested_count", "retest_count", "failed_count"))
 
-        total = passed + blocked + untested + retest + failed
-        total_tests += total
+        if has_summary_counts:
+            passed = int(run.get("passed_count") or 0)
+            blocked = int(run.get("blocked_count") or 0)
+            untested = int(run.get("untested_count") or 0)
+            retest = int(run.get("retest_count") or 0)
+            failed = int(run.get("failed_count") or 0)
 
-        combined_distribution["Passed"] = combined_distribution.get("Passed", 0) + passed
-        combined_distribution["Blocked"] = combined_distribution.get("Blocked", 0) + blocked
-        combined_distribution["Untested"] = combined_distribution.get("Untested", 0) + untested
-        combined_distribution["Retest"] = combined_distribution.get("Retest", 0) + retest
-        combined_distribution["Failed"] = combined_distribution.get("Failed", 0) + failed
+            total = passed + blocked + untested + retest + failed
+            total_tests += total
+
+            combined_distribution["Passed"] = combined_distribution.get("Passed", 0) + passed
+            combined_distribution["Blocked"] = combined_distribution.get("Blocked", 0) + blocked
+            combined_distribution["Untested"] = combined_distribution.get("Untested", 0) + untested
+            combined_distribution["Retest"] = combined_distribution.get("Retest", 0) + retest
+            combined_distribution["Failed"] = combined_distribution.get("Failed", 0) + failed
+        elif run_id:
+            try:
+                tests = client.get_tests_for_run(run_id)
+                if isinstance(tests, list):
+                    total_tests += len(tests)
+                    run_distribution = calculate_status_distribution(tests)
+                    for status, count in run_distribution.items():
+                        if isinstance(count, (int, float)):
+                            current = combined_distribution.get(status, 0)
+                            combined_distribution[status] = current + int(count)
+            except Exception as e:
+                print(f"Warning: Failed to fetch tests for run {run_id}: {e}", flush=True)
+                continue
 
         ts = run.get("updated_on")
         if isinstance(ts, (int, float)):
