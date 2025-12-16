@@ -114,7 +114,6 @@ async def _generate_dataset_task(job_id: str, config: DatasetConfig):
             include_demographic=config.include_demographic,
             include_economic=config.include_economic,
             use_spatial_clustering=config.use_spatial_clustering,
-            h3_resolution=9 if config.geometry_type == "H3" else None,
         )
 
         # Validate dataset
@@ -126,8 +125,6 @@ async def _generate_dataset_task(job_id: str, config: DatasetConfig):
             lon_max=lon_max,
             lat_min=lat_min,
             lat_max=lat_max,
-            h3_resolution=9 if config.geometry_type == "H3" else None,
-            land_geometry=land_geometry,
         )
 
         # Generate filename
