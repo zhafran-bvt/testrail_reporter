@@ -202,7 +202,7 @@ def get_dashboard_plans(
 
             try:
                 # Create a new client for this thread
-                stats = calculate_plan_statistics(plan_id, base_client, plan_data=plan)
+                stats = calculate_plan_statistics(plan_id, base_client)
 
                 # Convert to dict format
                 return {
@@ -240,8 +240,8 @@ def get_dashboard_plans(
                 }
 
         # Use ThreadPoolExecutor to calculate stats in parallel
-        # Allow more workers since we now use lightweight aggregation; cap to avoid overwhelming TestRail
-        max_workers = min(4, max(1, len(paginated_plans)))
+        # Limit to 2 workers to avoid TestRail API rate limits
+        max_workers = min(2, len(paginated_plans))
         plans_with_stats = []
 
         if paginated_plans:
