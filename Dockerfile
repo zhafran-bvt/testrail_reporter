@@ -8,9 +8,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# Install system dependencies needed for both build and runtime
+# Install system dependencies needed for both build and runtime (include git for submodules)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates libjemalloc2 ffmpeg && rm -rf /var/lib/apt/lists/*
+    curl ca-certificates libjemalloc2 ffmpeg git && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies (including dev dependencies for checks)
 COPY requirements.txt requirements-dev.txt ./
@@ -18,6 +18,13 @@ RUN pip install --upgrade pip && pip install -r requirements.txt -r requirements
 
 # Copy all application code and configurations
 COPY . .
+# Ensure dataset_generator submodule/content is available (clone if missing)
+RUN if [ ! -f dataset_generator/file_generator.py ]; then \
+      git submodule update --init --recursive || true; \
+      if [ ! -f dataset_generator/file_generator.py ]; then \
+        git clone --depth=1 https://github.com/zhafran-bvt/dataset_generator.git dataset_generator; \
+      fi; \
+    fi
 
 # Run linting, formatting checks, type checking, and unit tests
 # Note: These commands will cause the build to fail if checks do not pass
