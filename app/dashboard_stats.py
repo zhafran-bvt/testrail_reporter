@@ -420,6 +420,32 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: d
                 run_ids.append(run_id)
                 run_summaries.append(run)
 
+    # If we didn't get any run information from the list item, fetch full plan detail
+    if not run_ids:
+        try:
+            plan_detail = client.get_plan(plan_id)
+            if isinstance(plan_detail, dict):
+                entries = plan_detail.get("entries", [])
+                if not isinstance(entries, list):
+                    entries = []
+                run_summaries = []
+                run_ids = []
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    runs = entry.get("runs", [])
+                    if not isinstance(runs, list):
+                        continue
+                    for run in runs:
+                        if not isinstance(run, dict):
+                            continue
+                        run_id = run.get("id")
+                        if run_id and isinstance(run_id, int):
+                            run_ids.append(run_id)
+                            run_summaries.append(run)
+        except Exception as e:
+            print(f"Warning: Failed to fetch plan detail for {plan_id} when runs missing: {e}", flush=True)
+
     # Aggregate statistics across all runs
     total_tests = 0
     combined_distribution: dict[str, int] = {}
