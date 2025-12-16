@@ -16,6 +16,13 @@ from app.models.requests import DatasetConfig
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.append(str(PROJECT_ROOT / "dataset_generator"))
 
+DEFAULT_GEOJSON = {
+    "Jakarta": "dataset_generator/geoJson/jkt.geojson",
+    "Indonesia": "dataset_generator/geoJson/id.json",
+    "Japan": "dataset_generator/geoJson/jp.json",
+    "Vietnam": "dataset_generator/geoJson/vn.json",
+}
+
 try:
     import geopandas as gpd
     from shapely.ops import unary_union
@@ -92,11 +99,19 @@ async def _generate_dataset_task(job_id: str, config: DatasetConfig):
         lon_min, lon_max = area_config["lon_min"], area_config["lon_max"]
         lat_min, lat_max = area_config["lat_min"], area_config["lat_max"]
 
-        # Load land geometry if geojson_path provided
+        # Load land geometry if geojson_path provided or default available for area
         land_geometry = None
-        if config.geojson_path and Path(config.geojson_path).exists():
+        geojson_path = config.geojson_path or DEFAULT_GEOJSON.get(config.area)
+        if geojson_path:
+            gj_path = Path(geojson_path)
+            if not gj_path.is_absolute():
+                gj_path = PROJECT_ROOT / gj_path
+        else:
+            gj_path = None
+
+        if gj_path and gj_path.exists():
             try:
-                land_gdf = gpd.read_file(config.geojson_path)
+                land_gdf = gpd.read_file(gj_path)
                 if not land_gdf.empty:
                     land_geometry = unary_union(land_gdf["geometry"].values)
             except Exception as e:
