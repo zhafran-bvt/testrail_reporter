@@ -450,6 +450,7 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: d
     total_tests = 0
     combined_distribution: dict[str, int] = {}
     latest_updated_on: int | None = None
+    aggregated_run_ids: set[int] = set()
 
     # Prefer lightweight aggregation from run summary counts, but fallback to fetching tests if absent
     for run in run_summaries:
@@ -467,6 +468,8 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: d
 
             total = passed + blocked + untested + retest + failed
             total_tests += total
+            if run_id:
+                aggregated_run_ids.add(run_id)
 
             combined_distribution["Passed"] = combined_distribution.get("Passed", 0) + passed
             combined_distribution["Blocked"] = combined_distribution.get("Blocked", 0) + blocked
@@ -478,6 +481,7 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: d
                 tests = client.get_tests_for_run(run_id)
                 if isinstance(tests, list):
                     total_tests += len(tests)
+                    aggregated_run_ids.add(run_id)
                     run_distribution = calculate_status_distribution(tests)
                     for status, count in run_distribution.items():
                         if isinstance(count, (int, float)):
@@ -492,6 +496,26 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: d
             ts = int(ts)
             if latest_updated_on is None or ts > latest_updated_on:
                 latest_updated_on = ts
+
+    # If no tests were counted but we have runs, force a fallback aggregation from run tests
+    if total_tests == 0 and run_ids:
+        combined_distribution = {}
+        total_tests = 0
+        for run_id in run_ids:
+            if run_id in aggregated_run_ids:
+                continue
+            try:
+                tests = client.get_tests_for_run(run_id)
+                if not isinstance(tests, list):
+                    continue
+                total_tests += len(tests)
+                run_distribution = calculate_status_distribution(tests)
+                for status, count in run_distribution.items():
+                    if isinstance(count, (int, float)):
+                        current = combined_distribution.get(status, 0)
+                        combined_distribution[status] = current + int(count)
+            except Exception as e:
+                print(f"Warning: Fallback fetch tests for run {run_id} failed: {e}", flush=True)
 
     # Calculate aggregated rates
     try:
