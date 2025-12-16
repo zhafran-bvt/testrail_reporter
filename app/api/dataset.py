@@ -12,7 +12,9 @@ from pydantic import BaseModel
 # Import models
 from app.models.requests import DatasetConfig
 
-sys.path.append(str(Path(__file__).parent.parent.parent.parent / "dataset_generator"))
+# Ensure dataset_generator is importable regardless of working directory
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.append(str(PROJECT_ROOT / "dataset_generator"))
 
 try:
     import geopandas as gpd
