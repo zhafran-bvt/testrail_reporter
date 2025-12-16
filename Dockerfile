@@ -51,6 +51,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY --from=builder /app/app ./app
 COPY --from=builder /app/templates ./templates
 COPY --from=builder /app/assets ./assets
+COPY --from=builder /app/dataset_generator ./dataset_generator
 COPY --from=builder /app/testrail_client.py ./testrail_client.py
 COPY --from=builder /app/testrail_daily_report.py ./testrail_daily_report.py
 COPY --from=builder /app/.env.example ./.env.example
