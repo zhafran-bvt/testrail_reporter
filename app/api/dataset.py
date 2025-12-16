@@ -20,14 +20,16 @@ try:
     import geopandas as gpd
     from shapely.ops import unary_union
 
-    from dataset_generator.file_generator import (  # type: ignore
-        BOUNDING_BOXES,
-        H3_AVAILABLE,
-        REALISTIC_LABELS,
-        generate_parallel_dataframe,
-        save_files_chunked,
-        validate_generated_data,
-    )
+    # Import module first so missing optional attributes don't hard-fail
+    import dataset_generator.file_generator as dg  # type: ignore
+
+    BOUNDING_BOXES = dg.BOUNDING_BOXES
+    REALISTIC_LABELS = dg.REALISTIC_LABELS
+    generate_parallel_dataframe = dg.generate_parallel_dataframe
+    save_files_chunked = dg.save_files_chunked
+    validate_generated_data = dg.validate_generated_data
+    # Some versions may not define H3_AVAILABLE; default to False
+    H3_AVAILABLE = getattr(dg, "H3_AVAILABLE", False)
 
     DATASET_GENERATOR_AVAILABLE = True
 except ImportError as e:
