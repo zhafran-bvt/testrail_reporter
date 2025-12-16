@@ -419,7 +419,9 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: d
     # Prefer lightweight aggregation from run summary counts, but fallback to fetching tests if absent
     for run in run_summaries:
         run_id = run.get("id")
-        has_summary_counts = any(k in run for k in ("passed_count", "blocked_count", "untested_count", "retest_count", "failed_count"))
+        has_summary_counts = any(
+            k in run for k in ("passed_count", "blocked_count", "untested_count", "retest_count", "failed_count")
+        )
 
         if has_summary_counts:
             passed = int(run.get("passed_count") or 0)
