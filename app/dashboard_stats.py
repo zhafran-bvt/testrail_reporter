@@ -337,7 +337,7 @@ def calculate_run_statistics(run_id: int, client: TestRailClient) -> RunStatisti
     )
 
 
-def calculate_plan_statistics(plan_id: int, client: TestRailClient) -> PlanStatistics:
+def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: dict | None = None) -> PlanStatistics:
     """
     Calculate aggregated statistics across all runs in a plan.
 
@@ -358,11 +358,14 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient) -> PlanStati
     if client is None:
         raise ValueError("TestRail client cannot be None")
 
-    # Fetch plan details
-    try:
-        plan = client.get_plan(plan_id)
-    except Exception as e:
-        raise ValueError(f"Failed to fetch plan {plan_id}: {e}")
+    # Fetch plan details if not provided
+    if plan_data is None:
+        try:
+            plan = client.get_plan(plan_id)
+        except Exception as e:
+            raise ValueError(f"Failed to fetch plan {plan_id}: {e}")
+    else:
+        plan = plan_data
 
     # Validate plan data
     if not isinstance(plan, dict):
@@ -387,8 +390,9 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient) -> PlanStati
     if updated_on is not None and not isinstance(updated_on, (int, float)):
         updated_on = None
 
-    # Collect all runs from plan entries
+    # Collect all runs from plan entries (and any summary counts we can use)
     run_ids = []
+    run_summaries: list[dict[str, Any]] = []
     entries = plan.get("entries", [])
     if not isinstance(entries, list):
         entries = []
@@ -405,34 +409,35 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient) -> PlanStati
             run_id = run.get("id")
             if run_id and isinstance(run_id, int):
                 run_ids.append(run_id)
+                run_summaries.append(run)
 
     # Aggregate statistics across all runs
     total_tests = 0
     combined_distribution: dict[str, int] = {}
+    latest_updated_on: int | None = None
 
-    for run_id in run_ids:
-        try:
-            tests = client.get_tests_for_run(run_id)
-            if not isinstance(tests, list):
-                continue
+    # Prefer lightweight aggregation from run summary counts to avoid per-run test fetches
+    for run in run_summaries:
+        passed = int(run.get("passed_count") or 0)
+        blocked = int(run.get("blocked_count") or 0)
+        untested = int(run.get("untested_count") or 0)
+        retest = int(run.get("retest_count") or 0)
+        failed = int(run.get("failed_count") or 0)
 
-            total_tests += len(tests)
+        total = passed + blocked + untested + retest + failed
+        total_tests += total
 
-            # Aggregate status distribution
-            try:
-                run_distribution = calculate_status_distribution(tests)
-                for status, count in run_distribution.items():
-                    if isinstance(count, (int, float)):
-                        current = combined_distribution.get(status, 0)
-                        combined_distribution[status] = current + int(count)
-            except Exception as e:
-                # Log but continue with other runs
-                print(f"Warning: Failed to calculate distribution for run {run_id}: {e}", flush=True)
-                continue
-        except Exception as e:
-            # Log but continue with other runs
-            print(f"Warning: Failed to fetch tests for run {run_id}: {e}", flush=True)
-            continue
+        combined_distribution["Passed"] = combined_distribution.get("Passed", 0) + passed
+        combined_distribution["Blocked"] = combined_distribution.get("Blocked", 0) + blocked
+        combined_distribution["Untested"] = combined_distribution.get("Untested", 0) + untested
+        combined_distribution["Retest"] = combined_distribution.get("Retest", 0) + retest
+        combined_distribution["Failed"] = combined_distribution.get("Failed", 0) + failed
+
+        ts = run.get("updated_on")
+        if isinstance(ts, (int, float)):
+            ts = int(ts)
+            if latest_updated_on is None or ts > latest_updated_on:
+                latest_updated_on = ts
 
     # Calculate aggregated rates
     try:
@@ -461,7 +466,7 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient) -> PlanStati
         plan_name=plan_name,
         created_on=created_on,
         is_completed=is_completed,
-        updated_on=updated_on,
+        updated_on=latest_updated_on if latest_updated_on is not None else updated_on,
         total_runs=len(run_ids),
         total_tests=total_tests,
         status_distribution=combined_distribution,
