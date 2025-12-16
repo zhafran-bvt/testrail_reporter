@@ -366,6 +366,15 @@ def calculate_plan_statistics(plan_id: int, client: TestRailClient, plan_data: d
             raise ValueError(f"Failed to fetch plan {plan_id}: {e}")
     else:
         plan = plan_data
+        # If the list item is minimal (missing entries/runs), fetch full plan detail
+        entries_preview = plan.get("entries")
+        needs_detail = not isinstance(entries_preview, list) or len(entries_preview) == 0
+        if needs_detail:
+            try:
+                plan = client.get_plan(plan_id)
+            except Exception:
+                # If detail fetch fails, continue with the provided minimal plan
+                pass
 
     # Validate plan data
     if not isinstance(plan, dict):
