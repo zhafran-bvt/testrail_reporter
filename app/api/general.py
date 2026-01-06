@@ -32,6 +32,7 @@ def _resolve_runs_cache(request: Request):
 def _resolve_testrail_client(request: Request):
     return _resolve_dependency(request, dependencies.get_testrail_client)
 
+
 # Default status mapping for test cases
 DEFAULT_STATUS_MAP = {
     1: "Passed",

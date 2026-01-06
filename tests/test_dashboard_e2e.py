@@ -197,16 +197,16 @@ class TestDashboardEndToEnd:
         # Verify loading and empty states
         assert 'id="dashboardLoading"' in html
         assert 'id="dashboardEmpty"' in html
-        
+
         # Verify new Quick Filters feature
-        assert 'quick-filter-btn' in html
+        assert "quick-filter-btn" in html
         assert 'data-filter="today"' in html
         assert 'data-filter="this-week"' in html
         assert 'data-filter="this-month"' in html
         assert 'data-filter="active"' in html
         assert 'data-filter="completed"' in html
         assert 'data-filter="clear"' in html
-        
+
         # Verify new Saved Filters feature
         assert 'id="saveCurrentFilterBtn"' in html
         assert 'id="savedFiltersDropdown"' in html
@@ -236,10 +236,10 @@ class TestDashboardEndToEnd:
         assert "refreshDashboard" in js_content
         assert "generatePlanReport" in js_content
         assert "generateRunReport" in js_content
-        
+
         # Check for new Quick Filters functions
         assert "applyQuickFilter" in js_content
-        
+
         # Check for new Saved Filters functions
         assert "loadSavedFilters" in js_content
         assert "saveCurrentFilter" in js_content
@@ -295,12 +295,12 @@ class TestDashboardEndToEnd:
         assert "#10b981" in html  # Green for passed
         assert "#ef4444" in html  # Red for failed
         assert "#f59e0b" in html  # Orange/yellow for blocked
-        
+
         # Verify new Quick Filters styling
         assert "quick-filter-btn" in html
         assert ".quick-filter-btn:hover" in html or "quick-filter-btn:hover" in html
         assert ".quick-filter-btn.active" in html or "quick-filter-btn.active" in html
-        
+
         # Verify new Saved Filters styling
         assert "saved-filter-item" in html
         assert "saved-filter-name" in html

@@ -48,7 +48,9 @@ def create_plan(
 
 
 @router.post("/run")
-def create_run(payload: ManageRun, _write_enabled=Depends(require_write_enabled), client=Depends(_resolve_testrail_client)):
+def create_run(
+    payload: ManageRun, _write_enabled=Depends(require_write_enabled), client=Depends(_resolve_testrail_client)
+):
     """Create a new test run."""
     suite_id = config.DEFAULT_SUITE_ID
     if suite_id is None:

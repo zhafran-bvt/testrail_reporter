@@ -18,6 +18,7 @@ class TestBackwardCompatibilityPreservation:
     def client(self):
         """Create test client."""
         from app.main import app
+
         return TestClient(app)
 
     def test_legacy_report_endpoints_compatibility(self, client):

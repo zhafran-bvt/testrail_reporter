@@ -4,7 +4,7 @@ Script to add Quick Filters and Saved Filters HTML to templates/index.html
 """
 
 # HTML to insert
-QUICK_FILTERS_HTML = '''
+QUICK_FILTERS_HTML = """
         <!-- Quick Filters -->
         <div class="card" style="margin-bottom: 16px;">
           <h2 style="margin: 0 0 12px;">Quick Filters</h2>
@@ -46,10 +46,10 @@ QUICK_FILTERS_HTML = '''
           </div>
         </div>
 
-'''
+"""
 
 # CSS to add
-QUICK_FILTERS_CSS = '''
+QUICK_FILTERS_CSS = """
     .quick-filter-btn {
       padding: 8px 16px;
       font-size: 13px;
@@ -137,47 +137,49 @@ QUICK_FILTERS_CSS = '''
       border-color: #ef4444;
       color: #ef4444;
     }
-'''
+"""
+
 
 def main():
-    template_file = 'templates/index.html'
-    
+    template_file = "templates/index.html"
+
     print(f"Reading {template_file}...")
-    with open(template_file, 'r', encoding='utf-8') as f:
+    with open(template_file, "r", encoding="utf-8") as f:
         content = f.read()
-    
+
     # Check if already added
-    if 'Quick Filters' in content and 'quick-filter-btn' in content:
+    if "Quick Filters" in content and "quick-filter-btn" in content:
         print("✅ Quick Filters HTML already exists in the file!")
         return
-    
+
     # Find the insertion point (before Sort Controls)
-    sort_marker = '<!-- Sort Controls -->'
+    sort_marker = "<!-- Sort Controls -->"
     if sort_marker not in content:
         print(f"❌ Could not find '{sort_marker}' marker in the file")
         return
-    
+
     # Insert the HTML
     parts = content.split(sort_marker, 1)
-    new_content = parts[0] + QUICK_FILTERS_HTML + '\n        ' + sort_marker + parts[1]
-    
+    new_content = parts[0] + QUICK_FILTERS_HTML + "\n        " + sort_marker + parts[1]
+
     # Find the style section and add CSS
-    style_end = '</style>'
+    style_end = "</style>"
     if style_end in new_content:
         style_parts = new_content.split(style_end, 1)
-        new_content = style_parts[0] + QUICK_FILTERS_CSS + '\n  ' + style_end + style_parts[1]
+        new_content = style_parts[0] + QUICK_FILTERS_CSS + "\n  " + style_end + style_parts[1]
         print("✅ Added CSS styles")
     else:
         print("⚠️  Could not find </style> tag, CSS not added")
-    
+
     # Write the updated content
     print(f"Writing updated content to {template_file}...")
-    with open(template_file, 'w', encoding='utf-8') as f:
+    with open(template_file, "w", encoding="utf-8") as f:
         f.write(new_content)
-    
+
     print("✅ Successfully added Quick Filters and Saved Filters HTML!")
     print("✅ Successfully added CSS styles!")
     print("\n🎉 Integration complete! Refresh your browser at http://localhost:8000")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
