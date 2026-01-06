@@ -141,12 +141,17 @@ async def _generate_dataset_task(job_id: str, config: DatasetConfig):
         )
 
         # Save files
-        save_files_chunked(df, filename_prefix)
+        written_files = save_files_chunked(df, filename_prefix)
+        if not isinstance(written_files, list) or not written_files:
+            written_files = [
+                f"output/{filename_prefix}.csv",
+                f"output/{filename_prefix}.xlsx",
+            ]
 
         # Update job status
         job.status = "completed"
         job.validation_results = validation_results
-        job.file_paths = [f"output/{filename_prefix}.csv", f"output/{filename_prefix}.xlsx"]
+        job.file_paths = written_files
         job.completed_at = datetime.now().isoformat()
 
     except Exception as e:

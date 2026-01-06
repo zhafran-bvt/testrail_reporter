@@ -4,14 +4,33 @@ import json
 from datetime import datetime
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.core.dependencies import get_plans_cache, get_runs_cache, get_testrail_client
+import app.core.dependencies as dependencies
 from app.services.cache import cache_meta
 from testrail_client import get_plan, get_plans_for_project
 from testrail_daily_report import env_or_die
 
 router = APIRouter(prefix="/api", tags=["general"])
+
+
+def _resolve_dependency(request: Request, dependency):
+    override = request.app.dependency_overrides.get(dependency)
+    if override:
+        return override()
+    return dependency()
+
+
+def _resolve_plans_cache(request: Request):
+    return _resolve_dependency(request, dependencies.get_plans_cache)
+
+
+def _resolve_runs_cache(request: Request):
+    return _resolve_dependency(request, dependencies.get_runs_cache)
+
+
+def _resolve_testrail_client(request: Request):
+    return _resolve_dependency(request, dependencies.get_testrail_client)
 
 # Default status mapping for test cases
 DEFAULT_STATUS_MAP = {
@@ -24,7 +43,7 @@ DEFAULT_STATUS_MAP = {
 
 
 @router.get("/plans")
-def get_plans(project: int = 1, is_completed: int | None = None, plans_cache=Depends(get_plans_cache)):
+def get_plans(project: int = 1, is_completed: int | None = None, plans_cache=Depends(_resolve_plans_cache)):
     """List plans for a project, optionally filter by completion (0 or 1)."""
     cache_key = ("plans", project, is_completed)
     cached = plans_cache.get(cache_key)
@@ -65,7 +84,7 @@ def get_plans(project: int = 1, is_completed: int | None = None, plans_cache=Dep
 
 
 @router.get("/runs")
-def get_runs(plan: int | None = None, project: int = 1, runs_cache=Depends(get_runs_cache)):
+def get_runs(plan: int | None = None, project: int = 1, runs_cache=Depends(_resolve_runs_cache)):
     """Return runs for a plan. If no plan is provided, return an empty list instead of 422."""
     # Gracefully handle missing plan so client-side refreshes don't 422
     if plan is None:
@@ -132,7 +151,7 @@ def get_runs(plan: int | None = None, project: int = 1, runs_cache=Depends(get_r
 
 
 @router.get("/run/{run_id}")
-def get_run(run_id: int, client=Depends(get_testrail_client)):
+def get_run(run_id: int, client=Depends(_resolve_testrail_client)):
     """Fetch details for a specific run."""
     try:
         base_url = env_or_die("TESTRAIL_BASE_URL").rstrip("/")
@@ -167,7 +186,7 @@ def get_run(run_id: int, client=Depends(get_testrail_client)):
 
 
 @router.get("/tests/{run_id}")
-def get_tests_for_run(run_id: int, client=Depends(get_testrail_client)):
+def get_tests_for_run(run_id: int, client=Depends(_resolve_testrail_client)):
     """Fetch test cases for a specific run."""
     # Validate run_id
     if run_id < 1:
@@ -226,7 +245,7 @@ def get_tests_for_run(run_id: int, client=Depends(get_testrail_client)):
 
 
 @router.post("/cache/clear")
-def clear_cache(plans_cache=Depends(get_plans_cache), runs_cache=Depends(get_runs_cache)):
+def clear_cache(plans_cache=Depends(_resolve_plans_cache), runs_cache=Depends(_resolve_runs_cache)):
     """Clear the plans and runs cache for the reporter page."""
     plans_cache.clear()
     runs_cache.clear()
@@ -240,7 +259,7 @@ def get_cases(
     suite_id: int | None = None,
     section_id: int | None = None,
     filters: str | None = None,
-    client=Depends(get_testrail_client),
+    client=Depends(_resolve_testrail_client),
 ):
     """Get test cases for a project/suite/section."""
     try:
@@ -284,7 +303,7 @@ def get_cases(
 
 
 @router.get("/users")
-def get_users(project: int = 1, client=Depends(get_testrail_client)):
+def get_users(project: int = 1, client=Depends(_resolve_testrail_client)):
     """Return list of users for dropdowns."""
     try:
         users = client.get_users_map()

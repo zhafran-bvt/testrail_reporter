@@ -75,3 +75,8 @@ def require_write_enabled():
     # For now, always allow writes. This can be extended later
     # to check environment variables or user permissions
     return True
+
+
+def get_write_enabled():
+    """Backward-compatible alias for write permission dependency."""
+    return require_write_enabled()

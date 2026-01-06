@@ -78,10 +78,10 @@ class TestDashboardEndToEnd:
 
             # Mock tests data
             mock_client.get_tests_for_run.return_value = [
-                {"status_id": 1, "run_name": "Smoke Tests - Run 1"},  # Passed
-                {"status_id": 1, "run_name": "Smoke Tests - Run 1"},  # Passed
-                {"status_id": 5, "run_name": "Smoke Tests - Run 1"},  # Failed
-                {"status_id": 3, "run_name": "Smoke Tests - Run 1"},  # Untested
+                {"status_id": 1, "run_name": "Incorrect Run Name"},  # Passed
+                {"status_id": 1, "run_name": "Incorrect Run Name"},  # Passed
+                {"status_id": 5, "run_name": "Incorrect Run Name"},  # Failed
+                {"status_id": 3, "run_name": "Incorrect Run Name"},  # Untested
             ]
 
             mock_make_client.return_value = mock_client
@@ -101,7 +101,7 @@ class TestDashboardEndToEnd:
         7. Refreshing the data
         """
         # Step 1: Load dashboard plans
-        response = self.client.get("/api/dashboard/plans?project=1")
+        response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data = response.json()
 
@@ -120,13 +120,13 @@ class TestDashboardEndToEnd:
         assert "status_distribution" in plan
 
         # Step 2: Apply search filter
-        response = self.client.get("/api/dashboard/plans?project=1&search=Sprint")
+        response = client.get("/api/dashboard/plans?project=1&search=Sprint")
         assert response.status_code == 200
         filtered_data = response.json()
         assert len(filtered_data["plans"]) <= len(data["plans"])
 
         # Step 3: Apply completion filter
-        response = self.client.get("/api/dashboard/plans?project=1&is_completed=0")
+        response = client.get("/api/dashboard/plans?project=1&is_completed=0")
         assert response.status_code == 200
         active_data = response.json()
         for plan in active_data["plans"]:
@@ -134,7 +134,7 @@ class TestDashboardEndToEnd:
 
         # Step 4: Get plan details with runs
         plan_id = data["plans"][0]["plan_id"]
-        response = self.client.get(f"/api/dashboard/plan/{plan_id}")
+        response = client.get(f"/api/dashboard/plan/{plan_id}")
         assert response.status_code == 200
         plan_detail = response.json()
 
@@ -150,22 +150,24 @@ class TestDashboardEndToEnd:
             assert "run_name" in run
             assert "pass_rate" in run
             assert "status_distribution" in run
+            name_by_id = {r["run_id"]: r.get("run_name") for r in plan_detail["runs"]}
+            assert name_by_id.get(101) == "Smoke Tests - Run 1"
 
         # Step 5: Clear cache (refresh)
-        response = self.client.post("/api/dashboard/cache/clear")
+        response = client.post("/api/dashboard/cache/clear")
         assert response.status_code == 200
         clear_data = response.json()
         assert clear_data["status"] == "success"
 
         # Step 6: Verify data reloads after cache clear
-        response = self.client.get("/api/dashboard/plans?project=1")
+        response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         refreshed_data = response.json()
         assert "plans" in refreshed_data
 
     def test_dashboard_html_structure(self, client):
         """Test that the dashboard HTML structure is complete and accessible."""
-        response = self.client.get("/")
+        response = client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -195,10 +197,24 @@ class TestDashboardEndToEnd:
         # Verify loading and empty states
         assert 'id="dashboardLoading"' in html
         assert 'id="dashboardEmpty"' in html
+        
+        # Verify new Quick Filters feature
+        assert 'quick-filter-btn' in html
+        assert 'data-filter="today"' in html
+        assert 'data-filter="this-week"' in html
+        assert 'data-filter="this-month"' in html
+        assert 'data-filter="active"' in html
+        assert 'data-filter="completed"' in html
+        assert 'data-filter="clear"' in html
+        
+        # Verify new Saved Filters feature
+        assert 'id="saveCurrentFilterBtn"' in html
+        assert 'id="savedFiltersDropdown"' in html
+        assert 'id="savedFiltersList"' in html
 
     def test_dashboard_javascript_functionality(self, client):
         """Test that dashboard JavaScript module is loaded and functional."""
-        response = self.client.get("/")
+        response = client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -206,7 +222,7 @@ class TestDashboardEndToEnd:
         assert "dashboard.js" in html
 
         # Verify dashboard module functions are defined
-        response = self.client.get("/assets/dashboard.js")
+        response = client.get("/assets/dashboard.js")
         assert response.status_code == 200
         js_content = response.text
 
@@ -220,10 +236,20 @@ class TestDashboardEndToEnd:
         assert "refreshDashboard" in js_content
         assert "generatePlanReport" in js_content
         assert "generateRunReport" in js_content
+        
+        # Check for new Quick Filters functions
+        assert "applyQuickFilter" in js_content
+        
+        # Check for new Saved Filters functions
+        assert "loadSavedFilters" in js_content
+        assert "saveCurrentFilter" in js_content
+        assert "applySavedFilterById" in js_content
+        assert "setDefaultFilter" in js_content
+        assert "deleteSavedFilter" in js_content
 
     def test_dashboard_responsive_design(self, client):
         """Test that responsive design CSS is present and correct."""
-        response = self.client.get("/")
+        response = client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -244,7 +270,7 @@ class TestDashboardEndToEnd:
 
     def test_dashboard_visual_indicators(self, client):
         """Test that visual indicators and color coding are properly defined."""
-        response = self.client.get("/")
+        response = client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -269,10 +295,20 @@ class TestDashboardEndToEnd:
         assert "#10b981" in html  # Green for passed
         assert "#ef4444" in html  # Red for failed
         assert "#f59e0b" in html  # Orange/yellow for blocked
+        
+        # Verify new Quick Filters styling
+        assert "quick-filter-btn" in html
+        assert ".quick-filter-btn:hover" in html or "quick-filter-btn:hover" in html
+        assert ".quick-filter-btn.active" in html or "quick-filter-btn.active" in html
+        
+        # Verify new Saved Filters styling
+        assert "saved-filter-item" in html
+        assert "saved-filter-name" in html
+        assert "saved-filter-desc" in html
 
     def test_dashboard_accessibility_features(self, client):
         """Test that accessibility features are properly implemented."""
-        response = self.client.get("/")
+        response = client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -293,25 +329,25 @@ class TestDashboardEndToEnd:
     def test_dashboard_error_handling(self, client):
         """Test that error handling works correctly throughout the dashboard."""
         # Test invalid project ID
-        response = self.client.get("/api/dashboard/plans?project=-1")
+        response = client.get("/api/dashboard/plans?project=-1")
         assert response.status_code == 400
 
         # Test invalid plan ID
-        response = self.client.get("/api/dashboard/plan/-1")
+        response = client.get("/api/dashboard/plan/-1")
         assert response.status_code == 400
 
         # Test invalid date range
-        response = self.client.get("/api/dashboard/plans?project=1&created_after=1000&created_before=500")
+        response = client.get("/api/dashboard/plans?project=1&created_after=1000&created_before=500")
         assert response.status_code == 400
 
         # Test invalid is_completed value
-        response = self.client.get("/api/dashboard/plans?project=1&is_completed=5")
+        response = client.get("/api/dashboard/plans?project=1&is_completed=5")
         assert response.status_code == 400
 
     def test_dashboard_pagination(self, client, mock_testrail_client):
         """Test that pagination works correctly."""
         # Test first page
-        response = self.client.get("/api/dashboard/plans?project=1&limit=1&offset=0")
+        response = client.get("/api/dashboard/plans?project=1&limit=1&offset=0")
         assert response.status_code == 200
         data = response.json()
         assert data["limit"] == 1
@@ -319,7 +355,7 @@ class TestDashboardEndToEnd:
         assert len(data["plans"]) <= 1
 
         # Test second page
-        response = self.client.get("/api/dashboard/plans?project=1&limit=1&offset=1")
+        response = client.get("/api/dashboard/plans?project=1&limit=1&offset=1")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == 1
@@ -327,33 +363,33 @@ class TestDashboardEndToEnd:
     def test_dashboard_caching(self, client, mock_testrail_client):
         """Test that caching works correctly."""
         # Clear cache first to ensure clean state
-        self.client.post("/api/dashboard/cache/clear")
+        client.post("/api/dashboard/cache/clear")
 
         # First request should be a cache miss
-        response = self.client.get("/api/dashboard/plans?project=1")
+        response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data1 = response.json()
         assert data1["meta"]["cache"]["hit"] is False
 
         # Second request should be a cache hit
-        response = self.client.get("/api/dashboard/plans?project=1")
+        response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data2 = response.json()
         assert data2["meta"]["cache"]["hit"] is True
 
         # Clear cache
-        response = self.client.post("/api/dashboard/cache/clear")
+        response = client.post("/api/dashboard/cache/clear")
         assert response.status_code == 200
 
         # Next request should be a cache miss again
-        response = self.client.get("/api/dashboard/plans?project=1")
+        response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data3 = response.json()
         assert data3["meta"]["cache"]["hit"] is False
 
     def test_dashboard_statistics_accuracy(self, client, mock_testrail_client):
         """Test that statistics calculations are accurate."""
-        response = self.client.get("/api/dashboard/plans?project=1")
+        response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         data = response.json()
 
@@ -376,7 +412,7 @@ class TestDashboardEndToEnd:
 
     def test_dashboard_config_endpoint(self, client):
         """Test that configuration endpoint returns correct values."""
-        response = self.client.get("/api/dashboard/config")
+        response = client.get("/api/dashboard/config")
         assert response.status_code == 200
         config = response.json()
 
@@ -406,7 +442,7 @@ class TestDashboardBrowserCompatibility:
 
     def test_css_vendor_prefixes(self, client):
         """Test that CSS includes necessary vendor prefixes for compatibility."""
-        response = self.client.get("/")
+        response = client.get("/")
         assert response.status_code == 200
         html = response.text
 
@@ -421,7 +457,7 @@ class TestDashboardBrowserCompatibility:
 
     def test_javascript_es2020_compatibility(self, client):
         """Test that JavaScript uses ES2020 compatible features."""
-        response = self.client.get("/assets/dashboard.js")
+        response = client.get("/assets/dashboard.js")
         assert response.status_code == 200
         js_content = response.text
 
@@ -440,7 +476,7 @@ class TestDashboardBrowserCompatibility:
 
     def test_no_unsupported_features(self, client):
         """Test that code doesn't use unsupported or experimental features."""
-        response = self.client.get("/assets/dashboard.js")
+        response = client.get("/assets/dashboard.js")
         assert response.status_code == 200
         js_content = response.text
 
@@ -487,13 +523,13 @@ class TestDashboardPerformance:
     def test_pagination_limits_response_size(self, client, mock_testrail_client):
         """Test that pagination effectively limits response size."""
         # Request with small limit
-        response = self.client.get("/api/dashboard/plans?project=1&limit=10")
+        response = client.get("/api/dashboard/plans?project=1&limit=10")
         assert response.status_code == 200
         data = response.json()
         assert len(data["plans"]) <= 10
 
         # Request with large limit (should be capped at max)
-        response = self.client.get("/api/dashboard/plans?project=1&limit=1000")
+        response = client.get("/api/dashboard/plans?project=1&limit=1000")
         assert response.status_code == 200
         data = response.json()
         assert len(data["plans"]) <= 25  # Max page size
@@ -501,12 +537,12 @@ class TestDashboardPerformance:
     def test_cache_reduces_api_calls(self, client, mock_testrail_client):
         """Test that caching reduces API calls."""
         # First request
-        response = self.client.get("/api/dashboard/plans?project=1")
+        response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         first_call_count = mock_testrail_client.get_plans_for_project.call_count
 
         # Second request (should use cache)
-        response = self.client.get("/api/dashboard/plans?project=1")
+        response = client.get("/api/dashboard/plans?project=1")
         assert response.status_code == 200
         second_call_count = mock_testrail_client.get_plans_for_project.call_count
 

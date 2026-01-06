@@ -5,7 +5,6 @@ from functools import wraps
 from typing import Any, Callable, List, Optional
 
 import requests
-from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from app.core.dependencies import get_testrail_client
@@ -46,7 +45,11 @@ class TestRailClientService:
             )
 
             # Configure HTTP adapter with connection pooling
-            adapter = HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=retry_strategy)
+            adapter = requests.adapters.HTTPAdapter(
+                pool_connections=10,
+                pool_maxsize=20,
+                max_retries=retry_strategy,
+            )
 
             session.mount("http://", adapter)
             session.mount("https://", adapter)
@@ -69,7 +72,7 @@ class TestRailClientService:
             try:
                 return func(*args, **kwargs)
 
-            except requests.exceptions.RequestException as e:
+            except (requests.exceptions.RequestException, ConnectionError) as e:
                 if attempt == max_attempts - 1:
                     raise
 

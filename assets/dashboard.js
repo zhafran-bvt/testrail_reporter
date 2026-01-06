@@ -87,11 +87,26 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Format date from Unix timestamp
+// Format date from Unix timestamp - now uses relative time if available
 function formatDate(timestamp) {
   if (!timestamp) return 'N/A';
+  
+  // Use relative time formatting if available
+  if (typeof window.formatRelativeTime === 'function') {
+    return window.formatRelativeTime(timestamp);
+  }
+  
+  // Fallback to old format
   const date = new Date(timestamp * 1000);
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateInputValue(timestamp) {
+  const date = new Date(timestamp * 1000);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // Get pass rate color class
@@ -138,8 +153,22 @@ function renderPlanCard(plan) {
   
   // Set plan title and metadata
   card.querySelector('.dashboard-plan-title').textContent = plan.plan_name || `Plan ${plan.plan_id}`;
-  card.querySelector('.plan-created').textContent = `Created: ${formatDate(plan.created_on)}`;
-  card.querySelector('.plan-updated').textContent = plan.updated_on ? `Updated: ${formatDate(plan.updated_on)}` : '';
+  
+  // Use time elements with tooltips if available
+  const createdEl = card.querySelector('.plan-created');
+  const updatedEl = card.querySelector('.plan-updated');
+  
+  if (typeof window.createTimeElement === 'function') {
+    createdEl.innerHTML = `Created: ${window.createTimeElement(plan.created_on, 'plan-created-' + plan.plan_id)}`;
+    if (plan.updated_on) {
+      updatedEl.innerHTML = `Updated: ${window.createTimeElement(plan.updated_on, 'plan-updated-' + plan.plan_id)}`;
+    } else {
+      updatedEl.textContent = '';
+    }
+  } else {
+    createdEl.textContent = `Created: ${formatDate(plan.created_on)}`;
+    updatedEl.textContent = plan.updated_on ? `Updated: ${formatDate(plan.updated_on)}` : '';
+  }
   
   // Set completion badge
   const badge = card.querySelector('.badge-status');
@@ -223,7 +252,6 @@ function renderRunCard(run) {
   
   // Set run title and metadata
   card.querySelector('.dashboard-run-title').textContent = run.run_name || `Run ${run.run_id}`;
-  card.querySelector('.dashboard-run-suite').textContent = run.suite_name || 'No suite';
   
   // Set completion badge
   const badge = card.querySelector('.badge-status');
@@ -863,8 +891,255 @@ function initDashboard() {
     });
   });
   
+  // Setup quick filter buttons
+  document.querySelectorAll('.quick-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const filter = btn.dataset.filter;
+      applyQuickFilter(filter);
+      
+      // Update active state
+      document.querySelectorAll('.quick-filter-btn').forEach(b => b.classList.remove('active'));
+      if (filter !== 'clear') {
+        btn.classList.add('active');
+      }
+    });
+  });
+  
+  // Setup saved filters
+  loadSavedFilters();
+  
+  const saveCurrentFilterBtn = document.getElementById('saveCurrentFilterBtn');
+  if (saveCurrentFilterBtn) {
+    saveCurrentFilterBtn.addEventListener('click', saveCurrentFilter);
+  }
+  
+  const savedFiltersDropdown = document.getElementById('savedFiltersDropdown');
+  if (savedFiltersDropdown) {
+    savedFiltersDropdown.addEventListener('change', (event) => {
+      const filterId = event.target.value;
+      if (filterId) {
+        applySavedFilterById(filterId);
+      }
+    });
+  }
+  
   // Load initial data
   loadDashboardPlans();
+  
+  // Start time updates if available
+  if (typeof window.startTimeUpdates === 'function') {
+    window.startTimeUpdates();
+  }
+}
+
+/**
+ * Apply a quick filter to the dashboard
+ */
+function applyQuickFilter(filter) {
+  console.log('Applying quick filter:', filter);
+  
+  // Reset all filters first
+  dashboardState.filters.search = '';
+  dashboardState.filters.isCompleted = null;
+  dashboardState.filters.createdAfter = null;
+  dashboardState.filters.createdBefore = null;
+  
+  // Apply the selected quick filter
+  switch (filter) {
+    case 'today':
+      if (typeof window.getStartOfToday === 'function') {
+        dashboardState.filters.createdAfter = window.getStartOfToday();
+      }
+      break;
+    case 'this-week':
+      if (typeof window.getStartOfWeek === 'function') {
+        dashboardState.filters.createdAfter = window.getStartOfWeek();
+      }
+      break;
+    case 'this-month':
+      if (typeof window.getStartOfMonth === 'function') {
+        dashboardState.filters.createdAfter = window.getStartOfMonth();
+      }
+      break;
+    case 'active':
+      dashboardState.filters.isCompleted = 0;
+      break;
+    case 'completed':
+      dashboardState.filters.isCompleted = 1;
+      break;
+  }
+  
+  // Update UI inputs
+  const searchInput = document.getElementById('dashboardSearch');
+  const completionFilter = document.getElementById('dashboardCompletionFilter');
+  const dateFromInput = document.getElementById('dashboardDateFrom');
+  const dateToInput = document.getElementById('dashboardDateTo');
+  
+  if (searchInput) searchInput.value = '';
+  if (completionFilter) {
+    completionFilter.value = dashboardState.filters.isCompleted !== null ? dashboardState.filters.isCompleted : '';
+  }
+  if (dateFromInput) dateFromInput.value = '';
+  if (dateToInput) dateToInput.value = '';
+  
+  applyFilters();
+}
+
+/**
+ * Load saved filters
+ */
+function loadSavedFilters() {
+  const dropdown = document.getElementById('savedFiltersDropdown');
+  const listContainer = document.getElementById('savedFiltersList');
+  
+  if (!dropdown || !listContainer || typeof window.filterManager === 'undefined') return;
+  
+  try {
+    const filters = window.filterManager.getAllFilters();
+    
+    while (dropdown.options.length > 1) {
+      dropdown.remove(1);
+    }
+    
+    listContainer.innerHTML = '';
+    
+    if (filters.length === 0) {
+      listContainer.innerHTML = '<p style="color: var(--muted); font-size: 12px; text-align: center; padding: 12px;">No saved filters yet.</p>';
+      return;
+    }
+    
+    filters.forEach(filter => {
+      const option = document.createElement('option');
+      option.value = filter.id;
+      option.textContent = filter.name + (filter.isDefault ? ' (Default)' : '');
+      dropdown.appendChild(option);
+    });
+    
+    filters.forEach(filter => {
+      const item = document.createElement('div');
+      item.className = 'saved-filter-item' + (filter.isDefault ? ' default' : '');
+      item.innerHTML = `
+        <div style="flex: 1; min-width: 0;">
+          <div class="saved-filter-name">${escapeHtml(filter.name)}</div>
+          <div class="saved-filter-desc">${escapeHtml(filter.description || 'No description')}</div>
+        </div>
+        <div class="saved-filter-actions">
+          <button type="button" onclick="applySavedFilterById('${filter.id}')">Apply</button>
+          <button type="button" onclick="setDefaultFilter('${filter.id}')">${filter.isDefault ? '⭐' : '☆'}</button>
+          <button type="button" class="delete" onclick="deleteSavedFilter('${filter.id}')">🗑️</button>
+        </div>
+      `;
+      listContainer.appendChild(item);
+    });
+  } catch (error) {
+    console.error('Error loading saved filters:', error);
+  }
+}
+
+/**
+ * Save current filter
+ */
+function saveCurrentFilter() {
+  if (typeof window.filterManager === 'undefined' || typeof window.createFilterFromState === 'undefined') {
+    if (typeof showToast === 'function') showToast('Filter manager not available', 'error');
+    return;
+  }
+  
+  const name = prompt('Enter a name for this filter:');
+  if (!name || name.trim() === '') return;
+  
+  try {
+    const filterData = window.createFilterFromState(dashboardState);
+    const description = typeof window.getFilterDescription === 'function' ? 
+      window.getFilterDescription(filterData) : 'Custom filter';
+    
+    window.filterManager.saveFilter({
+      ...filterData,
+      name: name.trim(),
+      description: description
+    });
+    
+    loadSavedFilters();
+    if (typeof showToast === 'function') showToast(`Filter "${name}" saved successfully`, 'success');
+  } catch (error) {
+    console.error('Error saving filter:', error);
+    if (typeof showToast === 'function') showToast(error.message || 'Failed to save filter', 'error');
+  }
+}
+
+/**
+ * Apply saved filter by ID
+ */
+function applySavedFilterById(filterId) {
+  if (typeof window.filterManager === 'undefined' || typeof window.applyFilter === 'undefined') return;
+  
+  try {
+    const filter = window.filterManager.getFilter(filterId);
+    if (!filter) return;
+    
+    window.applyFilter(filter, dashboardState);
+    
+    const searchInput = document.getElementById('dashboardSearch');
+    const completionFilter = document.getElementById('dashboardCompletionFilter');
+    const dateFromInput = document.getElementById('dashboardDateFrom');
+    const dateToInput = document.getElementById('dashboardDateTo');
+    
+    if (searchInput) searchInput.value = dashboardState.filters.search || '';
+    if (completionFilter) {
+      completionFilter.value = dashboardState.filters.isCompleted !== null ? dashboardState.filters.isCompleted : '';
+    }
+    if (dateFromInput && dashboardState.filters.createdAfter) {
+      dateFromInput.value = formatDateInputValue(dashboardState.filters.createdAfter);
+    } else if (dateFromInput) {
+      dateFromInput.value = '';
+    }
+    if (dateToInput && dashboardState.filters.createdBefore) {
+      dateToInput.value = formatDateInputValue(dashboardState.filters.createdBefore);
+    } else if (dateToInput) {
+      dateToInput.value = '';
+    }
+    
+    applyFilters();
+    if (typeof showToast === 'function') showToast(`Filter "${filter.name}" applied`, 'success');
+  } catch (error) {
+    console.error('Error applying filter:', error);
+  }
+}
+
+/**
+ * Set default filter
+ */
+function setDefaultFilter(filterId) {
+  if (typeof window.filterManager === 'undefined') return;
+  
+  try {
+    window.filterManager.setDefaultFilter(filterId);
+    loadSavedFilters();
+    if (typeof showToast === 'function') showToast('Default filter updated', 'success');
+  } catch (error) {
+    console.error('Error setting default filter:', error);
+  }
+}
+
+/**
+ * Delete saved filter
+ */
+function deleteSavedFilter(filterId) {
+  if (typeof window.filterManager === 'undefined') return;
+  
+  try {
+    const filter = window.filterManager.getFilter(filterId);
+    if (!filter) return;
+    
+    const confirmed = confirm(`Delete filter "${filter.name}"?`);
+    if (!confirmed) return;
+    
+    window.filterManager.deleteFilter(filterId);
+    loadSavedFilters();
+    if (typeof showToast === 'function') showToast(`Filter "${filter.name}" deleted`, 'success');
+  } catch (error) {
+    console.error('Error deleting filter:', error);
+  }
 }
 
 // Export functions for use in main app
@@ -877,4 +1152,12 @@ if (typeof window !== 'undefined') {
     refreshDashboard: refreshDashboard,
     updateStatisticsDisplay: updateStatisticsDisplay
   };
+  
+  // Export filter functions
+  window.applyQuickFilter = applyQuickFilter;
+  window.loadSavedFilters = loadSavedFilters;
+  window.saveCurrentFilter = saveCurrentFilter;
+  window.applySavedFilterById = applySavedFilterById;
+  window.setDefaultFilter = setDefaultFilter;
+  window.deleteSavedFilter = deleteSavedFilter;
 }

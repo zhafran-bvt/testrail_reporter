@@ -102,7 +102,7 @@ The application provides full CRUD (Create, Read, Update, Delete) operations for
 - UI provides edit and delete buttons with confirmation dialogs
 - Form validation ensures data integrity
 
-For detailed CRUD operation documentation, see [CRUD Operations Guide](CRUD_OPERATIONS_GUIDE.md).
+For detailed CRUD operation documentation, see [CRUD Operations Guide](docs/CRUD_OPERATIONS_GUIDE.md).
 
 **BDD Scenarios Gherkin Formatting:**
 - Automatic conversion of JSON stringify format to readable Gherkin
@@ -111,7 +111,7 @@ For detailed CRUD operation documentation, see [CRUD Operations Guide](CRUD_OPER
 - No manual conversion needed - works automatically
 - Backward compatible with existing TestRail data
 
-For BDD scenarios documentation, see [Gherkin Parsing Guide](GHERKIN_PARSING.md) and [User Guide](USER_GUIDE_GHERKIN.md).
+For BDD scenarios documentation, see [Gherkin Parsing Guide](docs/GHERKIN_PARSING.md) and [User Guide](docs/USER_GUIDE_GHERKIN.md).
 
 ### Dashboard
 
@@ -269,14 +269,14 @@ The HTML is rendered with Jinja2 using `templates/daily_report.html.j2`. You can
 
 Comprehensive documentation is available for all features:
 
-- **[API Documentation](API_DOCUMENTATION.md)** - Complete API reference with examples
+- **[API Documentation](docs/API_DOCUMENTATION.md)** - Complete API reference with examples
   - Dashboard endpoints
   - Report generation endpoints
   - Management/CRUD endpoints
   - Error handling and status codes
   - Caching strategy
 
-- **[CRUD Operations Guide](CRUD_OPERATIONS_GUIDE.md)** - Detailed guide for managing TestRail entities
+- **[CRUD Operations Guide](docs/CRUD_OPERATIONS_GUIDE.md)** - Detailed guide for managing TestRail entities
   - Update operations (plans, runs, cases)
   - Delete operations with cascade rules
   - Dry run mode usage
@@ -284,7 +284,7 @@ Comprehensive documentation is available for all features:
   - Best practices and common workflows
   - Error handling and troubleshooting
 
-- **[Dashboard Guide](DASHBOARD_GUIDE.md)** - Dashboard usage instructions
+- **[Dashboard Guide](docs/DASHBOARD_GUIDE.md)** - Dashboard usage instructions
   - Features overview
   - Filtering and sorting
   - Visual indicators
@@ -292,25 +292,25 @@ Comprehensive documentation is available for all features:
   - Responsive design
   - Configuration options
 
-- **[Configuration Guide](CONFIGURATION.md)** - Environment variable reference
+- **[Configuration Guide](docs/CONFIGURATION.md)** - Environment variable reference
   - TestRail connection settings
   - Performance tuning
   - Cache configuration
   - Dashboard thresholds
 
-- **[Gherkin Parsing Guide](GHERKIN_PARSING.md)** - BDD scenarios formatting
+- **[Gherkin Parsing Guide](docs/GHERKIN_PARSING.md)** - BDD scenarios formatting
   - Automatic JSON stringify to Gherkin conversion
   - Technical implementation details
   - Supported formats and edge cases
   - Troubleshooting guide
 
-- **[User Guide: Gherkin](USER_GUIDE_GHERKIN.md)** - How to use BDD scenarios
+- **[User Guide: Gherkin](docs/USER_GUIDE_GHERKIN.md)** - How to use BDD scenarios
   - Step-by-step usage instructions
   - Before/after examples
   - Writing good BDD scenarios
   - Tips and best practices
 
-- **[Gherkin Examples](GHERKIN_EXAMPLES.md)** - Real-world BDD scenario examples
+- **[Gherkin Examples](docs/GHERKIN_EXAMPLES.md)** - Real-world BDD scenario examples
   - 8 practical examples with transformations
   - Login flows, API testing, error handling
   - Mobile app and integration test scenarios

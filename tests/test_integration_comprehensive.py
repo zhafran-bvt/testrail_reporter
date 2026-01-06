@@ -2,6 +2,7 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -10,10 +11,13 @@ from app.main import app
 class TestComprehensiveIntegration:
     """Integration tests that validate all modernization requirements working together."""
 
-    def test_modular_architecture_integration(self):
-        """Test that all modular components work together seamlessly."""
+    @pytest.fixture
+    def client(self):
+        """Create test client."""
+        return TestClient(app)
 
-        TestClient(app)
+    def test_modular_architecture_integration(self, client):
+        """Test that all modular components work together seamlessly."""
 
         # Test that all API routers are properly integrated
         with patch("app.core.dependencies.get_plans_cache") as mock_cache, patch(
@@ -30,11 +34,11 @@ class TestComprehensiveIntegration:
             mock_client_dep.return_value = mock_client
 
             # Test dashboard API integration
-            response = self.client.get("/healthz")
+            response = client.get("/healthz")
             assert response.status_code == 200
 
             # Test cache clear API integration
-            response = self.client.post("/api/cache/clear")
+            response = client.post("/api/cache/clear")
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
@@ -42,13 +46,11 @@ class TestComprehensiveIntegration:
             # Verify dependency injection is working
             assert mock_cache.called
 
-    def test_error_handling_integration(self):
+    def test_error_handling_integration(self, client):
         """Test that error handling works across all components."""
 
-        TestClient(app)
-
         # Test validation error handling
-        response = self.client.post(
+        response = client.post(
             "/api/manage/plan",
             json={
                 "project": -1,  # Invalid
@@ -92,10 +94,8 @@ class TestComprehensiveIntegration:
         result = service.with_retry(test_function)
         assert result == "success"
 
-    def test_api_structure_for_frontend_integration(self):
+    def test_api_structure_for_frontend_integration(self, client):
         """Test that API structure is ready for frontend framework integration."""
-
-        TestClient(app)
 
         # Test that API endpoints return proper JSON
         with patch("app.core.dependencies.get_plans_cache") as mock_cache:
@@ -106,7 +106,7 @@ class TestComprehensiveIntegration:
             mock_cache.return_value = mock_cache_instance
 
             # Test cache API
-            response = self.client.post("/api/cache/clear")
+            response = client.post("/api/cache/clear")
             assert response.status_code == 200
             assert response.headers["content-type"].startswith("application/json")
 
@@ -115,19 +115,17 @@ class TestComprehensiveIntegration:
             assert "success" in data
 
         # Test health check API for frontend monitoring
-        response = self.client.get("/healthz")
+        response = client.get("/healthz")
         assert response.status_code == 200
         health_data = response.json()
         assert "ok" in health_data
         assert isinstance(health_data["ok"], bool)
 
-    def test_documentation_integration(self):
+    def test_documentation_integration(self, client):
         """Test that enhanced documentation is properly integrated."""
 
-        TestClient(app)
-
         # Test OpenAPI schema generation
-        response = self.client.get("/openapi.json")
+        response = client.get("/openapi.json")
         assert response.status_code == 200
 
         openapi_schema = response.json()
@@ -149,22 +147,23 @@ class TestComprehensiveIntegration:
         for endpoint in expected_endpoints:
             assert any(endpoint in path for path in paths.keys()), f"Missing endpoint: {endpoint}"
 
-    def test_backward_compatibility_integration(self):
+    def test_backward_compatibility_integration(self, client):
         """Test that backward compatibility is maintained across all changes."""
 
-        TestClient(app)
-
         # Test that main page still works (HTML interface)
-        response = self.client.get("/")
+        response = client.get("/")
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
         # Test legacy form endpoint
-        response = self.client.get("/generate")
-        assert response.status_code == 307  # Redirect to main page
+        response = client.get("/generate")
+        assert response.status_code in (200, 307)  # Redirect to main page
+        if response.status_code == 200:
+            assert response.history
+            assert response.history[0].status_code == 307
 
         # Test UI alias
-        response = self.client.get("/ui")
+        response = client.get("/ui")
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
 
@@ -208,10 +207,8 @@ class TestComprehensiveIntegration:
         # Should respect size limits
         assert cache.size() <= cache.maxsize
 
-    def test_end_to_end_request_flow(self):
+    def test_end_to_end_request_flow(self, client):
         """Test complete request flow through the modernized architecture."""
-
-        TestClient(app)
 
         # Mock all dependencies for a complete flow test
         with patch("app.core.dependencies.get_plans_cache") as mock_plans_cache, patch(
@@ -232,7 +229,7 @@ class TestComprehensiveIntegration:
             mock_client.return_value = mock_testrail_client
 
             # Test 1: Health check (tests multiple components)
-            response = self.client.get("/healthz")
+            response = client.get("/healthz")
             assert response.status_code == 200
 
             health_data = response.json()
@@ -241,7 +238,7 @@ class TestComprehensiveIntegration:
             assert "cache" in health_data
 
             # Test 2: Cache operations (tests cache service integration)
-            response = self.client.post("/api/cache/clear")
+            response = client.post("/api/cache/clear")
             assert response.status_code == 200
 
             clear_data = response.json()
@@ -252,20 +249,18 @@ class TestComprehensiveIntegration:
             assert mock_cache.clear.call_count == 2  # Plans and runs cache
 
             # Test 3: Error handling (tests error middleware)
-            response = self.client.post("/api/manage/plan", json={"invalid": "data"})
+            response = client.post("/api/manage/plan", json={"invalid": "data"})
             assert response.status_code == 422  # Validation error
 
             # Test 4: Main page (tests template rendering)
-            response = self.client.get("/")
+            response = client.get("/")
             assert response.status_code == 200
             assert "text/html" in response.headers.get("content-type", "")
 
         print("✅ End-to-end request flow test completed successfully")
 
-    def test_system_resilience_under_load(self):
+    def test_system_resilience_under_load(self, client):
         """Test that the system remains resilient under simulated load."""
-
-        TestClient(app)
 
         # Mock dependencies to avoid external calls
         with patch("app.core.dependencies.get_plans_cache") as mock_cache:
@@ -284,7 +279,7 @@ class TestComprehensiveIntegration:
 
             def make_request(request_id):
                 try:
-                    response = self.client.get("/healthz")
+                    response = client.get("/healthz")
                     results.append(
                         {
                             "request_id": request_id,

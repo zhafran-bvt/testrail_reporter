@@ -2,8 +2,9 @@
 
 from unittest.mock import Mock, patch
 
+import pytest
 from fastapi.testclient import TestClient
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 # We'll test against the new modular structure to ensure it maintains compatibility
@@ -13,24 +14,21 @@ class TestBackwardCompatibilityPreservation:
     """Property 3: Backward Compatibility Preservation - For any existing API endpoint,
     the refactored system should maintain the same request/response contract and behavior."""
 
-    def test_legacy_report_endpoints_compatibility(self):
+    @pytest.fixture
+    def client(self):
+        """Create test client."""
+        from app.main import app
+        return TestClient(app)
+
+    def test_legacy_report_endpoints_compatibility(self, client):
         """Test that legacy report endpoints maintain the same interface."""
-        # Import the new modular app structure
-        from fastapi import FastAPI
-
-        from app.api.reports import router as reports_router
-
-        app = FastAPI()
-        app.include_router(reports_router)
-
-        TestClient(app)
 
         # Test legacy GET /api/report endpoint
         with patch("app.api.reports.generate_report") as mock_generate:
             mock_generate.return_value = "/path/to/report.html"
 
             # Test with plan parameter (legacy format)
-            response = self.client.get("/api/report?project=1&plan=123")
+            response = client.get("/api/report?project=1&plan=123")
 
             # Should return the same format as before
             assert response.status_code == 200
@@ -39,16 +37,8 @@ class TestBackwardCompatibilityPreservation:
             assert "url" in data
             assert data["url"].startswith("/reports/")
 
-    def test_dashboard_api_response_format_compatibility(self):
+    def test_dashboard_api_response_format_compatibility(self, client):
         """Test that dashboard API maintains expected response format."""
-        from fastapi import FastAPI
-
-        from app.api.dashboard import router as dashboard_router
-
-        app = FastAPI()
-        app.include_router(dashboard_router)
-
-        TestClient(app)
 
         # Mock dependencies to avoid actual TestRail calls
         with patch("app.api.dashboard.testrail_service") as mock_service, patch(
@@ -82,7 +72,7 @@ class TestBackwardCompatibilityPreservation:
                 mock_stats.untested_count = 0
                 mock_calc.return_value = mock_stats
 
-                response = self.client.get("/api/dashboard/plans?project=1")
+                response = client.get("/api/dashboard/plans?project=1")
 
         # Should maintain expected response structure
         assert response.status_code == 200
@@ -104,17 +94,9 @@ class TestBackwardCompatibilityPreservation:
         project_id=st.integers(min_value=1, max_value=100),
         plan_id=st.one_of(st.none(), st.integers(min_value=1, max_value=1000)),
     )
-    @settings(max_examples=10, deadline=None)
-    def test_plans_api_parameter_compatibility(self, project_id, plan_id):
+    @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+    def test_plans_api_parameter_compatibility(self, client, project_id, plan_id):
         """Test that plans API accepts the same parameters as before."""
-        from fastapi import FastAPI
-
-        from app.api.general import router as general_router
-
-        app = FastAPI()
-        app.include_router(general_router)
-
-        TestClient(app)
 
         # Mock dependencies
         with patch("app.core.dependencies.get_plans_cache") as mock_cache, patch(
@@ -139,7 +121,7 @@ class TestBackwardCompatibilityPreservation:
             if plan_id is not None:
                 params["is_completed"] = 0 if plan_id % 2 == 0 else 1
 
-            response = self.client.get("/api/plans", params=params)
+            response = client.get("/api/plans", params=params)
 
             # Should accept parameters and return expected format
             assert response.status_code == 200
@@ -149,16 +131,8 @@ class TestBackwardCompatibilityPreservation:
             assert "meta" in data
             assert isinstance(data["plans"], list)
 
-    def test_management_api_crud_compatibility(self):
+    def test_management_api_crud_compatibility(self, client):
         """Test that management API CRUD operations maintain compatibility."""
-        from fastapi import FastAPI
-
-        from app.api.management import router as management_router
-
-        app = FastAPI()
-        app.include_router(management_router)
-
-        TestClient(app)
 
         # Mock dependencies
         with patch("app.core.dependencies.get_testrail_client") as mock_get_client, patch(
@@ -173,7 +147,7 @@ class TestBackwardCompatibilityPreservation:
 
             plan_data = {"project": 1, "name": "Test Plan", "description": "Test Description", "dry_run": False}
 
-            response = self.client.post("/api/manage/plan", json=plan_data)
+            response = client.post("/api/manage/plan", json=plan_data)
 
             # Should maintain expected response format
             assert response.status_code == 200
@@ -182,16 +156,8 @@ class TestBackwardCompatibilityPreservation:
             assert "id" in data["plan"]  # ID should be present (value may vary)
             assert "name" in data["plan"]  # Name should be present
 
-    def test_error_response_format_compatibility(self):
+    def test_error_response_format_compatibility(self, client):
         """Test that error responses maintain expected format."""
-        from fastapi import FastAPI
-
-        from app.api.management import router as management_router
-
-        app = FastAPI()
-        app.include_router(management_router)
-
-        TestClient(app)
 
         # Test validation error (should return structured error)
         invalid_plan_data = {
@@ -200,7 +166,7 @@ class TestBackwardCompatibilityPreservation:
             "dry_run": False,
         }
 
-        response = self.client.post("/api/manage/plan", json=invalid_plan_data)
+        response = client.post("/api/manage/plan", json=invalid_plan_data)
 
         # Should return validation error in expected format
         # Note: The actual status code may vary based on error handling middleware
@@ -215,16 +181,8 @@ class TestBackwardCompatibilityPreservation:
                 assert "msg" in error
                 assert "type" in error
 
-    def test_health_check_endpoint_compatibility(self):
+    def test_health_check_endpoint_compatibility(self, client):
         """Test that health check maintains expected format."""
-        from fastapi import FastAPI
-
-        from app.api.health import router as health_router
-
-        app = FastAPI()
-        app.include_router(health_router)
-
-        TestClient(app)
 
         # Mock dependencies
         with patch("app.core.dependencies.get_plans_cache") as mock_plans_cache, patch(
@@ -245,7 +203,7 @@ class TestBackwardCompatibilityPreservation:
                     "latest_job": None,
                 }
 
-                response = self.client.get("/healthz")
+                response = client.get("/healthz")
 
         # Should maintain expected health check format
         assert response.status_code == 200
@@ -263,16 +221,8 @@ class TestBackwardCompatibilityPreservation:
         assert "retries" in http_config
         assert "backoff_seconds" in http_config
 
-    def test_cache_clear_endpoint_compatibility(self):
+    def test_cache_clear_endpoint_compatibility(self, client):
         """Test that cache clear endpoint maintains expected behavior."""
-        from fastapi import FastAPI
-
-        from app.api.general import router as general_router
-
-        app = FastAPI()
-        app.include_router(general_router)
-
-        TestClient(app)
 
         # Mock cache dependencies
         with patch("app.core.dependencies.get_plans_cache") as mock_plans_cache, patch(
@@ -283,7 +233,7 @@ class TestBackwardCompatibilityPreservation:
             mock_plans_cache.return_value = mock_plans_cache_instance
             mock_runs_cache.return_value = mock_runs_cache_instance
 
-            response = self.client.post("/api/cache/clear")
+            response = client.post("/api/cache/clear")
 
         # Should maintain expected response format
         assert response.status_code == 200
@@ -297,16 +247,8 @@ class TestBackwardCompatibilityPreservation:
         # Cache clear functionality should work (implementation details may vary)
         # The important thing is the endpoint returns the expected format
 
-    def test_async_report_generation_compatibility(self):
+    def test_async_report_generation_compatibility(self, client):
         """Test that async report generation maintains expected interface."""
-        from fastapi import FastAPI
-
-        from app.api.reports import router as reports_router
-
-        app = FastAPI()
-        app.include_router(reports_router)
-
-        TestClient(app)
 
         # Mock job manager
         with patch("app.api.reports.job_manager") as mock_job_manager:
@@ -332,7 +274,7 @@ class TestBackwardCompatibilityPreservation:
             # Test async report generation
             report_request = {"project": 1, "plan": 123, "run": None, "run_ids": None}
 
-            response = self.client.post("/api/report", json=report_request)
+            response = client.post("/api/report", json=report_request)
 
         # Should return 202 Accepted with job information
         assert response.status_code == 202

@@ -409,7 +409,8 @@ def get_dashboard_plan_detail(
             print(f"Error: Invalid plan data type for {plan_id}: {type(plan_data)}", flush=True)
             raise HTTPException(status_code=500, detail="Invalid response from TestRail API")
 
-        run_ids = []
+        run_ids: list[int] = []
+        run_meta_map: dict[int, dict[str, Any]] = {}
         entries = plan_data.get("entries", [])
         if not isinstance(entries, list):
             print(f"Warning: Invalid entries type for plan {plan_id}: {type(entries)}", flush=True)
@@ -418,6 +419,7 @@ def get_dashboard_plan_detail(
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
+            suite_name = entry.get("name")
             runs = entry.get("runs", [])
             if not isinstance(runs, list):
                 continue
@@ -426,7 +428,17 @@ def get_dashboard_plan_detail(
                     continue
                 run_id = run.get("id")
                 if run_id:
-                    run_ids.append(run_id)
+                    try:
+                        run_id_int = int(run_id)
+                    except (TypeError, ValueError):
+                        continue
+                    run_ids.append(run_id_int)
+                    run_meta_map[run_id_int] = {
+                        "run_name": run.get("name"),
+                        "suite_name": run.get("suite_name") or suite_name,
+                        "is_completed": run.get("is_completed"),
+                        "updated_on": run.get("updated_on"),
+                    }
 
         # Calculate statistics for each run
         runs_with_stats = []
@@ -435,16 +447,25 @@ def get_dashboard_plan_detail(
                 run_stats = calculate_run_statistics(run_id, base_client)
 
                 # Convert to dict format
+                meta = run_meta_map.get(run_id, {})
+                run_name = meta.get("run_name") or run_stats.run_name or f"Run {run_id}"
+                suite_name = meta.get("suite_name") or run_stats.suite_name
+                is_completed = meta.get("is_completed")
+                if is_completed is None:
+                    is_completed = run_stats.is_completed
+                updated_on = meta.get("updated_on")
+                if updated_on is None:
+                    updated_on = run_stats.updated_on
                 run_dict = {
                     "run_id": run_stats.run_id,
-                    "run_name": run_stats.run_name,
-                    "suite_name": run_stats.suite_name,
-                    "is_completed": run_stats.is_completed,
+                    "run_name": run_name,
+                    "suite_name": suite_name,
+                    "is_completed": is_completed,
                     "total_tests": run_stats.total_tests,
                     "status_distribution": run_stats.status_distribution,
                     "pass_rate": run_stats.pass_rate,
                     "completion_rate": run_stats.completion_rate,
-                    "updated_on": run_stats.updated_on,
+                    "updated_on": updated_on,
                 }
                 runs_with_stats.append(run_dict)
             except Exception as e:

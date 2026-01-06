@@ -126,6 +126,43 @@ class TestReportGenerator(unittest.TestCase):
 
     @patch("testrail_daily_report.download_attachment")
     @patch("testrail_daily_report.render_html")
+    def test_generate_report_single_run_uses_run_name_in_title(self, mock_render_html, mock_download_attachment):
+        fake_client = MagicMock()
+        fake_client.base_url = "http://fake-testrail.com"
+        fake_client.timeout = 5.0
+        fake_client.max_attempts = 2
+        fake_client.backoff = 1.0
+        fake_client.get_project.return_value = {"name": "Test Project"}
+        fake_client.get_run.return_value = {"id": 321, "name": "Login Flow"}
+        fake_client.get_tests_for_run.return_value = [
+            {
+                "id": 1,
+                "title": "Login works",
+                "status_id": 1,
+                "priority_id": 1,
+                "assignedto_id": 1,
+            },
+        ]
+        fake_client.get_results_for_run.return_value = [
+            {"id": 10, "test_id": 1, "status_id": 1, "comment": "OK"},
+        ]
+        fake_client.get_attachments_for_test.return_value = []
+        fake_client.get_users_map.return_value = {1: "User A"}
+        fake_client.get_priorities_map.return_value = {1: "P1"}
+        fake_client.get_statuses_map.return_value = {1: "Passed"}
+        mock_download_attachment.return_value = (b"", "image/png")
+        mock_render_html.return_value = "/tmp/run-report.html"
+
+        path = generate_report(project=1, run=321, api_client=fake_client)
+
+        self.assertEqual(path, "/tmp/run-report.html")
+        context = mock_render_html.call_args[0][0]
+        self.assertEqual(context["report_title"], "Testing Progress Report — Login Flow")
+        self.assertIsNone(context["plan_name"])
+        self.assertEqual(context["tables"][0]["run_name"], "Login Flow")
+
+    @patch("testrail_daily_report.download_attachment")
+    @patch("testrail_daily_report.render_html")
     def test_generate_report_attachments_failure(self, mock_render_html, mock_download_attachment):
         fake_client = MagicMock()
         fake_client.base_url = "http://fake-testrail.com"

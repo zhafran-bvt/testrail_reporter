@@ -18,6 +18,18 @@
     return a;
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+  var __objRest = (source, exclude) => {
+    var target = {};
+    for (var prop in source)
+      if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+        target[prop] = source[prop];
+    if (source != null && __getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(source)) {
+        if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+          target[prop] = source[prop];
+      }
+    return target;
+  };
   var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
   // src/theme.ts
@@ -125,28 +137,132 @@
   var appConfig2 = window.__APP_CONFIG__ || {};
 
   // src/utils.ts
-  var escapeHtml = (s) => String(s).replace(/[&<>\"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] || c);
-  function showToast(message, type = "info") {
-    const container = document.getElementById("toastContainer");
-    if (!container) return;
+  var escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => {
+    const map = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;"
+    };
+    return map[c] || c;
+  });
+  function showToast(message, typeOrOptions) {
+    let options;
+    if (typeof typeOrOptions === "string") {
+      options = { type: typeOrOptions };
+    } else {
+      options = typeOrOptions || {};
+    }
+    const {
+      type = "info",
+      position = "top-right",
+      duration = 4e3,
+      action,
+      showProgress = false
+    } = options;
+    const containerId = `toastContainer-${position}`;
+    let container = document.getElementById(containerId);
+    if (!container) {
+      container = document.createElement("div");
+      container.id = containerId;
+      container.className = `toast-container position-fixed p-3 toast-position-${position}`;
+      container.style.zIndex = "12000";
+      switch (position) {
+        case "top-right":
+          container.style.top = "16px";
+          container.style.right = "16px";
+          break;
+        case "top-left":
+          container.style.top = "16px";
+          container.style.left = "16px";
+          break;
+        case "bottom-right":
+          container.style.bottom = "16px";
+          container.style.right = "16px";
+          break;
+        case "bottom-left":
+          container.style.bottom = "16px";
+          container.style.left = "16px";
+          break;
+        case "top-center":
+          container.style.top = "16px";
+          container.style.left = "50%";
+          container.style.transform = "translateX(-50%)";
+          break;
+        case "bottom-center":
+          container.style.bottom = "16px";
+          container.style.left = "50%";
+          container.style.transform = "translateX(-50%)";
+          break;
+      }
+      document.body.appendChild(container);
+    }
     const div = document.createElement("div");
-    const variant = type === "error" ? "bg-danger text-white" : type === "success" ? "bg-success text-white" : "bg-info text-white";
+    const variant = type === "error" ? "bg-danger text-white" : type === "success" ? "bg-success text-white" : type === "warning" ? "bg-warning text-dark" : "bg-info text-white";
     div.className = `toast align-items-center ${variant}`;
     div.setAttribute("role", "alert");
     div.setAttribute("aria-live", "assertive");
     div.setAttribute("aria-atomic", "true");
     const safeMessage = escapeHtml(message != null ? message : "");
-    div.innerHTML = `<div class="d-flex">
-        <div class="toast-body">${safeMessage}</div>
-      </div>`;
+    let progressHtml = "";
+    if (showProgress) {
+      progressHtml = `
+      <div class="toast-progress-bar" style="position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.3); overflow: hidden;">
+        <div class="toast-progress-fill" style="height: 100%; background: rgba(255,255,255,0.8); width: 100%; animation: toastProgress ${duration}ms linear;"></div>
+      </div>
+    `;
+    }
+    let actionHtml = "";
+    if (action) {
+      actionHtml = `
+      <button type="button" class="btn btn-sm btn-light toast-action-btn" style="margin-right: 8px;">
+        ${escapeHtml(action.label)}
+      </button>
+    `;
+    }
+    div.innerHTML = `
+    <div class="d-flex align-items-center" style="position: relative;">
+      <div class="toast-body" style="flex: 1;">${safeMessage}</div>
+      ${actionHtml}
+      <button type="button" class="btn-close ${type === "warning" ? "" : "btn-close-white"}" data-bs-dismiss="toast" aria-label="Close"></button>
+      ${progressHtml}
+    </div>
+  `;
     container.appendChild(div);
-    const toastObj = new bootstrap.Toast(div, { delay: 4e3 });
+    if (action) {
+      const actionBtn = div.querySelector(".toast-action-btn");
+      if (actionBtn) {
+        actionBtn.addEventListener("click", () => {
+          action.onClick();
+          const toastObj2 = bootstrap.Toast.getInstance(div);
+          if (toastObj2) {
+            toastObj2.hide();
+          }
+        });
+      }
+    }
+    const toastObj = new bootstrap.Toast(div, { delay: duration, autohide: duration > 0 });
     toastObj.show();
     div.addEventListener("hidden.bs.toast", () => {
       if (div.parentNode === container) {
         container.removeChild(div);
       }
     });
+    return {
+      hide: () => toastObj.hide(),
+      element: div
+    };
+  }
+  if (typeof document !== "undefined" && !document.getElementById("toast-progress-styles")) {
+    const style = document.createElement("style");
+    style.id = "toast-progress-styles";
+    style.textContent = `
+    @keyframes toastProgress {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
+  `;
+    document.head.appendChild(style);
   }
   async function requestJson(url, options) {
     const resp = await fetch(url, options);
@@ -191,6 +307,588 @@
     }
     return `${secs}s`;
   };
+
+  // src/timeUtils.ts
+  function formatRelativeTime(timestamp) {
+    const now = Date.now();
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp * 1e3);
+    const diffMs = now - date.getTime();
+    const diffSec = Math.floor(diffMs / 1e3);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    const diffWeek = Math.floor(diffDay / 7);
+    const diffMonth = Math.floor(diffDay / 30);
+    const diffYear = Math.floor(diffDay / 365);
+    if (diffMs < 0) {
+      return "in the future";
+    }
+    if (diffMin < 1) {
+      return "just now";
+    }
+    if (diffHour < 1) {
+      return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
+    }
+    if (diffDay < 1) {
+      return `${diffHour} hour${diffHour === 1 ? "" : "s"} ago`;
+    }
+    if (diffDay === 1) {
+      return "yesterday";
+    }
+    if (diffWeek < 1) {
+      return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
+    }
+    if (diffDay < 14) {
+      return "last week";
+    }
+    if (diffMonth < 1) {
+      return `${diffWeek} week${diffWeek === 1 ? "" : "s"} ago`;
+    }
+    if (diffDay < 60) {
+      return "last month";
+    }
+    if (diffYear < 1) {
+      return `${diffMonth} month${diffMonth === 1 ? "" : "s"} ago`;
+    }
+    if (diffDay < 730) {
+      return "last year";
+    }
+    return `${diffYear} year${diffYear === 1 ? "" : "s"} ago`;
+  }
+  function formatAbsoluteTime(timestamp) {
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp * 1e3);
+    const dateStr = date.toLocaleDateString(void 0, {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    });
+    const timeStr = date.toLocaleTimeString(void 0, {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    return `${dateStr} at ${timeStr}`;
+  }
+  function formatTimestamp(timestamp) {
+    return {
+      relative: formatRelativeTime(timestamp),
+      absolute: formatAbsoluteTime(timestamp)
+    };
+  }
+  function createTimeElement(timestamp, className = "") {
+    const { relative, absolute } = formatTimestamp(timestamp);
+    const isoString = timestamp instanceof Date ? timestamp.toISOString() : new Date(timestamp * 1e3).toISOString();
+    return `<time datetime="${isoString}" title="${absolute}" class="${className}" data-timestamp="${typeof timestamp === "number" ? timestamp : Math.floor(timestamp.getTime() / 1e3)}">${relative}</time>`;
+  }
+  function updateAllTimeElements() {
+    const timeElements = document.querySelectorAll("time[data-timestamp]");
+    timeElements.forEach((element) => {
+      const timestamp = parseInt(element.getAttribute("data-timestamp") || "0", 10);
+      if (timestamp > 0) {
+        const { relative, absolute } = formatTimestamp(timestamp);
+        element.textContent = relative;
+        element.setAttribute("title", absolute);
+      }
+    });
+  }
+  function startTimeUpdates() {
+    const intervalId = setInterval(updateAllTimeElements, 6e4);
+    return () => clearInterval(intervalId);
+  }
+  function getStartOfToday() {
+    const today = /* @__PURE__ */ new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.floor(today.getTime() / 1e3);
+  }
+  function getStartOfWeek() {
+    const now = /* @__PURE__ */ new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    return Math.floor(startOfWeek.getTime() / 1e3);
+  }
+  function getStartOfMonth() {
+    const now = /* @__PURE__ */ new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    return Math.floor(startOfMonth.getTime() / 1e3);
+  }
+
+  // src/undoManager.ts
+  var UndoManager = class {
+    constructor() {
+      __publicField(this, "actions", []);
+      __publicField(this, "maxActions", 10);
+      __publicField(this, "defaultTTL", 1e4);
+      // 10 seconds
+      __publicField(this, "cleanupInterval", null);
+      this.startCleanup();
+    }
+    /**
+     * Add an action to the undo history
+     */
+    addAction(action) {
+      const id = this.generateId();
+      const timestamp = Date.now();
+      const expiresAt = timestamp + this.defaultTTL;
+      const fullAction = __spreadProps(__spreadValues({}, action), {
+        id,
+        timestamp,
+        expiresAt
+      });
+      this.actions.unshift(fullAction);
+      if (this.actions.length > this.maxActions) {
+        this.actions = this.actions.slice(0, this.maxActions);
+      }
+      return id;
+    }
+    /**
+     * Get an action by ID
+     */
+    getAction(id) {
+      return this.actions.find((action) => action.id === id) || null;
+    }
+    /**
+     * Remove an action from history
+     */
+    removeAction(id) {
+      this.actions = this.actions.filter((action) => action.id !== id);
+    }
+    /**
+     * Get all active (non-expired) actions
+     */
+    getActiveActions() {
+      const now = Date.now();
+      return this.actions.filter((action) => action.expiresAt > now);
+    }
+    /**
+     * Clear all actions
+     */
+    clearAll() {
+      this.actions = [];
+    }
+    /**
+     * Start periodic cleanup of expired actions
+     */
+    startCleanup() {
+      if (this.cleanupInterval !== null) {
+        return;
+      }
+      this.cleanupInterval = window.setInterval(() => {
+        this.cleanupExpired();
+      }, 1e3);
+    }
+    /**
+     * Stop periodic cleanup
+     */
+    stopCleanup() {
+      if (this.cleanupInterval !== null) {
+        clearInterval(this.cleanupInterval);
+        this.cleanupInterval = null;
+      }
+    }
+    /**
+     * Remove expired actions
+     */
+    cleanupExpired() {
+      const now = Date.now();
+      this.actions = this.actions.filter((action) => action.expiresAt > now);
+    }
+    /**
+     * Generate a unique ID for an action
+     */
+    generateId() {
+      return `undo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    /**
+     * Get time remaining until action expires (in milliseconds)
+     */
+    getTimeRemaining(id) {
+      const action = this.getAction(id);
+      if (!action) {
+        return 0;
+      }
+      const remaining = action.expiresAt - Date.now();
+      return Math.max(0, remaining);
+    }
+    /**
+     * Check if an action is still valid (not expired)
+     */
+    isActionValid(id) {
+      return this.getTimeRemaining(id) > 0;
+    }
+  };
+  var undoManager = new UndoManager();
+  function showUndoToast(action, onUndo) {
+    const container = document.getElementById("toastContainer");
+    if (!container) return;
+    const div = document.createElement("div");
+    div.className = "toast align-items-center bg-warning text-dark";
+    div.setAttribute("role", "alert");
+    div.setAttribute("aria-live", "assertive");
+    div.setAttribute("aria-atomic", "true");
+    div.setAttribute("data-undo-id", action.id);
+    const entityLabel = action.entityType.charAt(0).toUpperCase() + action.entityType.slice(1);
+    const actionLabel = action.type === "delete" ? "Deleted" : action.type === "bulk_delete" ? "Deleted" : "Updated";
+    const entityCount = Array.isArray(action.entityId) ? action.entityId.length : 1;
+    const entityText = entityCount > 1 ? `${entityCount} ${entityLabel}s` : entityLabel;
+    div.innerHTML = `
+    <div class="d-flex align-items-center" style="padding: 12px;">
+      <div class="toast-body" style="flex: 1;">
+        <strong>${actionLabel} ${entityText}</strong>
+        <div style="font-size: 12px; margin-top: 4px;">
+          <span id="undo-countdown-${action.id}">10s</span> to undo
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-dark" id="undo-btn-${action.id}" style="margin-right: 8px;">
+        Undo
+      </button>
+      <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  `;
+    container.appendChild(div);
+    const toast = new window.bootstrap.Toast(div, {
+      autohide: false
+      // We'll handle hiding manually
+    });
+    toast.show();
+    const countdownEl = document.getElementById(`undo-countdown-${action.id}`);
+    const updateCountdown = () => {
+      const remaining = undoManager.getTimeRemaining(action.id);
+      if (remaining <= 0) {
+        toast.hide();
+        undoManager.removeAction(action.id);
+        return;
+      }
+      const seconds = Math.ceil(remaining / 1e3);
+      if (countdownEl) {
+        countdownEl.textContent = `${seconds}s`;
+      }
+    };
+    const countdownInterval = setInterval(updateCountdown, 100);
+    const undoBtn = document.getElementById(`undo-btn-${action.id}`);
+    if (undoBtn) {
+      undoBtn.addEventListener("click", async () => {
+        clearInterval(countdownInterval);
+        undoBtn.textContent = "Undoing...";
+        undoBtn.setAttribute("disabled", "true");
+        try {
+          await onUndo(action);
+          undoManager.removeAction(action.id);
+          toast.hide();
+          if (typeof window.showToast === "function") {
+            window.showToast("Action undone successfully", "success");
+          }
+        } catch (error) {
+          console.error("Undo failed:", error);
+          undoBtn.textContent = "Undo";
+          undoBtn.removeAttribute("disabled");
+          if (typeof window.showToast === "function") {
+            window.showToast("Failed to undo action", "error");
+          }
+        }
+      });
+    }
+    div.addEventListener("hidden.bs.toast", () => {
+      clearInterval(countdownInterval);
+      if (div.parentNode === container) {
+        container.removeChild(div);
+      }
+    });
+  }
+  function createDeleteAction(entityType, entityId, entityName, data) {
+    return undoManager.addAction({
+      type: "delete",
+      entityType,
+      entityId,
+      entityName,
+      data
+    });
+  }
+  function createBulkDeleteAction(entityType, entityIds, entityName, data) {
+    return undoManager.addAction({
+      type: "bulk_delete",
+      entityType,
+      entityId: entityIds,
+      entityName,
+      data
+    });
+  }
+  function createUpdateAction(entityType, entityId, entityName, previousData) {
+    return undoManager.addAction({
+      type: "update",
+      entityType,
+      entityId,
+      entityName,
+      data: previousData
+    });
+  }
+
+  // src/filterManager.ts
+  var FilterManager = class {
+    constructor() {
+      __publicField(this, "storageKey", "testrail_saved_filters");
+      __publicField(this, "maxFilters", 10);
+    }
+    /**
+     * Get all saved filters
+     */
+    getAllFilters() {
+      try {
+        const stored = localStorage.getItem(this.storageKey);
+        if (!stored) {
+          return [];
+        }
+        const filters = JSON.parse(stored);
+        return Array.isArray(filters) ? filters : [];
+      } catch (error) {
+        console.error("Failed to load saved filters:", error);
+        return [];
+      }
+    }
+    /**
+     * Get a filter by ID
+     */
+    getFilter(id) {
+      const filters = this.getAllFilters();
+      return filters.find((f) => f.id === id) || null;
+    }
+    /**
+     * Get the default filter (if any)
+     */
+    getDefaultFilter() {
+      const filters = this.getAllFilters();
+      return filters.find((f) => f.isDefault) || null;
+    }
+    /**
+     * Save a new filter
+     */
+    saveFilter(filter) {
+      const filters = this.getAllFilters();
+      if (filters.length >= this.maxFilters) {
+        throw new Error(`Maximum of ${this.maxFilters} saved filters reached. Please delete an existing filter first.`);
+      }
+      if (filters.some((f) => f.name.toLowerCase() === filter.name.toLowerCase())) {
+        throw new Error("A filter with this name already exists.");
+      }
+      const now = Date.now();
+      const newFilter = __spreadProps(__spreadValues({}, filter), {
+        id: this.generateId(),
+        createdAt: now,
+        updatedAt: now
+      });
+      if (newFilter.isDefault) {
+        filters.forEach((f) => f.isDefault = false);
+      }
+      filters.push(newFilter);
+      this.saveToStorage(filters);
+      return newFilter;
+    }
+    /**
+     * Update an existing filter
+     */
+    updateFilter(id, updates) {
+      const filters = this.getAllFilters();
+      const index = filters.findIndex((f) => f.id === id);
+      if (index === -1) {
+        throw new Error("Filter not found.");
+      }
+      if (updates.name) {
+        const duplicate = filters.find(
+          (f) => f.id !== id && f.name.toLowerCase() === updates.name.toLowerCase()
+        );
+        if (duplicate) {
+          throw new Error("A filter with this name already exists.");
+        }
+      }
+      if (updates.isDefault) {
+        filters.forEach((f) => f.isDefault = false);
+      }
+      const updatedFilter = __spreadProps(__spreadValues(__spreadValues({}, filters[index]), updates), {
+        updatedAt: Date.now()
+      });
+      filters[index] = updatedFilter;
+      this.saveToStorage(filters);
+      return updatedFilter;
+    }
+    /**
+     * Delete a filter
+     */
+    deleteFilter(id) {
+      const filters = this.getAllFilters();
+      const filtered = filters.filter((f) => f.id !== id);
+      if (filtered.length === filters.length) {
+        throw new Error("Filter not found.");
+      }
+      this.saveToStorage(filtered);
+    }
+    /**
+     * Set a filter as default
+     */
+    setDefaultFilter(id) {
+      const filters = this.getAllFilters();
+      const filter = filters.find((f) => f.id === id);
+      if (!filter) {
+        throw new Error("Filter not found.");
+      }
+      filters.forEach((f) => f.isDefault = false);
+      filter.isDefault = true;
+      filter.updatedAt = Date.now();
+      this.saveToStorage(filters);
+    }
+    /**
+     * Clear the default filter
+     */
+    clearDefaultFilter() {
+      const filters = this.getAllFilters();
+      filters.forEach((f) => f.isDefault = false);
+      this.saveToStorage(filters);
+    }
+    /**
+     * Export a filter as JSON
+     */
+    exportFilter(id) {
+      const filter = this.getFilter(id);
+      if (!filter) {
+        throw new Error("Filter not found.");
+      }
+      return JSON.stringify(filter, null, 2);
+    }
+    /**
+     * Import a filter from JSON
+     */
+    importFilter(json) {
+      try {
+        const filter = JSON.parse(json);
+        if (!filter.name || !filter.filters) {
+          throw new Error("Invalid filter format.");
+        }
+        const _a = filter, { id, createdAt, updatedAt } = _a, filterData = __objRest(_a, ["id", "createdAt", "updatedAt"]);
+        return this.saveFilter(filterData);
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          throw new Error("Invalid JSON format.");
+        }
+        throw error;
+      }
+    }
+    /**
+     * Clear all saved filters
+     */
+    clearAll() {
+      localStorage.removeItem(this.storageKey);
+    }
+    /**
+     * Save filters to localStorage
+     */
+    saveToStorage(filters) {
+      try {
+        localStorage.setItem(this.storageKey, JSON.stringify(filters));
+      } catch (error) {
+        console.error("Failed to save filters:", error);
+        throw new Error("Failed to save filters. Storage may be full.");
+      }
+    }
+    /**
+     * Generate a unique ID
+     */
+    generateId() {
+      return `filter_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+    /**
+     * Get filter count
+     */
+    getFilterCount() {
+      return this.getAllFilters().length;
+    }
+    /**
+     * Check if maximum filters reached
+     */
+    isMaxFiltersReached() {
+      return this.getFilterCount() >= this.maxFilters;
+    }
+    /**
+     * Get available filter slots
+     */
+    getAvailableSlots() {
+      return Math.max(0, this.maxFilters - this.getFilterCount());
+    }
+  };
+  var filterManager = new FilterManager();
+  function applyFilter(filter, dashboardState) {
+    if (filter.filters.search !== void 0) {
+      dashboardState.filters.search = filter.filters.search;
+    }
+    if (filter.filters.isCompleted !== void 0) {
+      dashboardState.filters.isCompleted = filter.filters.isCompleted;
+    }
+    if (filter.filters.createdAfter !== void 0) {
+      dashboardState.filters.createdAfter = filter.filters.createdAfter;
+    }
+    if (filter.filters.createdBefore !== void 0) {
+      dashboardState.filters.createdBefore = filter.filters.createdBefore;
+    }
+    if (filter.filters.assignees !== void 0) {
+      dashboardState.filters.assignees = filter.filters.assignees;
+    }
+    if (filter.filters.priorities !== void 0) {
+      dashboardState.filters.priorities = filter.filters.priorities;
+    }
+    if (filter.filters.tags !== void 0) {
+      dashboardState.filters.tags = filter.filters.tags;
+    }
+    if (filter.filters.customFields !== void 0) {
+      dashboardState.filters.customFields = filter.filters.customFields;
+    }
+    if (filter.sortColumn !== void 0) {
+      dashboardState.sort.column = filter.sortColumn;
+    }
+    if (filter.sortDirection !== void 0) {
+      dashboardState.sort.direction = filter.sortDirection;
+    }
+    dashboardState.currentOffset = 0;
+  }
+  function createFilterFromState(dashboardState) {
+    return {
+      filters: {
+        search: dashboardState.filters.search || void 0,
+        isCompleted: dashboardState.filters.isCompleted !== null ? dashboardState.filters.isCompleted : void 0,
+        createdAfter: dashboardState.filters.createdAfter || void 0,
+        createdBefore: dashboardState.filters.createdBefore || void 0,
+        assignees: dashboardState.filters.assignees || void 0,
+        priorities: dashboardState.filters.priorities || void 0,
+        tags: dashboardState.filters.tags || void 0,
+        customFields: dashboardState.filters.customFields || void 0
+      },
+      sortColumn: dashboardState.sort.column,
+      sortDirection: dashboardState.sort.direction
+    };
+  }
+  function getFilterDescription(filter) {
+    const parts = [];
+    if (filter.filters.search) {
+      parts.push(`Search: "${filter.filters.search}"`);
+    }
+    if (filter.filters.isCompleted === 0) {
+      parts.push("Active only");
+    } else if (filter.filters.isCompleted === 1) {
+      parts.push("Completed only");
+    }
+    if (filter.filters.createdAfter || filter.filters.createdBefore) {
+      parts.push("Date range");
+    }
+    if (filter.filters.assignees && filter.filters.assignees.length > 0) {
+      parts.push(`${filter.filters.assignees.length} assignee(s)`);
+    }
+    if (filter.filters.priorities && filter.filters.priorities.length > 0) {
+      parts.push(`${filter.filters.priorities.length} priority(ies)`);
+    }
+    if (filter.filters.tags && filter.filters.tags.length > 0) {
+      parts.push(`${filter.filters.tags.length} tag(s)`);
+    }
+    if (filter.sortColumn) {
+      parts.push(`Sort by ${filter.sortColumn}`);
+    }
+    return parts.length > 0 ? parts.join(" \u2022 ") : "No filters applied";
+  }
 
   // src/runsUI.ts
   function renderRuns(runs) {
@@ -3721,6 +4419,25 @@ Note: This will only remove them from the run, not delete them from the project.
         setLoading(true, progress.label, progress);
       }
     });
+  }
+  if (typeof window !== "undefined") {
+    window.formatRelativeTime = formatRelativeTime;
+    window.formatAbsoluteTime = formatAbsoluteTime;
+    window.createTimeElement = createTimeElement;
+    window.updateAllTimeElements = updateAllTimeElements;
+    window.startTimeUpdates = startTimeUpdates;
+    window.getStartOfToday = getStartOfToday;
+    window.getStartOfWeek = getStartOfWeek;
+    window.getStartOfMonth = getStartOfMonth;
+    window.undoManager = undoManager;
+    window.createDeleteAction = createDeleteAction;
+    window.createBulkDeleteAction = createBulkDeleteAction;
+    window.createUpdateAction = createUpdateAction;
+    window.showUndoToast = showUndoToast;
+    window.filterManager = filterManager;
+    window.applyFilter = applyFilter;
+    window.createFilterFromState = createFilterFromState;
+    window.getFilterDescription = getFilterDescription;
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

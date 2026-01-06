@@ -1,16 +1,35 @@
 """Health check API endpoints."""
 
 import requests
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.core.dependencies import get_plans_cache, get_runs_cache, get_testrail_client
+import app.core.dependencies as dependencies
 from testrail_client import DEFAULT_HTTP_BACKOFF, DEFAULT_HTTP_RETRIES, DEFAULT_HTTP_TIMEOUT
 
 router = APIRouter(tags=["health"])
 
 
+def _resolve_dependency(request: Request, dependency):
+    override = request.app.dependency_overrides.get(dependency)
+    if override:
+        return override()
+    return dependency()
+
+
+def _resolve_plans_cache(request: Request):
+    return _resolve_dependency(request, dependencies.get_plans_cache)
+
+
+def _resolve_runs_cache(request: Request):
+    return _resolve_dependency(request, dependencies.get_runs_cache)
+
+
+def _resolve_testrail_client(request: Request):
+    return _resolve_dependency(request, dependencies.get_testrail_client)
+
+
 @router.get("/healthz")
-def health_check(plans_cache=Depends(get_plans_cache), runs_cache=Depends(get_runs_cache)):
+def health_check(plans_cache=Depends(_resolve_plans_cache), runs_cache=Depends(_resolve_runs_cache)):
     """Basic health check endpoint."""
     # Import here to avoid circular imports
     try:
@@ -38,7 +57,9 @@ def health_check(plans_cache=Depends(get_plans_cache), runs_cache=Depends(get_ru
 
 @router.get("/health/detailed")
 def detailed_health_check(
-    client=Depends(get_testrail_client), plans_cache=Depends(get_plans_cache), runs_cache=Depends(get_runs_cache)
+    client=Depends(_resolve_testrail_client),
+    plans_cache=Depends(_resolve_plans_cache),
+    runs_cache=Depends(_resolve_runs_cache),
 ):
     """Detailed health check including TestRail connectivity."""
     health_status = {"ok": True, "checks": {}, "timestamp": None}
@@ -99,7 +120,7 @@ def detailed_health_check(
 
 
 @router.get("/health/cache")
-def cache_health_check(plans_cache=Depends(get_plans_cache), runs_cache=Depends(get_runs_cache)):
+def cache_health_check(plans_cache=Depends(_resolve_plans_cache), runs_cache=Depends(_resolve_runs_cache)):
     """Cache-specific health check."""
     return {
         "ok": True,
@@ -111,7 +132,7 @@ def cache_health_check(plans_cache=Depends(get_plans_cache), runs_cache=Depends(
 
 
 @router.get("/health/testrail")
-def testrail_health_check(client=Depends(get_testrail_client)):
+def testrail_health_check(client=Depends(_resolve_testrail_client)):
     """TestRail connectivity health check."""
     try:
         # Test basic connectivity with a lightweight API call

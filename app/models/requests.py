@@ -44,6 +44,20 @@ class ManagePlan(BaseModel):
     milestone_id: int | None = None
     dry_run: bool = False
 
+    @field_validator("project")
+    @classmethod
+    def _validate_project(cls, v):
+        if v < 1:
+            raise ValueError("Project ID must be positive")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v):
+        if not v.strip():
+            raise ValueError("Plan name cannot be empty")
+        return v
+
 
 class ManageRun(BaseModel):
     project: int = 1

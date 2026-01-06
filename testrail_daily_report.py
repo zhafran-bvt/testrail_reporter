@@ -843,6 +843,7 @@ def generate_report(
     project_obj = api_client.get_project(project)
     project_name = project_obj.get("name") or f"Project {project}"
     plan_name: str | None = None
+    run_name: str | None = None
     run_names: dict[int, str] = {}
     plan_run_ids: list[int] = []
     if plan is not None:
@@ -859,6 +860,14 @@ def generate_report(
             missing = [rid for rid in run_ids if rid not in plan_run_ids]
             if missing:
                 raise ValueError(f"Run IDs not found in plan {plan}: {missing}")
+    elif run is not None:
+        try:
+            run_obj = api_client.get_run(int(run))
+            run_name = run_obj.get("name") or f"Run {run}"
+        except Exception as e:
+            print(f"Warning: failed to fetch run name for run {run}: {e}", file=sys.stderr)
+            run_name = f"Run {run}"
+        run_names[int(run)] = run_name
 
     user_lookup_allowed = True
     users_map: dict[int, str] = {}
@@ -1307,7 +1316,12 @@ def generate_report(
     else:
         donut_style = "conic-gradient(#e5e7eb 0 100%)"
 
-    report_title = f"Testing Progress Report — {plan_name}" if plan_name else "Testing Progress Report"
+    if plan_name:
+        report_title = f"Testing Progress Report — {plan_name}"
+    elif run_name:
+        report_title = f"Testing Progress Report — {run_name}"
+    else:
+        report_title = "Testing Progress Report"
     notify("rendering_report", total_runs=total_runs)
     preview_tables: list[dict] = []
     if snapshot_enabled and not tables_snapshot:

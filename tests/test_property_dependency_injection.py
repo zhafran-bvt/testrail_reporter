@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
@@ -12,7 +13,12 @@ class TestDependencyInjectionUsage:
     """Property 2: Dependency Injection Usage - For any API endpoint,
     dependencies should be injected via FastAPI's dependency system rather than using global variables."""
 
-    def test_testrail_client_dependency_injection(self):
+    @pytest.fixture
+    def client(self):
+        """Create test client."""
+        return TestClient(FastAPI())
+
+    def test_testrail_client_dependency_injection(self, client):
         """Test that TestRail client is properly injected as dependency."""
         app = FastAPI()
 
@@ -29,15 +35,15 @@ class TestDependencyInjectionUsage:
                 "TESTRAIL_API_KEY": "test-key",
             },
         ):
-            TestClient(app)
-            response = self.client.get("/test-endpoint")
+            test_client = TestClient(app)
+            response = test_client.get("/test-endpoint")
 
             assert response.status_code == 200
             data = response.json()
             assert "client_type" in data
             assert data["client_type"] == "TestRailClient"
 
-    def test_cache_dependency_injection(self):
+    def test_cache_dependency_injection(self, client):
         """Test that cache instances are properly injected as dependencies."""
         app = FastAPI()
 
@@ -50,8 +56,8 @@ class TestDependencyInjectionUsage:
                 "runs_cache_size": runs_cache.size(),
             }
 
-        TestClient(app)
-        response = self.client.get("/test-cache")
+        test_client = TestClient(app)
+        response = test_client.get("/test-cache")
 
         assert response.status_code == 200
         data = response.json()
@@ -60,7 +66,7 @@ class TestDependencyInjectionUsage:
         assert isinstance(data["plans_cache_size"], int)
         assert isinstance(data["runs_cache_size"], int)
 
-    def test_write_permission_dependency_injection(self):
+    def test_write_permission_dependency_injection(self, client):
         """Test that write permissions are checked via dependency injection."""
         app = FastAPI()
 
@@ -68,8 +74,8 @@ class TestDependencyInjectionUsage:
         def test_write_endpoint(write_enabled=Depends(require_write_enabled)):
             return {"write_enabled": write_enabled}
 
-        TestClient(app)
-        response = self.client.post("/test-write")
+        test_client = TestClient(app)
+        response = test_client.post("/test-write")
 
         assert response.status_code == 200
         data = response.json()
@@ -121,7 +127,7 @@ class TestDependencyInjectionUsage:
         write_enabled = require_write_enabled()
         assert isinstance(write_enabled, bool)
 
-    def test_dependency_isolation(self):
+    def test_dependency_isolation(self, client):
         """Test that dependencies are properly isolated and don't interfere with each other."""
         app = FastAPI()
 
@@ -136,11 +142,11 @@ class TestDependencyInjectionUsage:
             cache.set(("test2",), "value2")
             return {"endpoint": "2", "cache_size": cache.size()}
 
-        TestClient(app)
+        test_client = TestClient(app)
 
         # Call both endpoints
-        response1 = self.client.get("/endpoint1")
-        response2 = self.client.get("/endpoint2")
+        response1 = test_client.get("/endpoint1")
+        response2 = test_client.get("/endpoint2")
 
         assert response1.status_code == 200
         assert response2.status_code == 200
@@ -153,7 +159,7 @@ class TestDependencyInjectionUsage:
         assert data1["cache_size"] >= 1
         assert data2["cache_size"] >= 2  # Should have both items
 
-    def test_dependency_error_handling(self):
+    def test_dependency_error_handling(self, client):
         """Test that dependency injection handles errors gracefully."""
         app = FastAPI()
 
@@ -163,8 +169,8 @@ class TestDependencyInjectionUsage:
 
         # Test without proper environment variables
         with patch.dict("os.environ", {}, clear=True):
-            TestClient(app)
-            response = self.client.get("/test-error")
+            test_client = TestClient(app)
+            response = test_client.get("/test-error")
 
             # Should get an error due to missing credentials
             assert response.status_code == 500

@@ -10,6 +10,18 @@ import {
   escapeHtml,
 } from "./utils";
 import {
+  formatRelativeTime,
+  formatAbsoluteTime,
+  createTimeElement,
+  updateAllTimeElements,
+  startTimeUpdates,
+  getStartOfToday,
+  getStartOfWeek,
+  getStartOfMonth,
+} from "./timeUtils";
+import { undoManager, createDeleteAction, createBulkDeleteAction, createUpdateAction, showUndoToast } from "./undoManager";
+import { filterManager, applyFilter, createFilterFromState, getFilterDescription } from "./filterManager";
+import {
   loadPlans,
   loadManagePlans,
   loadRuns,
@@ -695,6 +707,27 @@ function init() {
       setLoading(true, progress.label, progress as any);
     }
   });
+}
+
+// Export utilities globally for use in dashboard.js and other vanilla JS files
+if (typeof window !== 'undefined') {
+  (window as any).formatRelativeTime = formatRelativeTime;
+  (window as any).formatAbsoluteTime = formatAbsoluteTime;
+  (window as any).createTimeElement = createTimeElement;
+  (window as any).updateAllTimeElements = updateAllTimeElements;
+  (window as any).startTimeUpdates = startTimeUpdates;
+  (window as any).getStartOfToday = getStartOfToday;
+  (window as any).getStartOfWeek = getStartOfWeek;
+  (window as any).getStartOfMonth = getStartOfMonth;
+  (window as any).undoManager = undoManager;
+  (window as any).createDeleteAction = createDeleteAction;
+  (window as any).createBulkDeleteAction = createBulkDeleteAction;
+  (window as any).createUpdateAction = createUpdateAction;
+  (window as any).showUndoToast = showUndoToast;
+  (window as any).filterManager = filterManager;
+  (window as any).applyFilter = applyFilter;
+  (window as any).createFilterFromState = createFilterFromState;
+  (window as any).getFilterDescription = getFilterDescription;
 }
 
 if (document.readyState === "loading") {
