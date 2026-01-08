@@ -154,6 +154,20 @@ document.addEventListener('DOMContentLoaded', function() {
                             <h3 style="margin: 0 0 12px; font-size: 16px; color: var(--primary);">⚙️ Advanced Options</h3>
                             <div class="form-grid" style="display: grid; grid-template-columns: 1fr; gap: 16px;">
                                 <div class="form-group">
+                                    <label for="datasetGeojsonPath" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Land Boundary (GeoJSON)
+                                    </label>
+                                    <select id="datasetGeojsonPath" name="geojson_path"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                        <option value="">None (allow ocean)</option>
+                                        <option value="dataset_generator/geoJson/jkt.geojson">Jakarta</option>
+                                        <option value="dataset_generator/geoJson/id.json">Indonesia</option>
+                                        <option value="dataset_generator/geoJson/jp.json">Japan</option>
+                                        <option value="dataset_generator/geoJson/vn.json">Vietnam</option>
+                                    </select>
+                                    <small style="color: var(--muted); font-size: 12px;">Optional: constrain points to land</small>
+                                </div>
+                                <div class="form-group">
                                     <label for="datasetFilenamePrefix" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
                                         Filename Prefix (Optional)
                                     </label>
@@ -314,7 +328,22 @@ function setupDatasetForm() {
         console.error('Dataset form not found');
         return;
     }
-    
+
+    const geojsonPaths = {
+        Jakarta: 'dataset_generator/geoJson/jkt.geojson',
+        Indonesia: 'dataset_generator/geoJson/id.json',
+        Japan: 'dataset_generator/geoJson/jp.json',
+        Vietnam: 'dataset_generator/geoJson/vn.json'
+    };
+    const areaSelect = document.getElementById('datasetArea');
+    const geojsonSelect = document.getElementById('datasetGeojsonPath');
+    if (areaSelect && geojsonSelect) {
+        geojsonSelect.value = geojsonPaths[areaSelect.value] || '';
+        areaSelect.addEventListener('change', () => {
+            geojsonSelect.value = geojsonPaths[areaSelect.value] || '';
+        });
+    }
+
     // Form submission handler
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -332,15 +361,18 @@ function setupDatasetForm() {
         
         // Collect form data
         const formData = new FormData(form);
+        const area = formData.get('area');
+        const geojsonPath = formData.get('geojson_path');
         const config = {
             rows: parseInt(formData.get('rows')),
             columns: parseInt(formData.get('columns')),
             geometry_type: formData.get('geometry_type'),
             format_type: formData.get('format_type'),
-            area: formData.get('area'),
+            area: area,
             include_demographic: formData.has('include_demographic'),
             include_economic: formData.has('include_economic'),
             use_spatial_clustering: formData.has('use_spatial_clustering'),
+            geojson_path: geojsonPath ? geojsonPath : null,
             filename_prefix: formData.get('filename_prefix') || null
         };
         
@@ -388,6 +420,9 @@ function setupDatasetForm() {
         document.getElementById('datasetIncludeEconomic').checked = true;
         document.getElementById('datasetUseClustering').checked = false;
         document.getElementById('datasetFilenamePrefix').value = '';
+        if (geojsonSelect) {
+            geojsonSelect.value = geojsonPaths.Jakarta || '';
+        }
         
         // Hide status and results
         statusDiv.style.display = 'none';
