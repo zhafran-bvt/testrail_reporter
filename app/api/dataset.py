@@ -101,6 +101,8 @@ async def _generate_dataset_task(job_id: str, config: DatasetConfig):
                     land_geometry = unary_union(land_gdf["geometry"].values)
             except Exception as e:
                 print(f"Warning: Could not load GeoJSON file: {e}")
+        if config.strict_land and land_geometry is None:
+            raise ValueError("Strict land mode requires a valid GeoJSON boundary.")
 
         # Generate dataset
         df = generate_parallel_dataframe(
@@ -116,6 +118,17 @@ async def _generate_dataset_task(job_id: str, config: DatasetConfig):
             include_demographic=config.include_demographic,
             include_economic=config.include_economic,
             use_spatial_clustering=config.use_spatial_clustering,
+            strict_land=config.strict_land,
+            distribution_mode=config.distribution_mode,
+            noise_level=config.noise_level,
+            outlier_rate=config.outlier_rate,
+            outlier_scale=config.outlier_scale,
+            missing_rate=config.missing_rate,
+            spatial_weighting=config.spatial_weighting,
+            seed=config.seed,
+            date_start=config.date_start,
+            date_end=config.date_end,
+            seasonality=config.seasonality,
         )
 
         # Validate dataset
@@ -174,6 +187,11 @@ async def generate_dataset(config: DatasetConfig, background_tasks: BackgroundTa
         _get_geometry_type_id(config.geometry_type)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if config.strict_land:
+        if not config.geojson_path:
+            raise HTTPException(status_code=400, detail="Strict land mode requires geojson_path.")
+        if not Path(config.geojson_path).exists():
+            raise HTTPException(status_code=400, detail="geojson_path does not exist.")
 
     # Create job
     import uuid

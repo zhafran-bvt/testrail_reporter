@@ -69,9 +69,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <label for="datasetColumns" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
                                         Columns <span style="color: #ef4444;">*</span>
                                     </label>
-                                    <input type="number" id="datasetColumns" name="columns" value="10" min="3" max="29" required
+                                    <input type="number" id="datasetColumns" name="columns" value="10" min="3" max="35" required
                                         style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
-                                    <small style="color: var(--muted); font-size: 12px;">3 - 29 columns</small>
+                                    <small style="color: var(--muted); font-size: 12px;">3 - 35 columns</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="datasetArea" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
@@ -148,6 +148,97 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Realism Options -->
+                        <div class="form-section">
+                            <h3 style="margin: 0 0 12px; font-size: 16px; color: var(--primary);">✨ Realism Options</h3>
+                            <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                                <div class="form-group">
+                                    <label for="datasetDistributionMode" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Value Distribution
+                                    </label>
+                                    <select id="datasetDistributionMode" name="distribution_mode"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                        <option value="uniform">Uniform</option>
+                                        <option value="normal">Normal</option>
+                                        <option value="lognormal">Lognormal</option>
+                                        <option value="beta">Beta</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetSpatialWeighting" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Spatial Weighting
+                                    </label>
+                                    <select id="datasetSpatialWeighting" name="spatial_weighting"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                        <option value="none">None</option>
+                                        <option value="urban_bias">Urban Bias</option>
+                                        <option value="rural_bias">Rural Bias</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetNoiseLevel" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Noise Level (0-1)
+                                    </label>
+                                    <input type="number" id="datasetNoiseLevel" name="noise_level" value="0" min="0" max="1" step="0.01"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetOutlierRate" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Outlier Rate (0-1)
+                                    </label>
+                                    <input type="number" id="datasetOutlierRate" name="outlier_rate" value="0" min="0" max="1" step="0.01"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetOutlierScale" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Outlier Scale (>= 1)
+                                    </label>
+                                    <input type="number" id="datasetOutlierScale" name="outlier_scale" value="2.5" min="1" step="0.1"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetMissingRate" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Missing Rate (0-1)
+                                    </label>
+                                    <input type="number" id="datasetMissingRate" name="missing_rate" value="0" min="0" max="1" step="0.01"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetSeasonality" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Seasonality
+                                    </label>
+                                    <select id="datasetSeasonality" name="seasonality"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                        <option value="none">None</option>
+                                        <option value="weekday">Weekday Peak</option>
+                                        <option value="monthly">Summer Peak</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetDateStart" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Date Start
+                                    </label>
+                                    <input type="date" id="datasetDateStart" name="date_start"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetDateEnd" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Date End
+                                    </label>
+                                    <input type="date" id="datasetDateEnd" name="date_end"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="datasetSeed" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                                        Seed (Optional)
+                                    </label>
+                                    <input type="number" id="datasetSeed" name="seed" placeholder="e.g., 1234"
+                                        style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px;">
+                                </div>
+                            </div>
+                            <small style="color: var(--muted); font-size: 12px;">Controls for realism, noise, and temporal patterns.</small>
+                        </div>
                         
                         <!-- Advanced Options -->
                         <div class="form-section">
@@ -166,6 +257,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <option value="dataset_generator/geoJson/vn.json">Vietnam</option>
                                     </select>
                                     <small style="color: var(--muted); font-size: 12px;">Optional: constrain points to land</small>
+                                </div>
+                                <div class="form-group">
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                        <input type="checkbox" id="datasetStrictLand" name="strict_land"
+                                            style="width: 18px; height: 18px;">
+                                        <span style="font-size: 14px; font-weight: 600; color: var(--text);">Strict Land-Only</span>
+                                    </label>
+                                    <small style="color: var(--muted); font-size: 12px; margin-left: 26px;">Fail if land boundaries are missing</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="datasetFilenamePrefix" style="display: block; margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--text);">
@@ -226,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <p style="margin: 0 0 8px;"><strong>Supported Formats:</strong> CSV, Excel</p>
                             <p style="margin: 0 0 8px;"><strong>Geometry Types:</strong> Point, Polygon, Multi-Polygon, H3 Hexagon</p>
                             <p style="margin: 0 0 8px;"><strong>Max Rows:</strong> 1,000,000</p>
-                            <p style="margin: 0 0 8px;"><strong>Max Columns:</strong> 29</p>
+                            <p style="margin: 0 0 8px;"><strong>Max Columns:</strong> 35</p>
                             <p style="margin: 0;"><strong>Available Areas:</strong> Jakarta, Yogyakarta, Indonesia, Japan, Vietnam</p>
                         </div>
                     </div>
@@ -363,6 +462,17 @@ function setupDatasetForm() {
         const formData = new FormData(form);
         const area = formData.get('area');
         const geojsonPath = formData.get('geojson_path');
+        const strictLand = formData.has('strict_land');
+        const noiseLevel = parseFloat(formData.get('noise_level'));
+        const outlierRate = parseFloat(formData.get('outlier_rate'));
+        const outlierScale = parseFloat(formData.get('outlier_scale'));
+        const missingRate = parseFloat(formData.get('missing_rate'));
+        const seedRaw = formData.get('seed');
+        if (strictLand && !geojsonPath) {
+            showError('Strict land mode requires a GeoJSON boundary.');
+            resetForm();
+            return;
+        }
         const config = {
             rows: parseInt(formData.get('rows')),
             columns: parseInt(formData.get('columns')),
@@ -373,6 +483,17 @@ function setupDatasetForm() {
             include_economic: formData.has('include_economic'),
             use_spatial_clustering: formData.has('use_spatial_clustering'),
             geojson_path: geojsonPath ? geojsonPath : null,
+            strict_land: strictLand,
+            distribution_mode: formData.get('distribution_mode'),
+            noise_level: Number.isNaN(noiseLevel) ? 0 : noiseLevel,
+            outlier_rate: Number.isNaN(outlierRate) ? 0 : outlierRate,
+            outlier_scale: Number.isNaN(outlierScale) ? 2.5 : outlierScale,
+            missing_rate: Number.isNaN(missingRate) ? 0 : missingRate,
+            spatial_weighting: formData.get('spatial_weighting'),
+            seed: seedRaw ? parseInt(seedRaw, 10) : null,
+            date_start: formData.get('date_start') || null,
+            date_end: formData.get('date_end') || null,
+            seasonality: formData.get('seasonality'),
             filename_prefix: formData.get('filename_prefix') || null
         };
         
@@ -420,6 +541,17 @@ function setupDatasetForm() {
         document.getElementById('datasetIncludeEconomic').checked = true;
         document.getElementById('datasetUseClustering').checked = false;
         document.getElementById('datasetFilenamePrefix').value = '';
+        document.getElementById('datasetDistributionMode').value = 'uniform';
+        document.getElementById('datasetSpatialWeighting').value = 'none';
+        document.getElementById('datasetNoiseLevel').value = '0';
+        document.getElementById('datasetOutlierRate').value = '0';
+        document.getElementById('datasetOutlierScale').value = '2.5';
+        document.getElementById('datasetMissingRate').value = '0';
+        document.getElementById('datasetSeasonality').value = 'none';
+        document.getElementById('datasetDateStart').value = '';
+        document.getElementById('datasetDateEnd').value = '';
+        document.getElementById('datasetSeed').value = '';
+        document.getElementById('datasetStrictLand').checked = false;
         if (geojsonSelect) {
             geojsonSelect.value = geojsonPaths.Jakarta || '';
         }

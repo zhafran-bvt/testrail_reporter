@@ -93,6 +93,28 @@
         max-height: 60vh;
         border-radius: var(--bs-border-radius);
     }
+    .print-attachments {
+        display: none;
+        margin-top: 8px;
+    }
+    .print-attachment {
+        display: inline-block;
+        margin: 0 8px 8px 0;
+        page-break-inside: avoid;
+        vertical-align: top;
+    }
+    .print-attachment img {
+        max-width: 220px;
+        max-height: 220px;
+        border-radius: 6px;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+    .print-attachment figcaption {
+        font-size: 10px;
+        color: #555;
+        max-width: 220px;
+        word-break: break-word;
+    }
     select,
     .form-select {
         background-image: var(--select-arrow);
@@ -150,6 +172,22 @@
         clip: rect(0, 0, 0, 0);
         white-space: nowrap;
         border: 0;
+    }
+
+    @media print {
+        .attachment-trigger,
+        .table-pager,
+        #attachmentModal,
+        .theme-toggle,
+        .btn-close {
+            display: none !important;
+        }
+        .print-attachments {
+            display: block;
+        }
+        .table-responsive {
+            max-height: none;
+        }
     }
   </style>
 </head>
@@ -357,6 +395,17 @@
                   {% if skipped_count > 0 %}
                     <div class="text-muted small mt-1">
                       {{ skipped_count }} attachment{% if skipped_count != 1 %}s{% endif %} too large.
+                    </div>
+                  {% endif %}
+                  {% set print_images = viewable|selectattr('is_image')|selectattr('inline_embedded')|list %}
+                  {% if print_images|length > 0 %}
+                    <div class="print-attachments">
+                      {% for att in print_images %}
+                        <figure class="print-attachment">
+                          <img src="{{ att.data_url }}" alt="{{ att.name|e }}" />
+                          <figcaption>{{ att.name }}</figcaption>
+                        </figure>
+                      {% endfor %}
                     </div>
                   {% endif %}
                 </td>

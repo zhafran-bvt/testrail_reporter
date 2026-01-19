@@ -1,5 +1,7 @@
 """Request models for API endpoints."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, field_validator, model_validator
 
 
@@ -146,6 +148,17 @@ class DatasetConfig(BaseModel):
     include_economic: bool = True
     use_spatial_clustering: bool = False
     geojson_path: str | None = None
+    strict_land: bool = False
+    distribution_mode: str = "uniform"
+    noise_level: float = 0.0
+    outlier_rate: float = 0.0
+    outlier_scale: float = 2.5
+    missing_rate: float = 0.0
+    spatial_weighting: str = "none"
+    seed: int | None = None
+    date_start: str | None = None
+    date_end: str | None = None
+    seasonality: str = "none"
     filename_prefix: str | None = None
 
     @field_validator("rows")
@@ -158,8 +171,8 @@ class DatasetConfig(BaseModel):
     @field_validator("columns")
     @classmethod
     def validate_columns(cls, v):
-        if not (3 <= v <= 29):
-            raise ValueError("Columns must be between 3 and 29")
+        if not (3 <= v <= 35):
+            raise ValueError("Columns must be between 3 and 35")
         return v
 
     @field_validator("geometry_type")
@@ -184,4 +197,65 @@ class DatasetConfig(BaseModel):
         valid_areas = ["Jakarta", "Yogyakarta", "Indonesia", "Japan", "Vietnam"]
         if v not in valid_areas:
             raise ValueError(f"Area must be one of: {valid_areas}")
+        return v
+
+    @field_validator("distribution_mode")
+    @classmethod
+    def validate_distribution_mode(cls, v):
+        valid_modes = ["uniform", "normal", "lognormal", "beta"]
+        if v.lower() not in valid_modes:
+            raise ValueError(f"Distribution mode must be one of: {valid_modes}")
+        return v.lower()
+
+    @field_validator("noise_level", "outlier_rate", "missing_rate")
+    @classmethod
+    def validate_rate_bounds(cls, v):
+        if not (0.0 <= v <= 1.0):
+            raise ValueError("Rate values must be between 0 and 1")
+        return float(v)
+
+    @field_validator("outlier_scale")
+    @classmethod
+    def validate_outlier_scale(cls, v):
+        if v < 1.0:
+            raise ValueError("Outlier scale must be >= 1.0")
+        return float(v)
+
+    @field_validator("spatial_weighting")
+    @classmethod
+    def validate_spatial_weighting(cls, v):
+        valid_options = ["none", "urban_bias", "rural_bias"]
+        if v.lower() not in valid_options:
+            raise ValueError(f"Spatial weighting must be one of: {valid_options}")
+        return v.lower()
+
+    @field_validator("seasonality")
+    @classmethod
+    def validate_seasonality(cls, v):
+        valid_options = ["none", "weekday", "monthly"]
+        if v.lower() not in valid_options:
+            raise ValueError(f"Seasonality must be one of: {valid_options}")
+        return v.lower()
+
+    @field_validator("seed")
+    @classmethod
+    def validate_seed(cls, v):
+        if v is None:
+            return v
+        if v < 0:
+            raise ValueError("Seed must be a positive integer")
+        return int(v)
+
+    @field_validator("date_start", "date_end")
+    @classmethod
+    def validate_date_range(cls, v):
+        if v is None or v == "":
+            return None
+        cleaned = v.strip()
+        if cleaned.endswith("Z"):
+            cleaned = cleaned[:-1]
+        try:
+            datetime.fromisoformat(cleaned)
+        except ValueError as exc:
+            raise ValueError("Date must be ISO format (e.g. 2025-01-01)") from exc
         return v
