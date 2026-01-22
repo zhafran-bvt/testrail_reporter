@@ -112,6 +112,14 @@ class Config:
     KEEPALIVE_INTERVAL = max(60, _int_env("KEEPALIVE_INTERVAL", 240))
     MEM_LOG_INTERVAL = max(30, _int_env("MEM_LOG_INTERVAL", 60))
 
+    # Automation Management
+    AUTOMATION_API_PAYLOAD_FIELD = os.getenv("AUTOMATION_API_PAYLOAD_FIELD")
+    AUTOMATION_WEB_INPUT_FIELD = os.getenv("AUTOMATION_WEB_INPUT_FIELD")
+    AUTOMATION_FEATURES_ROOT = os.getenv("AUTOMATION_FEATURES_ROOT")
+
+    # Automation Execution
+    AUTOMATION_REPO_ROOT = os.getenv("AUTOMATION_REPO_ROOT")
+
 
 # Global configuration instance
 config = Config()

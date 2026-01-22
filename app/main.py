@@ -6,25 +6,22 @@ import time
 from pathlib import Path
 
 import requests
-from dotenv import load_dotenv
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-# Import API routers
+from app.api.automation import router as automation_router
 from app.api.dashboard import router as dashboard_router
 from app.api.dataset import router as dataset_router
 from app.api.general import router as general_router
 from app.api.health import router as health_router
 from app.api.management import router as management_router
 from app.api.reports import router as reports_router
+from app.core import bootstrap  # noqa: F401
 from app.core.middleware import ErrorHandlingMiddleware, RequestLoggingMiddleware
 from app.utils.helpers import report_worker_config, web_worker_count
 from testrail_daily_report import generate_report, log_memory
-
-# Ensure local .env overrides host/env settings to avoid stale provider configs
-load_dotenv(override=True)
 
 app = FastAPI(title="TestRail Reporter", version="0.1.0")
 
@@ -64,6 +61,7 @@ app.include_router(reports_router)
 app.include_router(health_router)
 app.include_router(general_router)
 app.include_router(dataset_router)
+app.include_router(automation_router)
 
 # Keepalive and memory logging threads
 _keepalive_thread: threading.Thread | None = None

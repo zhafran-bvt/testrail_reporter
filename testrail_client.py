@@ -303,6 +303,25 @@ def get_cases(
     return cases
 
 
+def get_case(
+    session,
+    base_url,
+    case_id: int,
+    *,
+    timeout: float | None = None,
+    max_attempts: int | None = None,
+    backoff: float | None = None,
+):
+    return api_get(
+        session,
+        base_url,
+        f"get_case/{case_id}",
+        timeout=timeout,
+        max_attempts=max_attempts,
+        backoff=backoff,
+    )
+
+
 def get_users_map(
     session,
     base_url,
@@ -914,6 +933,18 @@ class TestRailClient:
                 project_id,
                 suite_id=suite_id,
                 section_id=section_id,
+                timeout=self.timeout,
+                max_attempts=self.max_attempts,
+                backoff=self.backoff,
+            )
+
+    def get_case(self, case_id: int):
+        """Get a single test case by ID."""
+        with self.make_session() as session:
+            return get_case(
+                session,
+                self.base_url,
+                case_id,
                 timeout=self.timeout,
                 max_attempts=self.max_attempts,
                 backoff=self.backoff,

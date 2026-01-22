@@ -199,6 +199,46 @@ Notes:
 
 All env variables can live in `.env` for local work; deployments (Railway, Render, etc.) can override them per environment.
 
+## Automation Management (Docker)
+
+The Automation Management UI reads `.feature` files and can run Cypress locally. In Docker, the container needs access to the `orbis-test-automation` repo.
+
+Required env vars:
+- `AUTOMATION_REPO_ROOT` → absolute path to the repo inside the container
+- `AUTOMATION_FEATURES_ROOT` → absolute path to `apps/<app>/cypress` inside the container
+
+By default, the Dockerfile now **bakes the orbis-test-automation repo into the image** (`testrail-automation-management` branch). You can override the repo or ref at build time:
+
+```bash
+docker build \
+  --build-arg ORBIS_AUTOMATION_REPO=https://github.com/bvarta-tech/orbis-test-automation.git \
+  --build-arg ORBIS_AUTOMATION_REF=testrail-automation-management \
+  -t testrail-daily-report:latest .
+```
+
+If you use `docker compose`, set `ORBIS_AUTOMATION_REPO` / `ORBIS_AUTOMATION_REF` in `.env` and the build args are applied automatically.
+
+Runtime sync (no rebuild):
+- Set `AUTOMATION_GIT_SYNC=1` to `git fetch` + reset to `ORBIS_AUTOMATION_REF` on container start.
+- Use `AUTOMATION_APP_PATH` if the Cypress app path is not `apps/lokasi_intelligence`.
+- `AUTOMATION_NPM_INSTALL=1` installs deps when `node_modules` is missing (default on).
+
+Example Docker run (host path `/opt/orbis-test-automation`), if you want to **override** the baked repo with a local checkout:
+
+```bash
+docker run \
+  -v /opt/orbis-test-automation:/opt/orbis-test-automation \
+  -e AUTOMATION_REPO_ROOT=/opt/orbis-test-automation \
+  -e AUTOMATION_FEATURES_ROOT=/opt/orbis-test-automation/apps/lokasi_intelligence/cypress \
+  -p 8080:8080 \
+  <your-image>
+```
+
+Notes:
+- The container must have `node`/`npm` available and the automation repo dependencies installed (`npm ci` in the repo).
+- If the repo path is missing, the UI shows a warning and disables automation actions.
+ - A host volume mount will override the baked-in repo path.
+
 ## Suggested environment profiles
 
 **Memory-conscious (≤4 GB)**

@@ -51,13 +51,14 @@ class TestKeyboardNavigationFocusIndicators(BaseAPITestCase):
         self.assertIn(".modal-close:focus", html)
 
     def test_create_section_toggle_has_focus_style(self):
-        """Test that create section toggle has visible focus indicator"""
+        """Test that Create tab buttons have visible focus indicator"""
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         html = response.text
 
-        # Verify create section toggle focus style exists
-        self.assertIn(".create-section-toggle:focus", html)
+        # Verify create tab buttons exist and general button focus style applies
+        self.assertIn('class="manage-tab', html)
+        self.assertIn("button:not(.panel-toggle):focus", html)
 
     def test_input_fields_have_focus_style(self):
         """Test that input fields have visible focus indicators"""
@@ -113,15 +114,14 @@ class TestKeyboardNavigationEnterSpace(BaseAPITestCase):
         self.client = TestClient(app)
 
     def test_create_section_toggle_keyboard_support(self):
-        """Test that create section toggle supports Enter and Space keys"""
+        """Test that create tabs are keyboard accessible via buttons"""
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         html = response.text
 
-        # Verify keyboard event listener for Enter and Space
-        self.assertIn("e.key === 'Enter'", html)
-        self.assertIn("e.key === ' '", html)
-        self.assertIn("toggleCreateSection()", html)
+        # Verify buttons are used for tabs with proper roles
+        self.assertIn('role="tab"', html)
+        self.assertIn('type="button" class="manage-tab', html)
 
 
 class TestKeyboardNavigationEscape(BaseAPITestCase):
@@ -130,15 +130,16 @@ class TestKeyboardNavigationEscape(BaseAPITestCase):
     def setUp(self):
         self.client = TestClient(app)
 
-    def test_escape_closes_create_section(self):
-        """Test that Escape key collapses Create section"""
+    def test_create_tabs_have_accessible_structure(self):
+        """Test that create tabs expose accessible structure for keyboard users"""
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         html = response.text
 
-        # Verify Escape key handler exists
-        self.assertIn("e.key === 'Escape'", html)
-        self.assertIn("collapseCreateSection", html)
+        # Verify tablist and tabpanel roles exist
+        self.assertIn('role="tablist"', html)
+        self.assertIn('role="tabpanel"', html)
+        self.assertIn("aria-selected", html)
 
     def test_escape_closes_modal(self):
         """Test that Escape key closes modals"""
@@ -172,17 +173,18 @@ class TestKeyboardNavigationTabOrder(BaseAPITestCase):
         # Verify search inputs exist
         self.assertIn('id="plansSearch"', html)
 
-        # Verify create section toggle exists
-        self.assertIn('class="create-section-toggle"', html)
+        # Verify create tabs exist
+        self.assertIn('class="manage-tab', html)
 
     def test_create_section_toggle_has_aria_expanded(self):
-        """Test that create section toggle has proper ARIA attributes"""
+        """Test that create tabs have proper ARIA attributes"""
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         html = response.text
 
         # Verify ARIA attributes exist
-        self.assertIn("aria-expanded", html)
+        self.assertIn("aria-selected", html)
+        self.assertIn("aria-controls", html)
 
     def test_modal_close_buttons_have_aria_label(self):
         """Test that modal close buttons have aria-label for accessibility"""
@@ -212,13 +214,14 @@ class TestKeyboardNavigationFocusManagement(BaseAPITestCase):
         self.assertIn("focus", js)
 
     def test_expand_create_section_focuses_toggle(self):
-        """Test that expanding create section focuses the toggle button"""
+        """Test that focusCreateTabs focuses the Plan tab"""
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         html = response.text
 
-        # Verify focus management in expandCreateSection
-        self.assertIn("toggleButton.focus()", html)
+        # Verify focus management in focusCreateTabs
+        self.assertIn("focusCreateTabs", html)
+        self.assertIn("planTab.focus()", html)
 
 
 if __name__ == "__main__":

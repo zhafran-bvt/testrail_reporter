@@ -429,127 +429,816 @@
        Management View Redesign Styles
        ======================================== */
     
-    /* Create Section - Collapsible, Compact Header */
-    .create-section {
+    .manage-create-tabs {
       margin-bottom: 24px;
+      padding: 18px 20px 20px;
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       background: #f9fafb;
-      overflow: hidden;
       box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-      transition: box-shadow .2s ease;
     }
-    
-    [data-theme="dark"] .create-section,
-    [data-bs-theme="dark"] .create-section {
+
+    [data-theme="dark"] .manage-create-tabs,
+    [data-bs-theme="dark"] .manage-create-tabs {
       background: rgba(255, 255, 255, 0.03);
     }
-    .create-section-toggle {
-      width: 100%;
+
+    .manage-create-top {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 16px 20px;
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      transition: background .15s ease;
-      text-align: left;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
     }
-    
-    .create-section-toggle:hover {
-      background: rgba(0,0,0,0.02);
-    }
-    
-    [data-theme="dark"] .create-section-toggle:hover,
-    [data-bs-theme="dark"] .create-section-toggle:hover {
-      background: rgba(255,255,255,0.05);
-    }
-    
-    .create-section-toggle:focus {
-      outline: 2px solid var(--primary);
-      outline-offset: -2px;
-    }
-    
-    .create-section-toggle .icon {
-      font-size: 20px;
-      flex-shrink: 0;
-      line-height: 1;
-    }
-    
-    .create-section-toggle h2 {
-      flex: 1;
+
+    .manage-create-title {
       margin: 0;
       font-size: 18px;
       font-weight: 600;
       color: var(--text);
       letter-spacing: 0.2px;
     }
-    
-    .create-section-toggle .toggle-indicator {
-      font-size: 14px;
-      color: var(--muted);
-      transition: transform .3s ease;
-      line-height: 1;
-    }
-    
-    .create-section-toggle[aria-expanded="true"] .toggle-indicator {
-      transform: rotate(180deg);
-    }
-    .create-section-content {
-      padding: 0 20px 20px;
-      transition: max-height .3s ease, opacity .3s ease;
-      animation: slideDown .3s ease;
-    }
-    
-    @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    
-    .create-section-content.hidden {
-      display: none;
-    }
-    
-    .create-forms-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-    }
-    
-    .create-form-card {
-      background: white;
+
+    .manage-tablist {
+      display: flex;
+      gap: 6px;
+      padding: 4px;
+      border-radius: 999px;
+      background: #fff;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      transition: box-shadow .2s ease, border-color .2s ease;
+      flex-wrap: wrap;
     }
-    
-    [data-theme="dark"] .create-form-card,
-    [data-bs-theme="dark"] .create-form-card {
-      background: rgba(255, 255, 255, 0.05);
+
+    [data-theme="dark"] .manage-tablist,
+    [data-bs-theme="dark"] .manage-tablist {
+      background: rgba(255, 255, 255, 0.06);
     }
-    
-    .create-form-card:hover {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      border-color: var(--primary);
+
+    .manage-tab {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s ease, color .15s ease;
     }
-    
-    .create-form-card h3 {
-      margin: 0 0 12px;
-      font-size: 16px;
+
+    .manage-tab.is-active {
+      background: var(--primary);
+      color: #fff;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+    }
+
+    .manage-tab-panel {
+      display: none;
+      animation: fadeIn .25s ease;
+    }
+
+    .manage-tab-panel.is-active {
+      display: block;
+    }
+
+    .automation-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .automation-header h2 {
+      margin: 0;
+      font-size: 18px;
       font-weight: 600;
       color: var(--text);
+    }
+
+    .automation-header p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .automation-runner {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      background: var(--card-bg);
+      display: grid;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .automation-runner-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .automation-runner-head h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .automation-runner-head p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .automation-runner-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .automation-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .automation-field label {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .automation-runner-actions {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .automation-runner-status {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .automation-callout--warning {
+      border-color: rgba(239, 68, 68, 0.35);
+      background: rgba(239, 68, 68, 0.08);
+      color: #991b1b;
+    }
+
+    .automation-link {
+      font-size: 12px;
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .automation-link:hover {
+      text-decoration: underline;
+    }
+
+    .automation-progress {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(26, 138, 133, 0.15);
+      overflow: hidden;
+    }
+
+    .automation-progress-bar {
+      width: 0%;
+      height: 100%;
+      background: var(--primary);
+      transition: width 0.25s ease;
+    }
+
+    .automation-run-log {
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 11px;
+      line-height: 1.5;
+      max-height: 220px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    [data-theme="dark"] .automation-run-log,
+    [data-bs-theme="dark"] .automation-run-log {
+      background: rgba(15, 23, 42, 0.7);
+      color: #e2e8f0;
+    }
+
+    .automation-tabs {
+      margin-bottom: 16px;
+    }
+
+    .automation-grid {
+      display: grid;
+      grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.3fr);
+      gap: 16px;
+    }
+
+    .automation-panel {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      background: var(--card-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .automation-panel h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .automation-search {
+      display: flex;
+      gap: 10px;
+    }
+
+    .automation-case-list {
+      display: grid;
+      gap: 10px;
+      max-height: 520px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .automation-case-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+      display: grid;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    [data-theme="dark"] .automation-case-card,
+    [data-bs-theme="dark"] .automation-case-card {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .automation-case-card.is-active {
+      border-color: var(--primary);
+      box-shadow: inset 0 0 0 1px rgba(26, 138, 133, 0.2);
+    }
+
+    .automation-case-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .automation-case-meta-line {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .automation-case-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .automation-meta {
+      display: grid;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .automation-meta strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .automation-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .automation-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(26, 138, 133, 0.12);
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .automation-code {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.6;
+      overflow: auto;
+      max-height: 280px;
+      font-family: "Consolas", "Monaco", monospace;
+    }
+
+    .automation-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .automation-table th,
+    .automation-table td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .automation-table th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .automation-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .automation-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(242, 107, 94, 0.14);
+      color: #a43c32;
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .automation-callout {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(242, 107, 94, 0.1);
+      color: var(--text);
+      font-size: 12px;
+      border: 1px dashed rgba(242, 107, 94, 0.3);
+    }
+
+    .automation-input-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .automation-input-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+      display: grid;
+      gap: 8px;
+    }
+
+    [data-theme="dark"] .automation-input-card,
+    [data-bs-theme="dark"] .automation-input-card {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .automation-input-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .automation-input-value {
+      font-family: "Consolas", "Monaco", monospace;
+      font-size: 11px;
+      color: var(--primary);
+      background: rgba(26, 138, 133, 0.1);
+      padding: 3px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .automation-preview {
+      background: #111827;
+      color: #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.6;
+      font-family: "Consolas", "Monaco", monospace;
+    }
+
+    .automation-editor textarea {
+      width: 100%;
+      min-height: 200px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      font-size: 12px;
+      font-family: "Consolas", "Monaco", monospace;
+      background: #fff;
+      color: var(--text);
+    }
+
+    [data-theme="dark"] .automation-editor textarea,
+    [data-bs-theme="dark"] .automation-editor textarea {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    @media (max-width: 1100px) {
+      .automation-grid {
+        grid-template-columns: 1fr;
+      }
+      .automation-input-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .create-page {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      background: var(--card-bg);
+    }
+
+    .create-page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .create-page-header h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .create-page-subtitle {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .create-stepper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .create-step-chip {
+      border: 1px solid var(--border);
+      background: rgba(15,23,42,0.03);
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, color .15s ease;
+    }
+
+    .create-step-chip.is-active {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .create-step-chip.is-complete {
+      border-color: rgba(26, 138, 133, 0.4);
+      color: var(--primary);
+      background: rgba(26, 138, 133, 0.08);
+    }
+
+    .create-step-content {
+      display: none;
+    }
+
+    .create-step-content.is-active {
+      display: block;
+      animation: fadeIn .25s ease;
+    }
+
+    .create-step-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .create-step-actions-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .create-review {
+      display: grid;
+      gap: 10px;
+    }
+
+    .create-review-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.04);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .create-review-row strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .input-invalid {
+      border-color: #ef4444 !important;
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+    }
+
+    .run-create-card {
+      grid-column: 1 / -1;
+    }
+
+    .run-create-layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(0, 1.4fr) minmax(220px, 0.9fr);
+      gap: 16px;
+    }
+
+    .run-create-panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.75);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    [data-theme="dark"] .run-create-panel,
+    [data-bs-theme="dark"] .run-create-panel {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .run-create-panel h4 {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .create-panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.75);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    [data-theme="dark"] .create-panel,
+    [data-bs-theme="dark"] .create-panel {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .create-panel h4 {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .case-edit-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr);
+      gap: 16px;
+    }
+
+    .case-edit-panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      background: rgba(0, 0, 0, 0.02);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    [data-theme="dark"] .case-edit-panel,
+    [data-bs-theme="dark"] .case-edit-panel {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .case-edit-panel h4 {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .run-details-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .run-details-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .run-summary-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.02);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .run-summary-card strong {
+      font-size: 16px;
+      color: var(--text);
+    }
+
+    .run-details-side {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .evidence-panel {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .evidence-panel h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .evidence-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .evidence-item {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+      background: #fff;
+    }
+
+    [data-theme="dark"] .evidence-item,
+    [data-bs-theme="dark"] .evidence-item {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .evidence-thumb {
+      width: 46px;
+      height: 46px;
+      border-radius: 8px;
+      background: rgba(26, 138, 133, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .evidence-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .evidence-thumb video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .evidence-meta {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .evidence-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .plan-create-layout,
+    .case-create-layout {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .run-create-helper {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .run-scope-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(26, 138, 133, 0.06);
+    }
+
+    .run-summary {
+      display: grid;
+      gap: 10px;
+    }
+
+    .run-summary-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.04);
+      font-size: 12px;
+    }
+
+    .run-summary-row strong {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .run-summary-value {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .run-create-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .create-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
     }
     
     /* Manage Section - Always Visible, Subsections */
@@ -1040,10 +1729,6 @@
     
     /* Desktop (default) - Multi-column layout */
     @media (min-width: 1025px) {
-      .create-forms-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
-      
       .manage-subsection {
         padding: 24px;
       }
@@ -1055,15 +1740,10 @@
     
     /* Tablet (768px - 1024px) - Adjusted columns */
     @media (max-width: 1024px) and (min-width: 768px) {
-      .create-forms-grid {
+      .dashboard-stats-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 16px;
       }
-      
-      .create-section-content {
-        padding: 0 16px 16px;
-      }
-      
+
       .manage-subsection {
         padding: 18px;
       }
@@ -1084,39 +1764,12 @@
     
     /* Mobile (below 768px) - Single column layout */
     @media (max-width: 767px) {
-      .create-section {
-        margin-bottom: 16px;
-        border-radius: 10px;
-      }
-      
-      .create-section-toggle {
-        padding: 14px 16px;
-        gap: 10px;
-      }
-      
-      .create-section-toggle h2 {
-        font-size: 16px;
-      }
-      
-      .create-section-toggle .icon {
-        font-size: 18px;
-      }
-      
-      .create-section-content {
-        padding: 0 12px 12px;
-      }
-      
-      .create-forms-grid {
+      .dashboard-stats-grid {
         grid-template-columns: 1fr;
-        gap: 12px;
       }
-      
-      .create-form-card {
-        padding: 14px;
-      }
-      
-      .create-form-card h3 {
-        font-size: 15px;
+
+      .manage-create-tabs {
+        padding: 16px;
       }
       
       .manage-section {
@@ -1235,22 +1888,6 @@
     
     /* Extra small mobile (below 480px) - Optimize for very small screens */
     @media (max-width: 479px) {
-      .create-section-toggle {
-        padding: 12px 14px;
-      }
-      
-      .create-section-toggle h2 {
-        font-size: 15px;
-      }
-      
-      .create-section-content {
-        padding: 0 10px 10px;
-      }
-      
-      .create-form-card {
-        padding: 12px;
-      }
-      
       .manage-subsection {
         padding: 14px;
       }
@@ -1295,7 +1932,6 @@
     @media (max-width: 767px) and (hover: none) {
       .btn-edit,
       .btn-delete,
-      .create-section-toggle,
       .refresh-btn {
         min-height: 44px; /* iOS recommended touch target size */
       }
@@ -1307,10 +1943,6 @@
     
     /* Landscape orientation adjustments for mobile */
     @media (max-width: 767px) and (orientation: landscape) {
-      .create-forms-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-      
       .entity-card-actions {
         flex-direction: row;
       }
@@ -1321,10 +1953,22 @@
         flex: 1;
       }
     }
+
+    @media (max-width: 1100px) {
+      .run-create-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .plan-create-layout,
+      .case-create-layout,
+      .case-edit-layout {
+        grid-template-columns: 1fr;
+      }
+    }
     
     /* Print styles for Management view */
     @media print {
-      .create-section {
+      .manage-create-tabs {
         display: none !important;
       }
       
@@ -3103,6 +3747,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2h-2V6H7v4h10v2H7v6H5V6Z" fill="currentColor" fill-opacity=".15"/><path d="M9 13h10v-2H9v2Zm8-7H7v4h10V6Zm-10 8h10v2H7v-2Zm0 4h5v2H7v-2Z" fill="currentColor"/></svg>
           Management
         </a>
+        <a href="#" id="linkAutomation" class="nav-item">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 1 3 3v1.1l1.6.9a3 3 0 0 1 1.1 4.1l-.55.95.55.95a3 3 0 0 1-1.1 4.1l-1.6.9V19a3 3 0 0 1-6 0v-1.1l-1.6-.9a3 3 0 0 1-1.1-4.1l.55-.95-.55-.95a3 3 0 0 1 1.1-4.1l1.6-.9V5a3 3 0 0 1 3-3Z" fill="currentColor" fill-opacity=".15"/><path d="M12 8.5a3.5 3.5 0 1 1-3.5 3.5A3.5 3.5 0 0 1 12 8.5Zm0 2a1.5 1.5 0 1 0 1.5 1.5A1.5 1.5 0 0 0 12 10.5Z" fill="currentColor"/></svg>
+          Automation Management
+        </a>
         <a href="#" id="linkDataset" class="nav-item" onclick="showDatasetView(); return false;">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor" fill-opacity=".15"/><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h18v2H3v-2zm0 4h18v2H3v-2zm0 4h18v2H3v-2z" fill="currentColor"/></svg>
           Dataset Generator
@@ -3350,94 +3998,303 @@
 
       <div id="manageView" class="hidden" style="width: 90vw; max-width: 1400px; margin: 0 auto;">
         
-        <!-- Create Section - Collapsible, Compact Header -->
-        <div class="create-section" role="region" aria-labelledby="createSectionHeading">
-          <button class="create-section-toggle" type="button" aria-expanded="false" aria-controls="createSectionContent" aria-label="Toggle create new entity section">
-            <span class="icon" aria-hidden="true">➕</span>
-            <h2 id="createSectionHeading">Create New</h2>
-            <span class="toggle-indicator" aria-hidden="true">▼</span>
-          </button>
-          
-          <div id="createSectionContent" class="create-section-content hidden">
-            <div class="create-forms-grid">
-              
-              <!-- Create Test Plan Form -->
-              <div class="create-form-card" role="form" aria-labelledby="planFormHeading">
-                <h3 id="planFormHeading"><span aria-hidden="true">📋</span> Create Test Plan</h3>
-                <form id="planCreateForm" aria-describedby="planFormDesc">
-                  <span id="planFormDesc" class="sr-only">Form to create a new test plan</span>
-                  <div class="input-group" style="margin-top:6px;">
-                    <span class="input-group-text" id="planProjectLabel">Project</span>
-                    <input type="number" id="planProject" value="{{ default_project }}" required aria-labelledby="planProjectLabel" aria-describedby="planProjectDesc">
-                    <span id="planProjectDesc" class="sr-only">Enter the project ID for the test plan</span>
-                  </div>
-                  <input type="text" id="planName" placeholder="Plan name" required style="margin-top:8px;" aria-label="Plan name" aria-required="true">
-                  <textarea id="planDesc" placeholder="Description (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="Plan description (optional)"></textarea>
-                  <div class="input-group" style="margin-top:8px;">
-                    <span class="input-group-text" id="planMilestoneLabel">Milestone</span>
-                    <input type="number" id="planMilestone" placeholder="Milestone ID (optional)" aria-labelledby="planMilestoneLabel" aria-describedby="planMilestoneDesc">
-                    <span id="planMilestoneDesc" class="sr-only">Optional milestone ID to associate with the plan</span>
-                  </div>
-                  <div class="actions" style="justify-content:flex-start; margin-top:12px;">
-                    <button type="submit" aria-label="Create test plan">Create Test Plan</button>
-                  </div>
-                </form>
-              </div>
-              
-              <!-- Create Test Run Form -->
-              <div class="create-form-card" role="form" aria-labelledby="runFormHeading">
-                <h3 id="runFormHeading"><span aria-hidden="true">🏃</span> Create Test Run</h3>
-                <form id="runCreateForm" aria-describedby="runFormDesc">
-                  <span id="runFormDesc" class="sr-only">Form to create a new test run</span>
-                  <div class="input-group" style="margin-top:6px;">
-                    <span class="input-group-text" id="runProjectLabel">Project</span>
-                    <input type="number" id="runProject" value="{{ default_project }}" required aria-labelledby="runProjectLabel">
-                  </div>
-                  <div class="input-group" style="margin-top:8px;">
-                    <span class="input-group-text" id="runPlanLabel">Plan</span>
-                    <select id="runPlanSelect" aria-labelledby="runPlanLabel" aria-describedby="runPlanDesc">
-                    </select>
-                    <span id="runPlanDesc" class="sr-only">Select the test plan to add this run to</span>
-                  </div>
-                  <input type="text" id="runName" placeholder="Run name" required style="margin-top:8px;" aria-label="Run name" aria-required="true">
-                  <textarea id="runDesc" placeholder="Description (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="Run description (optional)"></textarea>
-                  <input type="text" id="runRefs" placeholder="Refs (comma separated, optional)" style="margin-top:8px;" aria-label="References (comma separated, optional)">
-                  <div style="margin-top:8px;">
-                    <label><input type="checkbox" id="runIncludeAll" checked aria-describedby="runIncludeAllDesc"> Include all cases</label>
-                    <span id="runIncludeAllDesc" class="sr-only">When checked, all test cases will be included in this run</span>
-                  </div>
-                  <input type="text" id="runCaseIds" placeholder="Case IDs (comma separated, optional)" style="margin-top:8px;" aria-label="Case IDs (comma separated, optional)">
-                  <div class="actions" style="justify-content:flex-start; gap:8px; margin-top:8px;">
-                    <button type="button" class="refresh-btn" id="casePickerToggle" aria-label="Open case picker to select test cases">Select cases</button>
-                    <span id="casePickerStatus" class="note" style="margin:0; text-align:left;" aria-live="polite">No cases selected.</span>
-                  </div>
-                  <div class="actions" style="justify-content:flex-start; margin-top:12px;">
-                    <button type="submit" aria-label="Create test run">Create Test Run</button>
-                    <button type="button" class="refresh-btn" id="refreshManagePlansBtn" style="margin-left:8px;" aria-label="Refresh available plans list">Refresh plans</button>
-                  </div>
-                </form>
-              </div>
-              
-              <!-- Create Test Case Form -->
-              <div class="create-form-card" role="form" aria-labelledby="caseFormHeading">
-                <h3 id="caseFormHeading"><span aria-hidden="true">📝</span> Create Test Case</h3>
-                <form id="caseCreateForm" aria-describedby="caseFormDesc">
-                  <span id="caseFormDesc" class="sr-only">Form to create a new test case</span>
-                  <div class="input-group" style="margin-top:6px;">
-                    <span class="input-group-text" id="caseProjectLabel">Project</span>
-                    <input type="number" id="caseProject" value="{{ default_project }}" required aria-labelledby="caseProjectLabel">
-                  </div>
-                  <input type="text" id="caseTitle" placeholder="Case title" required style="margin-top:8px;" aria-label="Case title" aria-required="true">
-                  <input type="text" id="caseRefs" placeholder="Refs (comma separated, optional)" style="margin-top:8px;" aria-label="References (comma separated, optional)">
-                  <textarea id="caseBdd" placeholder="BDD scenarios (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="BDD scenarios (optional)"></textarea>
-                  <div class="actions" style="justify-content:flex-start; margin-top:12px;">
-                    <button type="submit" aria-label="Create test case">Create Test Case</button>
-                  </div>
-                </form>
-              </div>
-              
+        <!-- Create Section - Tabbed Pages -->
+        <div class="manage-create-tabs" role="region" aria-labelledby="createTabsTitle">
+          <div class="manage-create-top">
+            <h2 id="createTabsTitle" class="manage-create-title">Create</h2>
+            <div class="manage-tablist" role="tablist" aria-label="Create entities">
+              <button type="button" class="manage-tab is-active" role="tab" aria-selected="true" aria-controls="createPlanTab" id="tabCreatePlan">Plan</button>
+              <button type="button" class="manage-tab" role="tab" aria-selected="false" aria-controls="createRunTab" id="tabCreateRun">Run</button>
+              <button type="button" class="manage-tab" role="tab" aria-selected="false" aria-controls="createCaseTab" id="tabCreateCase">Case</button>
             </div>
           </div>
+
+          <section id="createPlanTab" class="manage-tab-panel is-active" role="tabpanel" aria-labelledby="tabCreatePlan">
+            <div class="create-page">
+              <div class="create-page-header">
+                <div>
+                  <h3>Plan Creation</h3>
+                  <p class="create-page-subtitle">Define the plan identity and context before adding runs.</p>
+                </div>
+              </div>
+              <form id="planCreateForm" data-wizard="plan" aria-describedby="planFormDesc">
+                <span id="planFormDesc" class="sr-only">Form to create a new test plan</span>
+                <div class="create-stepper" role="tablist" aria-label="Plan creation steps">
+                  <button type="button" class="create-step-chip is-active" data-step="1" aria-selected="true">1. Identity</button>
+                  <button type="button" class="create-step-chip" data-step="2" aria-selected="false">2. Context</button>
+                  <button type="button" class="create-step-chip" data-step="3" aria-selected="false">3. Review</button>
+                </div>
+
+                <div class="create-step-content is-active" data-step="1">
+                  <div class="plan-create-layout">
+                    <section class="create-panel">
+                      <h4>Plan Identity</h4>
+                      <input type="text" id="planName" placeholder="Plan name" required style="margin-top:8px;" aria-label="Plan name" aria-required="true">
+                      <textarea id="planDesc" placeholder="Description (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="Plan description (optional)"></textarea>
+                    </section>
+                  </div>
+                  <div class="create-step-actions">
+                    <span class="run-create-helper">Step 1 of 3</span>
+                    <div class="create-step-actions-group">
+                      <button type="button" class="btn-edit" data-step-next>Next</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="create-step-content" data-step="2">
+                  <div class="plan-create-layout">
+                    <section class="create-panel">
+                      <h4>Context</h4>
+                      <div class="input-group" style="margin-top:6px;">
+                        <span class="input-group-text" id="planProjectLabel">Project</span>
+                        <input type="number" id="planProject" value="{{ default_project }}" required aria-labelledby="planProjectLabel" aria-describedby="planProjectDesc">
+                        <span id="planProjectDesc" class="sr-only">Enter the project ID for the test plan</span>
+                      </div>
+                      <div class="input-group" style="margin-top:8px;">
+                        <span class="input-group-text" id="planMilestoneLabel">Milestone</span>
+                        <input type="number" id="planMilestone" placeholder="Milestone ID (optional)" aria-labelledby="planMilestoneLabel" aria-describedby="planMilestoneDesc">
+                        <span id="planMilestoneDesc" class="sr-only">Optional milestone ID to associate with the plan</span>
+                      </div>
+                    </section>
+                  </div>
+                  <div class="create-step-actions">
+                    <button type="button" class="btn-edit" data-step-prev>Back</button>
+                    <div class="create-step-actions-group">
+                      <button type="button" class="btn-edit" data-step-next>Review</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="create-step-content" data-step="3">
+                  <section class="create-panel">
+                    <h4>Review</h4>
+                    <div class="create-review">
+                      <div class="create-review-row">
+                        <span>Plan name</span>
+                        <strong data-summary="planName">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Description</span>
+                        <strong data-summary="planDesc">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Project</span>
+                        <strong data-summary="planProject">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Milestone</span>
+                        <strong data-summary="planMilestone">—</strong>
+                      </div>
+                    </div>
+                  </section>
+                  <div class="create-step-actions">
+                    <button type="button" class="btn-edit" data-step-prev>Back</button>
+                    <div class="create-step-actions-group">
+                      <button type="submit" aria-label="Create test plan">Create Test Plan</button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section id="createRunTab" class="manage-tab-panel" role="tabpanel" aria-labelledby="tabCreateRun">
+            <div class="create-page">
+              <div class="create-page-header">
+                <div>
+                  <h3>Run Creation</h3>
+                  <p class="create-page-subtitle">Choose scope, include cases, and validate the run summary.</p>
+                </div>
+              </div>
+              <form id="runCreateForm" data-wizard="run" aria-describedby="runFormDesc">
+                <span id="runFormDesc" class="sr-only">Form to create a new test run</span>
+                <div class="create-stepper" role="tablist" aria-label="Run creation steps">
+                  <button type="button" class="create-step-chip is-active" data-step="1" aria-selected="true">1. Basics</button>
+                  <button type="button" class="create-step-chip" data-step="2" aria-selected="false">2. Scope</button>
+                  <button type="button" class="create-step-chip" data-step="3" aria-selected="false">3. Review</button>
+                </div>
+
+                <div class="create-step-content is-active" data-step="1">
+                  <div class="run-create-layout" style="grid-template-columns: minmax(240px, 1fr);">
+                    <section class="run-create-panel">
+                      <h4>Run Basics</h4>
+                      <div class="input-group" style="margin-top:6px;">
+                        <span class="input-group-text" id="runProjectLabel">Project</span>
+                        <input type="number" id="runProject" value="{{ default_project }}" required aria-labelledby="runProjectLabel">
+                      </div>
+                      <div class="input-group" style="margin-top:8px;">
+                        <span class="input-group-text" id="runPlanLabel">Plan</span>
+                        <select id="runPlanSelect" aria-labelledby="runPlanLabel" aria-describedby="runPlanDesc">
+                        </select>
+                        <span id="runPlanDesc" class="sr-only">Select the test plan to add this run to</span>
+                      </div>
+                      <input type="text" id="runName" placeholder="Run name" required style="margin-top:8px;" aria-label="Run name" aria-required="true">
+                      <textarea id="runDesc" placeholder="Description (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="Run description (optional)"></textarea>
+                      <input type="text" id="runRefs" placeholder="Refs (comma separated, optional)" style="margin-top:8px;" aria-label="References (comma separated, optional)">
+                    </section>
+                  </div>
+                  <div class="create-step-actions">
+                    <span class="run-create-helper">Step 1 of 3</span>
+                    <div class="create-step-actions-group">
+                      <button type="button" class="refresh-btn" id="refreshManagePlansBtn" aria-label="Refresh available plans list">Refresh plans</button>
+                      <button type="button" class="btn-edit" data-step-next>Next</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="create-step-content" data-step="2">
+                  <div class="run-create-layout" style="grid-template-columns: minmax(240px, 1fr);">
+                    <section class="run-create-panel">
+                      <h4>Scope Builder</h4>
+                      <div class="run-scope-row">
+                        <label style="margin:0;">
+                          <input type="checkbox" id="runIncludeAll" checked aria-describedby="runIncludeAllDesc">
+                          Include all cases
+                        </label>
+                        <span id="runIncludeAllDesc" class="sr-only">When checked, all test cases will be included in this run</span>
+                      </div>
+                      <input type="text" id="runCaseIds" placeholder="Case IDs (comma separated, optional)" style="margin-top:8px;" aria-label="Case IDs (comma separated, optional)">
+                      <div class="run-create-actions">
+                        <button type="button" class="refresh-btn" id="casePickerToggle" aria-label="Open case picker to select test cases">Select cases</button>
+                      </div>
+                      <div class="run-create-helper">
+                        Use the case picker to filter by section, tag, or search. Manual IDs override include-all.
+                      </div>
+                    </section>
+                  </div>
+                  <div class="create-step-actions">
+                    <button type="button" class="btn-edit" data-step-prev>Back</button>
+                    <div class="create-step-actions-group">
+                      <button type="button" class="btn-edit" data-step-next>Review</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="create-step-content" data-step="3">
+                  <section class="run-create-panel">
+                    <h4>Run Summary</h4>
+                    <div class="create-review">
+                      <div class="create-review-row">
+                        <span>Project</span>
+                        <strong data-summary="runProject">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Plan</span>
+                        <strong data-summary="runPlanSelect">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Run name</span>
+                        <strong data-summary="runName">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Refs</span>
+                        <strong data-summary="runRefs">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Scope mode</span>
+                        <strong data-summary="runScope">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Selected cases</span>
+                        <strong id="casePickerStatus" class="run-summary-value" aria-live="polite">No cases selected.</strong>
+                      </div>
+                    </div>
+                  </section>
+                  <div class="create-step-actions">
+                    <button type="button" class="btn-edit" data-step-prev>Back</button>
+                    <div class="create-step-actions-group">
+                      <button type="submit" aria-label="Create test run">Create Test Run</button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section id="createCaseTab" class="manage-tab-panel" role="tabpanel" aria-labelledby="tabCreateCase">
+            <div class="create-page">
+              <div class="create-page-header">
+                <div>
+                  <h3>Case Creation</h3>
+                  <p class="create-page-subtitle">Document the case details and add BDD scenarios.</p>
+                </div>
+              </div>
+              <form id="caseCreateForm" data-wizard="case" aria-describedby="caseFormDesc">
+                <span id="caseFormDesc" class="sr-only">Form to create a new test case</span>
+                <div class="create-stepper" role="tablist" aria-label="Case creation steps">
+                  <button type="button" class="create-step-chip is-active" data-step="1" aria-selected="true">1. Details</button>
+                  <button type="button" class="create-step-chip" data-step="2" aria-selected="false">2. Scenario</button>
+                  <button type="button" class="create-step-chip" data-step="3" aria-selected="false">3. Review</button>
+                </div>
+
+                <div class="create-step-content is-active" data-step="1">
+                  <div class="case-create-layout">
+                    <section class="create-panel">
+                      <h4>Case Details</h4>
+                      <div class="input-group" style="margin-top:6px;">
+                        <span class="input-group-text" id="caseProjectLabel">Project</span>
+                        <input type="number" id="caseProject" value="{{ default_project }}" required aria-labelledby="caseProjectLabel">
+                      </div>
+                      <input type="text" id="caseTitle" placeholder="Case title" required style="margin-top:8px;" aria-label="Case title" aria-required="true">
+                      <input type="text" id="caseRefs" placeholder="Refs (comma separated, optional)" style="margin-top:8px;" aria-label="References (comma separated, optional)">
+                    </section>
+                  </div>
+                  <div class="create-step-actions">
+                    <span class="run-create-helper">Step 1 of 3</span>
+                    <div class="create-step-actions-group">
+                      <button type="button" class="btn-edit" data-step-next>Next</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="create-step-content" data-step="2">
+                  <div class="case-create-layout">
+                    <section class="create-panel">
+                      <h4>BDD Scenario</h4>
+                      <textarea id="caseBdd" placeholder="BDD scenarios (optional)" style="margin-top:8px; width:100%; min-height:68px;" aria-label="BDD scenarios (optional)"></textarea>
+                      <div class="run-create-helper">Scenarios auto-format as Given/When/Then when saved.</div>
+                    </section>
+                  </div>
+                  <div class="create-step-actions">
+                    <button type="button" class="btn-edit" data-step-prev>Back</button>
+                    <div class="create-step-actions-group">
+                      <button type="button" class="btn-edit" data-step-next>Review</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="create-step-content" data-step="3">
+                  <section class="create-panel">
+                    <h4>Review</h4>
+                    <div class="create-review">
+                      <div class="create-review-row">
+                        <span>Project</span>
+                        <strong data-summary="caseProject">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Case title</span>
+                        <strong data-summary="caseTitle">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>Refs</span>
+                        <strong data-summary="caseRefs">—</strong>
+                      </div>
+                      <div class="create-review-row">
+                        <span>BDD summary</span>
+                        <strong data-summary="caseBdd">—</strong>
+                      </div>
+                    </div>
+                  </section>
+                  <div class="create-step-actions">
+                    <button type="button" class="btn-edit" data-step-prev>Back</button>
+                    <div class="create-step-actions-group">
+                      <button type="submit" aria-label="Create test case">Create Test Case</button>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </section>
         </div>
         
         <!-- Manage Section - Always Visible, Auto-loads -->
@@ -3474,7 +4331,7 @@
                 <div class="empty-state-icon" aria-hidden="true">📋</div>
                 <h4 class="empty-state-title">No plans yet</h4>
                 <p class="empty-state-message">Create your first plan above ↑</p>
-                <button class="btn-primary" onclick="expandCreateSection()" aria-label="Expand create section to create a new plan">
+                <button class="btn-primary" onclick="focusCreateTabs()" aria-label="Focus create tabs to create a new plan">
                   <span class="icon" aria-hidden="true">➕</span> Create Plan
                 </button>
               </div>
@@ -3489,6 +4346,211 @@
           
         </div>
       </div>
+
+      <div id="automationView" class="hidden" style="width: 90vw; max-width: 1400px; margin: 0 auto;">
+        <div class="automation-header">
+          <div>
+            <h2 id="automationTabsTitle">Automation Management</h2>
+            <p>Centralize API payloads and web inputs by TestRail case ID.</p>
+          </div>
+        </div>
+
+        <div class="automation-callout automation-callout--warning" id="automationRepoWarning" style="display:none;"></div>
+
+        <div class="automation-runner">
+          <div class="automation-runner-head">
+            <h3>Run Automation</h3>
+            <p>Run orbis-test-automation locally from this host.</p>
+          </div>
+          <div class="automation-runner-grid">
+            <div class="automation-field">
+              <label for="automationRunApp">App</label>
+              <select id="automationRunApp">
+                <option value="lokasi_intelligence">lokasi_intelligence</option>
+              </select>
+            </div>
+            <div class="automation-field">
+              <label for="automationRunType">Test type</label>
+              <select id="automationRunType">
+                <option value="api">API</option>
+                <option value="e2e">Web (E2E)</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+            <div class="automation-field">
+              <label for="automationRunEnv">Environment</label>
+              <select id="automationRunEnv">
+                <option value="staging">staging</option>
+                <option value="preproduction">preproduction</option>
+                <option value="production">production</option>
+              </select>
+            </div>
+            <div class="automation-field">
+              <label for="automationRunTag">Test tag (grepTags)</label>
+              <input type="text" id="automationRunTag" placeholder="@C1425 or @api" />
+            </div>
+            <div class="automation-field">
+              <label for="automationAllureLabel">Allure label (optional)</label>
+              <input type="text" id="automationAllureLabel" placeholder="staging-smoke-2025-02-01" />
+            </div>
+            <div class="automation-field">
+              <label for="automationRunParallel">Parallel (6 instances)</label>
+              <select id="automationRunParallel">
+                <option value="false">false</option>
+                <option value="true">true</option>
+              </select>
+            </div>
+          </div>
+          <div class="automation-runner-actions">
+            <button type="button" class="refresh-btn" id="automationRunUseSelectedBtn">Use selected case</button>
+            <button type="button" class="refresh-btn" id="automationRunBtn">Run Automation</button>
+            <button type="button" class="refresh-btn" id="automationAllureBtn">Generate Allure Report</button>
+          </div>
+          <div class="automation-runner-status" id="automationRunStatus">Ready to run.</div>
+          <div class="automation-runner-status" id="automationAllureStatus">Allure report: not generated.</div>
+          <a class="automation-link" id="automationAllureLink" href="#" target="_blank" rel="noopener" style="display:none;">Open Allure Report</a>
+          <div class="automation-progress" aria-label="Automation run progress">
+            <div class="automation-progress-bar" id="automationRunProgressBar"></div>
+          </div>
+          <pre class="automation-run-log" id="automationRunLog">No logs yet.</pre>
+        </div>
+
+        <div class="automation-tabs" role="region" aria-labelledby="automationTabsTitle">
+          <div class="manage-tablist" role="tablist" aria-label="Automation views">
+            <button type="button" class="manage-tab is-active" role="tab" aria-selected="true" aria-controls="automationApiPanel" id="tabAutomationApi">API</button>
+            <button type="button" class="manage-tab" role="tab" aria-selected="false" aria-controls="automationWebPanel" id="tabAutomationWeb">Web</button>
+          </div>
+
+          <section id="automationApiPanel" class="manage-tab-panel is-active" role="tabpanel" aria-labelledby="tabAutomationApi">
+            <div class="automation-grid">
+              <div class="automation-panel">
+                <h3>API Test Cases</h3>
+                <div class="automation-search">
+                  <input type="search" id="automationApiSearch" placeholder="Search case ID or feature title..." aria-label="Search API test cases" />
+                  <button type="button" class="refresh-btn" id="automationApiRefreshBtn">Refresh</button>
+                </div>
+                <div class="automation-case-list" id="automationApiCaseList">
+                  <div class="automation-case-card">Loading API cases...</div>
+                </div>
+              </div>
+
+              <div class="automation-panel">
+                <h3>API Payload Details</h3>
+                <div class="automation-meta">
+                  <div>Selected Case: <strong id="automationApiCaseTitle">Select a case</strong></div>
+                  <div>Feature file: <strong id="automationApiFeaturePath">—</strong></div>
+                  <div class="automation-tags" id="automationApiTags"></div>
+                </div>
+
+                <div class="automation-search">
+                  <input type="number" id="automationApiCaseId" placeholder="Case ID" aria-label="API case ID" />
+                  <button type="button" class="refresh-btn" id="automationApiLoadBtn">Load Case</button>
+                </div>
+
+                <div class="automation-editor">
+                  <label for="automationApiPayloadEditor" style="font-size:12px; color: var(--muted);">Payload JSON</label>
+                  <textarea id="automationApiPayloadEditor" rows="10" aria-label="API payload JSON"></textarea>
+                </div>
+
+                <table class="automation-table" aria-label="Linked API payloads">
+                  <thead>
+                    <tr>
+                      <th>Payload ID</th>
+                      <th>Endpoint</th>
+                      <th>Method</th>
+                      <th>Variant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>analysis_h3</strong></td>
+                      <td>/analytics/v1/analysis</td>
+                      <td><span class="automation-pill">POST</span></td>
+                      <td>h3 grid</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="automation-callout">
+                  Automation usage: GET /api/payloads/by-case/C1425?env=preprod
+                </div>
+                <div class="automation-case-actions">
+                  <button type="button" class="refresh-btn" id="automationApiSaveBtn">Save Payload</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="automationWebPanel" class="manage-tab-panel" role="tabpanel" aria-labelledby="tabAutomationWeb">
+            <div class="automation-grid">
+              <div class="automation-panel">
+                <h3>Web Test Cases</h3>
+                <div class="automation-search">
+                  <input type="search" id="automationWebSearch" placeholder="Search case ID or feature title..." aria-label="Search web test cases" />
+                  <button type="button" class="refresh-btn" id="automationWebRefreshBtn">Refresh</button>
+                </div>
+                <div class="automation-case-list" id="automationWebCaseList">
+                  <div class="automation-case-card">Loading web cases...</div>
+                </div>
+              </div>
+
+              <div class="automation-panel">
+                <h3>Web Input Details</h3>
+                <div class="automation-meta">
+                  <div>Selected Case: <strong id="automationWebCaseTitle">Select a case</strong></div>
+                  <div>Feature file: <strong id="automationWebFeaturePath">—</strong></div>
+                  <div class="automation-tags" id="automationWebTags"></div>
+                </div>
+
+                <div class="automation-search">
+                  <input type="number" id="automationWebCaseId" placeholder="Case ID" aria-label="Web case ID" />
+                  <button type="button" class="refresh-btn" id="automationWebLoadBtn">Load Case</button>
+                </div>
+
+                <div class="automation-input-grid">
+                  <div class="automation-input-card">
+                    <strong>Input JSON</strong>
+                    <textarea id="automationWebInputsEditor" rows="10" aria-label="Web input JSON" style="width:100%; min-height:180px; border-radius: 10px; border:1px solid var(--border); padding: 10px 12px; font-size: 12px; font-family: 'Consolas', 'Monaco', monospace;"></textarea>
+                  </div>
+                  <div class="automation-input-card">
+                    <strong>Resolved Preview</strong>
+                    <div class="automation-preview" id="automationWebPreview">
+{}
+                    </div>
+                  </div>
+                </div>
+
+                <table class="automation-table" aria-label="Linked web inputs">
+                  <thead>
+                    <tr>
+                      <th>Input ID</th>
+                      <th>Scope</th>
+                      <th>Source</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>login_invalid_email</strong></td>
+                      <td>Login</td>
+                      <td>env</td>
+                      <td>negative case</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="automation-callout">
+                  Automation usage: GET /api/testdata/by-case/C1606?env=preprod
+                </div>
+                <div class="automation-case-actions">
+                  <button type="button" class="refresh-btn" id="automationWebSaveBtn">Save Inputs</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
       <div id="howToView" class="hidden" style="max-width: 900px; margin: 0 auto; padding: 12px 0;">
         <div class="card" style="margin-bottom:12px;">
           <h2 style="margin:0 0 8px;">How to Use</h2>
@@ -3840,7 +4902,7 @@
 
   <!-- Case Edit Modal -->
   <div id="caseEditModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="caseEditModalTitle">
-    <div class="modal-card" style="max-width: 700px;">
+    <div class="modal-card" style="max-width: 980px;">
       <!-- Loading Overlay -->
       <div id="caseEditLoadingOverlay" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: 14px;">
         <div class="spinner" style="width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
@@ -3879,109 +4941,106 @@
       </nav>
       
       <form id="caseEditForm" class="modal-body" style="padding: 20px; max-height: 70vh; overflow-y: auto;">
-        <!-- Hidden field for case ID -->
         <input type="hidden" id="caseEditId" value="" />
-        
-        <!-- Case Title Field (Required) -->
-        <div style="margin-bottom: 16px;">
-          <label for="caseEditTitle" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
-            Title <span style="color: #ef4444;">*</span>
-          </label>
-          <input 
-            type="text" 
-            id="caseEditTitle" 
-            name="title"
-            placeholder="Enter case title" 
-            required
-            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
-            aria-describedby="caseEditTitleError"
-          />
-          <p id="caseEditTitleError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
-            Title is required and cannot be empty or whitespace only.
-          </p>
-        </div>
-        
-        <!-- References Field -->
-        <div style="margin-bottom: 16px;">
-          <label for="caseEditRefs" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
-            References
-          </label>
-          <input 
-            type="text" 
-            id="caseEditRefs" 
-            name="refs"
-            placeholder="e.g., JIRA-123, TICKET-456" 
-            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
-          />
-          <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
-            Comma-separated list of references (e.g., ticket IDs)
-          </p>
-        </div>
-        
-        <!-- BDD Scenarios Field (Textarea) -->
-        <div style="margin-bottom: 16px;">
-          <label for="caseEditBddScenarios" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
-            BDD Scenarios
-          </label>
-          <textarea 
-            id="caseEditBddScenarios" 
-            name="bdd_scenarios"
-            placeholder="Enter BDD scenarios (Gherkin format)" 
-            rows="5"
-            style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; resize: vertical; min-height: 100px; font-family: 'Consolas', 'Monaco', monospace; transition: border-color .15s ease, box-shadow .15s ease;"
-          ></textarea>
-          <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
-            Optional BDD scenarios in Gherkin format (Given/When/Then)
-          </p>
-        </div>
-        
-        <!-- File Upload Section -->
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
-            Attachments
-          </label>
-          
-          <!-- Drag and Drop Zone -->
-          <div 
-            id="caseEditDropZone" 
-            style="border: 2px dashed var(--border); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: border-color .15s ease, background .15s ease;"
-            role="button"
-            tabindex="0"
-            aria-label="Click or drag files to upload"
-          >
-            <div style="font-size: 32px; margin-bottom: 8px; opacity: 0.5;" aria-hidden="true">📎</div>
-            <p style="margin: 0 0 8px; font-size: 14px; color: var(--text); font-weight: 500;">
-              Drag & drop files here or click to browse
-            </p>
-            <p style="margin: 0; font-size: 12px; color: var(--muted);">
-              Supported: PNG, JPG, GIF, MP4, MOV, WebM, PDF (max 25MB)
-            </p>
-            <input 
-              type="file" 
-              id="caseEditFileInput" 
-              accept=".png,.jpg,.jpeg,.gif,.mp4,.mov,.webm,.pdf,image/png,image/jpeg,image/gif,video/mp4,video/mov,video/webm,application/pdf"
-              style="display: none;"
-              aria-describedby="caseEditFileError"
-            />
-          </div>
-          
-          <!-- File Validation Error -->
-          <p id="caseEditFileError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
-            Invalid file. Please select a valid file type (PNG, JPG, GIF, MP4, MOV, WebM, PDF) under 25MB.
-          </p>
-          
-          <!-- Upload Progress -->
-          <div id="caseEditUploadProgress" class="hidden" style="margin-top: 12px; padding: 12px; background: rgba(26, 138, 133, 0.06); border-radius: 8px;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div class="spinner" style="width: 20px; height: 20px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;"></div>
-              <span id="caseEditUploadFileName" style="font-size: 13px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Uploading...</span>
+        <div class="case-edit-layout">
+          <section class="case-edit-panel">
+            <h4>Case Details</h4>
+            <div>
+              <label for="caseEditTitle" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                Title <span style="color: #ef4444;">*</span>
+              </label>
+              <input
+                type="text"
+                id="caseEditTitle"
+                name="title"
+                placeholder="Enter case title"
+                required
+                style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
+                aria-describedby="caseEditTitleError"
+              />
+              <p id="caseEditTitleError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
+                Title is required and cannot be empty or whitespace only.
+              </p>
             </div>
-          </div>
-          
-          <!-- Attachments List -->
-          <div id="caseEditAttachmentsList" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
-            <!-- Attachments will be rendered here -->
-          </div>
+
+            <div>
+              <label for="caseEditRefs" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                References
+              </label>
+              <input
+                type="text"
+                id="caseEditRefs"
+                name="refs"
+                placeholder="e.g., JIRA-123, TICKET-456"
+                style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; transition: border-color .15s ease, box-shadow .15s ease;"
+              />
+              <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
+                Comma-separated list of references (e.g., ticket IDs)
+              </p>
+            </div>
+
+            <div>
+              <label for="caseEditBddScenarios" style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                BDD Scenarios
+              </label>
+              <textarea
+                id="caseEditBddScenarios"
+                name="bdd_scenarios"
+                placeholder="Enter BDD scenarios (Gherkin format)"
+                rows="5"
+                style="width: 100%; padding: 10px 12px; border: 2px solid var(--border); border-radius: 8px; font-size: 14px; resize: vertical; min-height: 100px; font-family: 'Consolas', 'Monaco', monospace; transition: border-color .15s ease, box-shadow .15s ease;"
+              ></textarea>
+              <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
+                Optional BDD scenarios in Gherkin format (Given/When/Then)
+              </p>
+            </div>
+          </section>
+
+          <aside class="case-edit-panel">
+            <h4>Evidence</h4>
+            <div>
+              <label style="display: block; margin-bottom: 6px; font-size: 14px; font-weight: 600; color: var(--text);">
+                Attachments
+              </label>
+              <div
+                id="caseEditDropZone"
+                style="border: 2px dashed var(--border); border-radius: 8px; padding: 24px; text-align: center; cursor: pointer; transition: border-color .15s ease, background .15s ease;"
+                role="button"
+                tabindex="0"
+                aria-label="Click or drag files to upload"
+              >
+                <div style="font-size: 32px; margin-bottom: 8px; opacity: 0.5;" aria-hidden="true">📎</div>
+                <p style="margin: 0 0 8px; font-size: 14px; color: var(--text); font-weight: 500;">
+                  Drag & drop files here or click to browse
+                </p>
+                <p style="margin: 0; font-size: 12px; color: var(--muted);">
+                  Supported: PNG, JPG, GIF, MP4, MOV, WebM, PDF (max 25MB)
+                </p>
+                <input
+                  type="file"
+                  id="caseEditFileInput"
+                  accept=".png,.jpg,.jpeg,.gif,.mp4,.mov,.webm,.pdf,image/png,image/jpeg,image/gif,video/mp4,video/mov,video/webm,application/pdf"
+                  style="display: none;"
+                  aria-describedby="caseEditFileError"
+                />
+              </div>
+
+              <p id="caseEditFileError" class="hidden" style="margin: 6px 0 0; color: #ef4444; font-size: 12px; font-weight: 500;">
+                Invalid file. Please select a valid file type (PNG, JPG, GIF, MP4, MOV, WebM, PDF) under 25MB.
+              </p>
+
+              <div id="caseEditUploadProgress" class="hidden" style="margin-top: 12px; padding: 12px; background: rgba(26, 138, 133, 0.06); border-radius: 8px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div class="spinner" style="width: 20px; height: 20px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;"></div>
+                  <span id="caseEditUploadFileName" style="font-size: 13px; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Uploading...</span>
+                </div>
+              </div>
+
+              <div id="caseEditAttachmentsList" style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Attachments will be rendered here -->
+              </div>
+            </div>
+          </aside>
         </div>
       </form>
       
@@ -4321,68 +5380,101 @@
         
         <!-- Test Cases Section -->
         <div id="runDetailsCasesContainer" class="hidden" style="margin-top: 24px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-            <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">
-              Test Cases
-            </h4>
-            <div style="display: flex; gap: 8px;">
-              <button type="button" id="runDetailsAddCases" class="btn-edit" style="padding: 6px 12px; font-size: 13px; background: var(--primary); color: white; border-color: var(--primary);">
-                <span class="icon" aria-hidden="true">➕</span> Add Cases
-              </button>
-              <button type="button" id="runDetailsSelectAll" class="btn-edit" style="padding: 6px 12px; font-size: 13px;">
-                Select All
-              </button>
-              <button type="button" id="runDetailsDeselectAll" class="btn-edit" style="padding: 6px 12px; font-size: 13px;">
-                Deselect All
-              </button>
+          <div id="runDetailsSummary" class="run-details-summary hidden">
+            <div class="run-summary-card">
+              <span>Pass rate</span>
+              <strong id="runSummaryPassRate">0%</strong>
+            </div>
+            <div class="run-summary-card">
+              <span>Failed</span>
+              <strong id="runSummaryFailed">0</strong>
+            </div>
+            <div class="run-summary-card">
+              <span>Blocked</span>
+              <strong id="runSummaryBlocked">0</strong>
+            </div>
+            <div class="run-summary-card">
+              <span>Untested</span>
+              <strong id="runSummaryUntested">0</strong>
             </div>
           </div>
-          
-          <!-- Bulk Action Toolbar -->
-          <div id="runDetailsBulkToolbar" class="hidden" style="background: rgba(26, 138, 133, 0.1); border: 2px solid var(--primary); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-weight: 600; color: var(--primary); font-size: 14px;">
-                <span id="runDetailsBulkCount">0</span> selected
-              </span>
-            </div>
-            <button type="button" id="runDetailsBulkRemove" class="btn-delete" style="padding: 8px 16px; font-size: 13px; font-weight: 600;">
-              <span class="icon" aria-hidden="true">🗑️</span> Remove from Run
-            </button>
-          </div>
-          
-          <!-- Loading State -->
-          <div id="runDetailsCasesLoadingState" class="loading-state hidden">
-            <div class="spinner"></div>
-            <span class="loading-text">Loading test cases...</span>
-          </div>
-          
-          <!-- Error State -->
-          <div id="runDetailsCasesErrorState" class="hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center;">
-            <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.5;">⚠️</div>
-            <h4 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: var(--text);">Failed to Load Test Cases</h4>
-            <p id="runDetailsCasesErrorMessage" style="margin: 0 0 16px; font-size: 14px; color: var(--muted); max-width: 400px;">
-              An error occurred while loading the test cases for this run.
-            </p>
-            <button type="button" id="runDetailsCasesRetryBtn" class="refresh-btn" style="padding: 8px 16px; font-weight: 600;">
-              <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" aria-hidden="true">
-                <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-              </svg>
-              Retry
-            </button>
-          </div>
-          
-          <!-- Empty State -->
-          <div id="runDetailsCasesEmptyState" class="empty-state hidden">
-            <div class="empty-state-icon">📝</div>
-            <h4 class="empty-state-title">No Test Cases Found</h4>
-            <p class="empty-state-message">
-              This test run doesn't have any test cases yet.
-            </p>
-          </div>
-          
-          <!-- Test Cases List -->
-          <div id="runDetailsCasesList" class="entity-list hidden">
-            <!-- Test cases will be dynamically inserted here -->
+
+          <div class="run-details-grid">
+            <section class="run-details-main">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--text);">
+                  Test Cases
+                </h4>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" id="runDetailsAddCases" class="btn-edit" style="padding: 6px 12px; font-size: 13px; background: var(--primary); color: white; border-color: var(--primary);">
+                    <span class="icon" aria-hidden="true">➕</span> Add Cases
+                  </button>
+                  <button type="button" id="runDetailsSelectAll" class="btn-edit" style="padding: 6px 12px; font-size: 13px;">
+                    Select All
+                  </button>
+                  <button type="button" id="runDetailsDeselectAll" class="btn-edit" style="padding: 6px 12px; font-size: 13px;">
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+
+              <div id="runDetailsBulkToolbar" class="hidden" style="background: rgba(26, 138, 133, 0.1); border: 2px solid var(--primary); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-weight: 600; color: var(--primary); font-size: 14px;">
+                    <span id="runDetailsBulkCount">0</span> selected
+                  </span>
+                </div>
+                <button type="button" id="runDetailsBulkRemove" class="btn-delete" style="padding: 8px 16px; font-size: 13px; font-weight: 600;">
+                  <span class="icon" aria-hidden="true">🗑️</span> Remove from Run
+                </button>
+              </div>
+
+              <div id="runDetailsCasesLoadingState" class="loading-state hidden">
+                <div class="spinner"></div>
+                <span class="loading-text">Loading test cases...</span>
+              </div>
+
+              <div id="runDetailsCasesErrorState" class="hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 12px; opacity: 0.5;">⚠️</div>
+                <h4 style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: var(--text);">Failed to Load Test Cases</h4>
+                <p id="runDetailsCasesErrorMessage" style="margin: 0 0 16px; font-size: 14px; color: var(--muted); max-width: 400px;">
+                  An error occurred while loading the test cases for this run.
+                </p>
+                <button type="button" id="runDetailsCasesRetryBtn" class="refresh-btn" style="padding: 8px 16px; font-weight: 600;">
+                  <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;" aria-hidden="true">
+                    <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                  </svg>
+                  Retry
+                </button>
+              </div>
+
+              <div id="runDetailsCasesEmptyState" class="empty-state hidden">
+                <div class="empty-state-icon">📝</div>
+                <h4 class="empty-state-title">No Test Cases Found</h4>
+                <p class="empty-state-message">
+                  This test run doesn't have any test cases yet.
+                </p>
+              </div>
+
+              <div id="runDetailsCasesList" class="entity-list hidden">
+                <!-- Test cases will be dynamically inserted here -->
+              </div>
+            </section>
+
+            <aside class="run-details-side">
+              <div class="evidence-panel" id="runDetailsEvidencePanel">
+                <h4>Evidence Viewer</h4>
+                <div id="runDetailsEvidenceMeta" class="run-create-helper">Select a test to view attachments.</div>
+                <div id="runDetailsEvidenceLoading" class="hidden" style="margin-top: 10px; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px;">
+                  <div class="spinner" style="width: 18px; height: 18px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                  Loading evidence...
+                </div>
+                <div id="runDetailsEvidenceEmpty" class="run-create-helper hidden" style="margin-top: 10px;">
+                  No attachments for this test.
+                </div>
+                <div id="runDetailsEvidenceList" class="evidence-list"></div>
+              </div>
+            </aside>
           </div>
         </div>
       </div>
@@ -4695,6 +5787,50 @@
         }
       }
 
+      function initScopedTabs(container) {
+        if (!container) return;
+        const tabButtons = Array.from(container.querySelectorAll('.manage-tab'));
+        const panels = Array.from(container.querySelectorAll('.manage-tab-panel'));
+        if (!tabButtons.length || !panels.length) return;
+
+        function activateTab(button) {
+          const targetId = button.getAttribute('aria-controls');
+          tabButtons.forEach((btn) => {
+            const active = btn === button;
+            btn.classList.toggle('is-active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+          });
+          panels.forEach((panel) => {
+            panel.classList.toggle('is-active', panel.id === targetId);
+          });
+        }
+
+        tabButtons.forEach((btn) => {
+          btn.addEventListener('click', () => activateTab(btn));
+        });
+      }
+
+      function initCreateTabs() {
+        initScopedTabs(document.querySelector('.manage-create-tabs'));
+      }
+
+      function initAutomationTabs() {
+        initScopedTabs(document.querySelector('.automation-tabs'));
+      }
+
+      function focusCreateTabs() {
+        const container = document.querySelector('.manage-create-tabs');
+        if (!container) return;
+        const planTab = container.querySelector('#tabCreatePlan');
+        if (planTab) {
+          planTab.click();
+          planTab.focus();
+        }
+        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      window.focusCreateTabs = focusCreateTabs;
+
       // Edit Plan functionality
       window.openEditPlanModal = function(planId, planName, planDesc, planMilestone) {
         document.getElementById('editPlanId').value = planId || '';
@@ -4850,6 +5986,8 @@
 
       // Event listeners for modal controls
       document.addEventListener('DOMContentLoaded', function() {
+        initCreateTabs();
+        initAutomationTabs();
         // Plan modal
         const editPlanClose = document.getElementById('editPlanClose');
         const editPlanCancel = document.getElementById('editPlanCancel');
@@ -5081,113 +6219,6 @@
       window.loadCaseList = loadCaseList;
     })();
 
-    // Create Section Toggle Functionality
-    (function() {
-      /**
-       * Toggle the Create section expand/collapse state
-       * Implements Requirements: 1.4, 6.1, 6.2, 11.3, 11.4
-       */
-      function toggleCreateSection() {
-        const toggleButton = document.querySelector('.create-section-toggle');
-        const content = document.getElementById('createSectionContent');
-        
-        if (!toggleButton || !content) {
-          console.warn('Create section elements not found');
-          return;
-        }
-        
-        const isExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
-        
-        if (isExpanded) {
-          // Collapse the section
-          content.classList.add('hidden');
-          toggleButton.setAttribute('aria-expanded', 'false');
-        } else {
-          // Expand the section
-          content.classList.remove('hidden');
-          toggleButton.setAttribute('aria-expanded', 'true');
-        }
-      }
-      
-      /**
-       * Collapse the Create section (used for Escape key)
-       */
-      function collapseCreateSection() {
-        const toggleButton = document.querySelector('.create-section-toggle');
-        const content = document.getElementById('createSectionContent');
-        
-        if (!toggleButton || !content) return;
-        
-        const isExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
-        
-        if (isExpanded) {
-          content.classList.add('hidden');
-          toggleButton.setAttribute('aria-expanded', 'false');
-        }
-      }
-      
-      /**
-       * Expand the Create section (used by empty state buttons)
-       */
-      function expandCreateSection() {
-        const toggleButton = document.querySelector('.create-section-toggle');
-        const content = document.getElementById('createSectionContent');
-        
-        if (!toggleButton || !content) return;
-        
-        content.classList.remove('hidden');
-        toggleButton.setAttribute('aria-expanded', 'true');
-        
-        // Focus the toggle button for accessibility
-        toggleButton.focus();
-      }
-      
-      // Initialize on DOM ready
-      document.addEventListener('DOMContentLoaded', function() {
-        const toggleButton = document.querySelector('.create-section-toggle');
-        
-        if (toggleButton) {
-          // Add click event listener
-          toggleButton.addEventListener('click', toggleCreateSection);
-          
-          // Add keyboard support for Enter and Space
-          toggleButton.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              toggleCreateSection();
-            }
-          });
-        }
-        
-        // Add global Escape key handler to collapse Create section
-        document.addEventListener('keydown', function(e) {
-          if (e.key === 'Escape') {
-            const content = document.getElementById('createSectionContent');
-            if (content && !content.classList.contains('hidden')) {
-              // Only collapse if Create section is expanded and no modal is open
-              const modals = document.querySelectorAll('.modal-backdrop:not(.hidden)');
-              if (modals.length === 0) {
-                collapseCreateSection();
-              }
-            }
-          }
-        });
-        
-        // Ensure Create section starts collapsed (default state)
-        const content = document.getElementById('createSectionContent');
-        const toggleButton = document.querySelector('.create-section-toggle');
-        
-        if (content && toggleButton) {
-          content.classList.add('hidden');
-          toggleButton.setAttribute('aria-expanded', 'false');
-        }
-      });
-      
-      // Make functions globally available for empty state buttons
-      window.expandCreateSection = expandCreateSection;
-      window.toggleCreateSection = toggleCreateSection;
-    })();
-
     // Simple navigation functionality for Dataset Generator
     document.addEventListener('DOMContentLoaded', function() {
       console.log('Navigation JavaScript loaded');
@@ -5195,6 +6226,7 @@
         'linkReporter': 'reporterView',
         'linkDashboard': 'dashboardView', 
         'linkManage': 'manageView',
+        'linkAutomation': 'automationView',
         'linkDataset': 'datasetView',
         'linkHowTo': 'howToView'
       };
@@ -5239,7 +6271,7 @@
       function showView(viewId) {
         console.log('Switching to view:', viewId);
         // Hide all views
-        const allViews = ['reporterView', 'dashboardView', 'manageView', 'datasetView', 'howToView'];
+        const allViews = ['reporterView', 'dashboardView', 'manageView', 'automationView', 'datasetView', 'howToView'];
         allViews.forEach(id => {
           const view = document.getElementById(id);
           if (view) view.classList.add('hidden');

@@ -280,6 +280,8 @@ async function submitPlanForm(event: Event) {
     
     // Refresh corresponding Manage subsection (Requirement 6.4)
     await refreshPlanList();
+
+    resetCreateWizard("planCreateForm");
     
     // Keep Create section expanded for additional creations (Requirement 6.5)
     // The section is already expanded if the user is submitting the form
@@ -340,6 +342,8 @@ async function submitRunForm(event: Event) {
     resetSelectedCases();
     updateCasePickerStatus();
     applySelectionToList();
+
+    resetCreateWizard("runCreateForm");
     
     // Refresh removed - runs subsection no longer exists in hierarchical navigation
     
@@ -382,6 +386,8 @@ async function submitCaseForm(event: Event) {
     if (caseTitleEl) caseTitleEl.value = "";
     if (caseRefs) caseRefs.value = "";
     if (caseBdd) caseBdd.value = "";
+
+    resetCreateWizard("caseCreateForm");
     
     // Refresh removed - cases subsection no longer exists in hierarchical navigation
     
@@ -456,12 +462,830 @@ class SmoothProgress {
   }
 }
 
+function formatSummaryText(value: string) {
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  if (!cleaned) return "—";
+  if (cleaned.length <= 120) return cleaned;
+  return `${cleaned.slice(0, 117)}...`;
+}
+
+function formatBddSummary(value: string) {
+  const cleaned = value.trim();
+  if (!cleaned) return "—";
+  const lines = cleaned.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length > 3) return `${lines.length} steps`;
+  return formatSummaryText(lines.join(" / "));
+}
+
+function getWizardSummaryValue(form: HTMLFormElement, key: string) {
+  if (key === "runScope") {
+    const includeAll = (document.getElementById("runIncludeAll") as HTMLInputElement | null)?.checked ?? false;
+    const manualIds = parseIdList((document.getElementById("runCaseIds") as HTMLInputElement | null)?.value || "");
+    const selectedCount = getSelectedCases().size;
+    const manualCount = manualIds.filter((id) => Number.isFinite(id)).length + selectedCount;
+    if (manualCount > 0) {
+      return `Manual selection (${manualCount} case${manualCount === 1 ? "" : "s"})`;
+    }
+    return includeAll ? "All cases" : "Manual selection";
+  }
+
+  if (key === "caseBdd") {
+    const bddField = document.getElementById("caseBdd") as HTMLTextAreaElement | null;
+    return bddField ? formatBddSummary(bddField.value) : "—";
+  }
+
+  const field = form.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`#${key}`);
+  if (!field) return "—";
+  if (field instanceof HTMLSelectElement) {
+    const option = field.selectedOptions[0];
+    return option?.textContent?.trim() || option?.value || "—";
+  }
+  if (field instanceof HTMLInputElement && field.type === "checkbox") {
+    return field.checked ? "Yes" : "No";
+  }
+  return formatSummaryText(field.value || "");
+}
+
+function updateWizardSummary(form: HTMLFormElement) {
+  const summaryEls = Array.from(form.querySelectorAll<HTMLElement>("[data-summary]"));
+  summaryEls.forEach((el) => {
+    const key = el.dataset.summary;
+    if (!key) return;
+    el.textContent = getWizardSummaryValue(form, key);
+  });
+}
+
+function validateWizardStep(stepContent: HTMLElement) {
+  const fields = Array.from(stepContent.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+    "input, select, textarea"
+  ));
+  let isValid = true;
+  let firstInvalid: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null = null;
+
+  fields.forEach((field) => {
+    const required = field.hasAttribute("required") || field.getAttribute("aria-required") === "true";
+    if (!required || field.disabled) {
+      field.classList.remove("input-invalid");
+      return;
+    }
+    if (!field.checkValidity()) {
+      isValid = false;
+      field.classList.add("input-invalid");
+      if (!firstInvalid) firstInvalid = field;
+    } else {
+      field.classList.remove("input-invalid");
+    }
+  });
+
+  if (firstInvalid) {
+    firstInvalid.reportValidity();
+  }
+  return isValid;
+}
+
+function applyWizardStep(form: HTMLFormElement, step: number) {
+  const steps = Array.from(form.querySelectorAll<HTMLElement>(".create-step-content"));
+  const chips = Array.from(form.querySelectorAll<HTMLButtonElement>(".create-step-chip"));
+  if (!steps.length || !chips.length) return;
+
+  const totalSteps = steps.length;
+  const nextStep = Math.max(1, Math.min(totalSteps, step));
+  form.dataset.currentStep = String(nextStep);
+  form.dataset.totalSteps = String(totalSteps);
+
+  steps.forEach((content) => {
+    const contentStep = Number(content.dataset.step || "0");
+    content.classList.toggle("is-active", contentStep === nextStep);
+  });
+
+  chips.forEach((chip) => {
+    const chipStep = Number(chip.dataset.step || "0");
+    const isActive = chipStep === nextStep;
+    chip.classList.toggle("is-active", isActive);
+    chip.classList.toggle("is-complete", chipStep < nextStep);
+    chip.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
+  updateWizardSummary(form);
+}
+
+function initCreateWizards() {
+  const forms = Array.from(document.querySelectorAll<HTMLFormElement>("form[data-wizard]"));
+  forms.forEach((form) => {
+    const steps = Array.from(form.querySelectorAll<HTMLElement>(".create-step-content"));
+    const chips = Array.from(form.querySelectorAll<HTMLButtonElement>(".create-step-chip"));
+    if (!steps.length || !chips.length) return;
+
+    const getCurrentStep = () => Number(form.dataset.currentStep || "1");
+
+    const goToStep = (step: number) => {
+      applyWizardStep(form, step);
+    };
+
+    const goNext = () => {
+      const currentStep = getCurrentStep();
+      const currentContent = steps[currentStep - 1];
+      if (!currentContent || !validateWizardStep(currentContent)) return;
+      goToStep(currentStep + 1);
+    };
+
+    const goPrev = () => {
+      const currentStep = getCurrentStep();
+      goToStep(currentStep - 1);
+    };
+
+    form.querySelectorAll<HTMLElement>("[data-step-next]").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        goNext();
+      });
+    });
+
+    form.querySelectorAll<HTMLElement>("[data-step-prev]").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        goPrev();
+      });
+    });
+
+    chips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const targetStep = Number(chip.dataset.step || "1");
+        const currentStep = getCurrentStep();
+        if (targetStep === currentStep) return;
+        if (targetStep < currentStep) {
+          goToStep(targetStep);
+          return;
+        }
+        let canAdvance = true;
+        for (let i = 0; i < targetStep - 1; i += 1) {
+          if (!validateWizardStep(steps[i])) {
+            canAdvance = false;
+            break;
+          }
+        }
+        if (canAdvance) {
+          goToStep(targetStep);
+        }
+      });
+    });
+
+    form.addEventListener("submit", (event) => {
+      const currentStep = getCurrentStep();
+      if (currentStep < steps.length) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        goNext();
+      }
+    });
+
+    form.addEventListener("input", (event) => {
+      const target = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
+      if (target && "checkValidity" in target && target.classList.contains("input-invalid")) {
+        if (target.checkValidity()) {
+          target.classList.remove("input-invalid");
+        }
+      }
+      updateWizardSummary(form);
+    });
+
+    form.addEventListener("change", () => updateWizardSummary(form));
+
+    applyWizardStep(form, 1);
+  });
+}
+
+function resetCreateWizard(formId: string) {
+  const form = document.getElementById(formId) as HTMLFormElement | null;
+  if (!form) return;
+  form.querySelectorAll(".input-invalid").forEach((el) => el.classList.remove("input-invalid"));
+  applyWizardStep(form, 1);
+}
+
+function stripAutomationHtml(value: string) {
+  const lowered = value.toLowerCase();
+  if (!lowered.includes("<p") && !lowered.includes("<br") && !lowered.includes("</")) {
+    return value;
+  }
+  let text = value.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n");
+  text = text.replace(/<[^>]+>/g, "");
+  const textarea = document.createElement("textarea");
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
+function stripJsonFence(value: string) {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (match) {
+    return match[1].trim();
+  }
+  return value;
+}
+
+function normalizeAutomationPayload(value: string, stripHtml: boolean) {
+  let text = value;
+  if (stripHtml) {
+    text = stripAutomationHtml(text);
+  }
+  text = stripJsonFence(text);
+  return text.trim();
+}
+
+function formatAutomationPayload(value: any) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") {
+    const normalized = normalizeAutomationPayload(value, true);
+    if (!normalized) return "";
+    try {
+      return JSON.stringify(JSON.parse(normalized), null, 2);
+    } catch {
+      return normalized;
+    }
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function parseAutomationPayload(text: string) {
+  const normalized = normalizeAutomationPayload(text, false);
+  if (!normalized) return "";
+  try {
+    return JSON.parse(normalized);
+  } catch {
+    return normalized;
+  }
+}
+
+function initAutomationManagement() {
+  type AutomationCaseListItem = {
+    id: number;
+    title: string;
+    feature?: string;
+    feature_path?: string;
+    feature_group?: string;
+    tags?: string[];
+    method?: string;
+    endpoint?: string;
+  };
+
+  const casesByType: Record<"api" | "web", AutomationCaseListItem[]> = { api: [], web: [] };
+  const caseMaps: Record<"api" | "web", Map<number, AutomationCaseListItem>> = {
+    api: new Map(),
+    web: new Map(),
+  };
+
+  const apiSearch = document.getElementById("automationApiSearch") as HTMLInputElement | null;
+  const webSearch = document.getElementById("automationWebSearch") as HTMLInputElement | null;
+  const apiList = document.getElementById("automationApiCaseList");
+  const webList = document.getElementById("automationWebCaseList");
+  const apiRefreshBtn = document.getElementById("automationApiRefreshBtn") as HTMLButtonElement | null;
+  const webRefreshBtn = document.getElementById("automationWebRefreshBtn") as HTMLButtonElement | null;
+
+  const runApp = document.getElementById("automationRunApp") as HTMLSelectElement | null;
+  const runType = document.getElementById("automationRunType") as HTMLSelectElement | null;
+  const runEnv = document.getElementById("automationRunEnv") as HTMLSelectElement | null;
+  const runTag = document.getElementById("automationRunTag") as HTMLInputElement | null;
+  const allureLabel = document.getElementById("automationAllureLabel") as HTMLInputElement | null;
+  const runParallel = document.getElementById("automationRunParallel") as HTMLSelectElement | null;
+  const runUseSelected = document.getElementById("automationRunUseSelectedBtn") as HTMLButtonElement | null;
+  const runBtn = document.getElementById("automationRunBtn") as HTMLButtonElement | null;
+  const runStatus = document.getElementById("automationRunStatus");
+  const runProgressBar = document.getElementById("automationRunProgressBar") as HTMLElement | null;
+  const runLog = document.getElementById("automationRunLog");
+  const runStorageKey = "automationRunId";
+  let runPoller: number | null = null;
+
+  const allureBtn = document.getElementById("automationAllureBtn") as HTMLButtonElement | null;
+  const allureStatus = document.getElementById("automationAllureStatus");
+  const allureLink = document.getElementById("automationAllureLink") as HTMLAnchorElement | null;
+  const repoWarning = document.getElementById("automationRepoWarning");
+
+  let canLoadCases = true;
+
+  const apiCaseInput = document.getElementById("automationApiCaseId") as HTMLInputElement | null;
+  const apiLoadBtn = document.getElementById("automationApiLoadBtn") as HTMLButtonElement | null;
+  const apiSaveBtn = document.getElementById("automationApiSaveBtn") as HTMLButtonElement | null;
+  const apiEditor = document.getElementById("automationApiPayloadEditor") as HTMLTextAreaElement | null;
+  const apiTitle = document.getElementById("automationApiCaseTitle");
+  const apiTags = document.getElementById("automationApiTags");
+  const apiFeaturePath = document.getElementById("automationApiFeaturePath");
+
+  const webCaseInput = document.getElementById("automationWebCaseId") as HTMLInputElement | null;
+  const webLoadBtn = document.getElementById("automationWebLoadBtn") as HTMLButtonElement | null;
+  const webSaveBtn = document.getElementById("automationWebSaveBtn") as HTMLButtonElement | null;
+  const webEditor = document.getElementById("automationWebInputsEditor") as HTMLTextAreaElement | null;
+  const webTitle = document.getElementById("automationWebCaseTitle");
+  const webTags = document.getElementById("automationWebTags");
+  const webFeaturePath = document.getElementById("automationWebFeaturePath");
+  const webPreview = document.getElementById("automationWebPreview");
+
+  let selectedCase: { id: number; kind: "api" | "web" } | null = null;
+
+  const renderTags = (container: HTMLElement | null, kind: "api" | "web", item: AutomationCaseListItem) => {
+    if (!container) return;
+    const tags = new Set<string>();
+    tags.add(kind === "api" ? "@api" : "@e2e");
+    tags.add(`@C${item.id}`);
+    (item.tags || []).forEach((tag) => {
+      if (!tag.startsWith("@C")) tags.add(tag);
+    });
+    if (item.feature_group) {
+      tags.add(item.feature_group);
+    }
+    container.innerHTML = "";
+    Array.from(tags).forEach((tag) => {
+      const span = document.createElement("span");
+      span.className = "automation-tag";
+      span.textContent = tag;
+      container.appendChild(span);
+    });
+  };
+
+  const applyCaseMeta = (kind: "api" | "web", item: AutomationCaseListItem) => {
+    const titleText = `C${item.id} — ${item.title || "Untitled case"}`;
+    if (kind === "api") {
+      if (apiTitle) apiTitle.textContent = titleText;
+      if (apiFeaturePath) apiFeaturePath.textContent = item.feature_path || "—";
+      renderTags(apiTags, "api", item);
+    } else {
+      if (webTitle) webTitle.textContent = titleText;
+      if (webFeaturePath) webFeaturePath.textContent = item.feature_path || "—";
+      renderTags(webTags, "web", item);
+    }
+  };
+
+  const ensureSelectedCard = (listEl: HTMLElement | null, card: HTMLElement | null) => {
+    if (!listEl || !card) return;
+    listEl.querySelectorAll(".automation-case-card").forEach((el) => {
+      el.classList.remove("is-active");
+    });
+    card.classList.add("is-active");
+  };
+
+  const renderCaseList = (kind: "api" | "web", list: AutomationCaseListItem[]) => {
+    const listEl = kind === "api" ? apiList : webList;
+    if (!listEl) return;
+    listEl.innerHTML = "";
+    if (!list.length) {
+      const empty = document.createElement("div");
+      empty.className = "automation-case-card";
+      empty.textContent = "No cases found.";
+      listEl.appendChild(empty);
+      return;
+    }
+    list.forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "automation-case-card";
+      card.dataset.automationCase = "true";
+      card.dataset.caseId = String(item.id);
+      card.dataset.caseType = kind;
+      card.dataset.caseTitle = item.title || "";
+      card.dataset.featurePath = item.feature_path || "";
+      card.dataset.feature = item.feature || "";
+      card.dataset.featureGroup = item.feature_group || "";
+      card.dataset.method = item.method || "";
+      card.dataset.endpoint = item.endpoint || "";
+      card.dataset.tags = JSON.stringify(item.tags || []);
+
+      const title = document.createElement("div");
+      title.className = "automation-case-title";
+      title.textContent = `C${item.id} — ${item.title || "Untitled case"}`;
+
+      const featureLine = document.createElement("div");
+      featureLine.className = "automation-case-meta-line";
+      featureLine.textContent = `Feature: ${item.feature || item.feature_group || "—"}`;
+
+      const detailLine = document.createElement("div");
+      detailLine.className = "automation-case-meta-line";
+      if (kind === "api") {
+        const endpointLabel = item.endpoint
+          ? `${item.method ? `${item.method} ` : ""}${item.endpoint}`
+          : item.feature_path || "—";
+        detailLine.textContent = `Endpoint: ${endpointLabel}`;
+      } else {
+        detailLine.textContent = `File: ${item.feature_path || "—"}`;
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "automation-case-actions";
+      const openBtn = document.createElement("button");
+      openBtn.type = "button";
+      openBtn.className = "refresh-btn";
+      openBtn.dataset.action = "open";
+      openBtn.textContent = kind === "api" ? "Open Payload" : "Open Inputs";
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "refresh-btn";
+      copyBtn.dataset.action = "copy";
+      copyBtn.textContent = "Copy Case ID";
+      actions.appendChild(openBtn);
+      actions.appendChild(copyBtn);
+
+      card.appendChild(title);
+      card.appendChild(featureLine);
+      card.appendChild(detailLine);
+      card.appendChild(actions);
+      listEl.appendChild(card);
+    });
+  };
+
+  const updateMetaFromId = (kind: "api" | "web", caseId: number) => {
+    const item = caseMaps[kind].get(caseId);
+    if (!item) {
+      const fallback = { id: caseId, title: `Case ${caseId}` };
+      applyCaseMeta(kind, fallback);
+      return;
+    }
+    applyCaseMeta(kind, item);
+  };
+
+  const loadCase = async (kind: "api" | "web") => {
+    const input = kind === "api" ? apiCaseInput : webCaseInput;
+    if (!input) return;
+    const caseId = parseIntMaybe(input.value);
+    if (!caseId) {
+      showToast("Provide a valid case ID.", "error");
+      return;
+    }
+    try {
+      const data = await requestJson(`/api/automation/case/${caseId}`);
+      if (kind === "api") {
+        updateMetaFromId("api", caseId);
+        if (apiEditor) apiEditor.value = formatAutomationPayload(data?.api_payload || "");
+      } else {
+        updateMetaFromId("web", caseId);
+        if (webEditor) webEditor.value = formatAutomationPayload(data?.web_inputs || "");
+        if (webPreview && webEditor) {
+          webPreview.textContent = webEditor.value || "{}";
+        }
+      }
+      selectedCase = { id: caseId, kind };
+      showToast(`Loaded case C${caseId}`, "success");
+    } catch (err: any) {
+      showToast(err?.message || "Failed to load case", "error");
+    }
+  };
+
+  const saveCase = async (kind: "api" | "web") => {
+    const input = kind === "api" ? apiCaseInput : webCaseInput;
+    const editor = kind === "api" ? apiEditor : webEditor;
+    if (!input || !editor) return;
+    const caseId = parseIntMaybe(input.value);
+    if (!caseId) {
+      showToast("Provide a valid case ID.", "error");
+      return;
+    }
+    const payloadValue = parseAutomationPayload(editor.value);
+    const body = kind === "api" ? { api_payload: payloadValue } : { web_inputs: payloadValue };
+    try {
+      await requestJson(`/api/automation/case/${caseId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (kind === "web" && webPreview) {
+        webPreview.textContent = editor.value || "{}";
+      }
+      showToast(`Saved automation data for C${caseId}`, "success");
+    } catch (err: any) {
+      showToast(err?.message || "Failed to save automation data", "error");
+    }
+  };
+
+  apiLoadBtn?.addEventListener("click", () => loadCase("api"));
+  webLoadBtn?.addEventListener("click", () => loadCase("web"));
+  apiSaveBtn?.addEventListener("click", () => saveCase("api"));
+  webSaveBtn?.addEventListener("click", () => saveCase("web"));
+
+  const handleCaseListClick = (kind: "api" | "web", event: Event) => {
+    const target = event.target as HTMLElement | null;
+    const listEl = kind === "api" ? apiList : webList;
+    if (!target || !listEl) return;
+    const card = target.closest<HTMLElement>(".automation-case-card");
+    if (!card || !listEl.contains(card)) return;
+    const caseId = parseIntMaybe(card.dataset.caseId || "");
+    if (!caseId) return;
+
+    const action = target.closest<HTMLElement>("[data-action]")?.dataset.action;
+    if (action === "copy") {
+      event.stopPropagation();
+      if (!navigator.clipboard) {
+        showToast("Clipboard not available", "error");
+        return;
+      }
+      navigator.clipboard
+        .writeText(String(caseId))
+        .then(() => showToast(`Copied C${caseId}`, "success"))
+        .catch(() => showToast("Failed to copy case ID", "error"));
+      return;
+    }
+
+    if (kind === "api" && apiCaseInput) apiCaseInput.value = String(caseId);
+    if (kind === "web" && webCaseInput) webCaseInput.value = String(caseId);
+    updateMetaFromId(kind, caseId);
+    ensureSelectedCard(listEl, card);
+    selectedCase = { id: caseId, kind };
+    loadCase(kind);
+  };
+
+  apiList?.addEventListener("click", (event) => handleCaseListClick("api", event));
+  webList?.addEventListener("click", (event) => handleCaseListClick("web", event));
+
+  const fetchCaseList = async (kind: "api" | "web") => {
+    if (!canLoadCases) {
+      const listEl = kind === "api" ? apiList : webList;
+      if (listEl) {
+        listEl.innerHTML = "";
+        const warning = document.createElement("div");
+        warning.className = "automation-case-card";
+        warning.textContent = "Feature files are not available on this host.";
+        listEl.appendChild(warning);
+      }
+      return;
+    }
+    try {
+      const data = await requestJson<{ cases: AutomationCaseListItem[] }>(
+        `/api/automation/cases?case_type=${kind}`
+      );
+      const list = Array.isArray(data?.cases) ? data.cases : [];
+      casesByType[kind] = list;
+      caseMaps[kind] = new Map(list.map((item) => [item.id, item]));
+      renderCaseList(kind, list);
+    } catch (err: any) {
+      const listEl = kind === "api" ? apiList : webList;
+      if (listEl) {
+        listEl.innerHTML = "";
+        const errorCard = document.createElement("div");
+        errorCard.className = "automation-case-card";
+        errorCard.textContent = err?.message || "Failed to load cases.";
+        listEl.appendChild(errorCard);
+      }
+    }
+  };
+
+  const filterCasesByQuery = (kind: "api" | "web", query: string) => {
+    const normalized = query.trim().toLowerCase();
+    const list = casesByType[kind];
+    if (!normalized) {
+      renderCaseList(kind, list);
+      return;
+    }
+    const filtered = list.filter((item) => {
+      const idMatch = String(item.id).includes(normalized);
+      const titleMatch = (item.title || "").toLowerCase().includes(normalized);
+      const featureMatch = (item.feature || "").toLowerCase().includes(normalized);
+      return idMatch || titleMatch || featureMatch;
+    });
+    renderCaseList(kind, filtered);
+  };
+
+  apiSearch?.addEventListener("input", () => {
+    filterCasesByQuery("api", apiSearch.value);
+  });
+  webSearch?.addEventListener("input", () => {
+    filterCasesByQuery("web", webSearch.value);
+  });
+
+  apiRefreshBtn?.addEventListener("click", () => fetchCaseList("api"));
+  webRefreshBtn?.addEventListener("click", () => fetchCaseList("web"));
+
+  const applyAutomationStatus = (status: any) => {
+    const warnings: string[] = [];
+    const repoOk = Boolean(status?.repo_root_ok);
+    const featuresOk = Boolean(status?.features_root_ok);
+    const appOk = Boolean(status?.app_root_ok);
+    const npmOk = Boolean(status?.npm_available);
+
+    if (!repoOk) {
+      warnings.push("Automation repo not found. Set AUTOMATION_REPO_ROOT and mount the repo.");
+    }
+    if (!appOk) {
+      warnings.push("Automation app path not found inside the repo.");
+    }
+    if (!featuresOk) {
+      warnings.push("Feature files not found. Set AUTOMATION_FEATURES_ROOT.");
+    }
+    if (!npmOk) {
+      warnings.push("npm is not available in this environment.");
+    }
+
+    canLoadCases = featuresOk;
+    if (repoWarning) {
+      if (warnings.length) {
+        repoWarning.textContent = warnings.join(" ");
+        repoWarning.style.display = "block";
+      } else {
+        repoWarning.textContent = "";
+        repoWarning.style.display = "none";
+      }
+    }
+
+    const canRun = repoOk && appOk && npmOk;
+    if (runBtn) runBtn.disabled = !canRun;
+    if (allureBtn) allureBtn.disabled = !canRun;
+    if (!canRun && runStatus) {
+      runStatus.textContent = "Automation runner is unavailable on this host.";
+    }
+    if (!featuresOk) {
+      fetchCaseList("api");
+      fetchCaseList("web");
+    }
+  };
+
+  const loadAutomationStatus = async () => {
+    try {
+      const status = await requestJson("/api/automation/status");
+      applyAutomationStatus(status);
+    } catch (err: any) {
+      if (repoWarning) {
+        repoWarning.textContent = err?.message || "Failed to load automation status.";
+        repoWarning.style.display = "block";
+      }
+    }
+  };
+
+  loadAutomationStatus();
+
+  runUseSelected?.addEventListener("click", () => {
+    if (!selectedCase) {
+      showToast("Select a case first.", "error");
+      return;
+    }
+    if (runTag) {
+      runTag.value = `@C${selectedCase.id}`;
+    }
+    if (runType) {
+      runType.value = selectedCase.kind === "api" ? "api" : "e2e";
+    }
+    if (runStatus) {
+      runStatus.textContent = `Ready to run C${selectedCase.id}.`;
+    }
+  });
+
+  runBtn?.addEventListener("click", async () => {
+    const wantsParallel = (runParallel?.value || "false") === "true";
+    if (wantsParallel) {
+      showToast("Parallel runs are not supported locally yet.", "error");
+      return;
+    }
+    const payload = {
+      app_name: runApp?.value || "lokasi_intelligence",
+      test_type: runType?.value || "api",
+      test_tag: runTag?.value.trim() || "",
+      environment: runEnv?.value || "staging",
+      parallel: wantsParallel,
+    };
+
+    if (runStatus) {
+      runStatus.textContent = "Dispatching workflow...";
+    }
+    try {
+      const response = await requestJson("/api/automation/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const runId = response?.run_id || "";
+      if (runId) {
+        localStorage.setItem(runStorageKey, runId);
+      }
+      if (runStatus) {
+        const logPath = response?.log_path ? ` Logs: ${response.log_path}` : "";
+        const envPath = response?.env_path ? ` Env: ${response.env_path}` : "";
+        runStatus.textContent = `Run started (PID ${response?.pid || "?"}).${logPath}${envPath}`;
+      }
+      if (runProgressBar) {
+        runProgressBar.style.width = "0%";
+      }
+      if (runLog) {
+        runLog.textContent = "Waiting for logs...";
+      }
+      if (runId) {
+        startRunPolling(runId);
+      }
+      showToast("Automation run started.", "success");
+    } catch (err: any) {
+      if (runStatus) {
+        runStatus.textContent = err?.message || "Dispatch failed.";
+      }
+      showToast(err?.message || "Failed to dispatch workflow.", "error");
+    }
+  });
+
+  allureBtn?.addEventListener("click", async () => {
+    const payload = {
+      app_name: runApp?.value || "lokasi_intelligence",
+      output_label: allureLabel?.value.trim() || "",
+    };
+    if (allureStatus) {
+      allureStatus.textContent = "Generating Allure report...";
+    }
+    if (allureLink) {
+      allureLink.style.display = "none";
+      allureLink.removeAttribute("href");
+    }
+    try {
+      const response = await requestJson("/api/automation/allure-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const url = response?.url || "";
+      if (allureStatus) {
+        allureStatus.textContent = "Allure report generated.";
+      }
+      if (allureLink && url) {
+        allureLink.href = url;
+        allureLink.style.display = "inline-flex";
+        allureLink.textContent = "Open Allure Report";
+      }
+      showToast("Allure report generated.", "success");
+    } catch (err: any) {
+      if (allureStatus) {
+        allureStatus.textContent = err?.message || "Allure report failed.";
+      }
+      showToast(err?.message || "Failed to generate Allure report.", "error");
+    }
+  });
+
+  const stopRunPolling = () => {
+    if (runPoller !== null) {
+      window.clearInterval(runPoller);
+      runPoller = null;
+    }
+  };
+
+  const updateRunUI = (data: any) => {
+    const status = data?.status || "unknown";
+    const completed = data?.completed_cases ?? 0;
+    const total = data?.total_cases;
+    const progress = data?.progress_percent;
+    const summaryParts = [`Status: ${status}`];
+    if (typeof total === "number") {
+      summaryParts.push(`Progress: ${completed}/${total}`);
+    } else {
+      summaryParts.push("Progress: n/a");
+    }
+    if (typeof progress === "number") {
+      summaryParts.push(`${progress}%`);
+    }
+    if (data?.last_log_line) {
+      summaryParts.push(`Last: ${data.last_log_line}`);
+    }
+    if (runStatus) {
+      runStatus.textContent = summaryParts.join(" · ");
+    }
+    if (runProgressBar) {
+      runProgressBar.style.width = typeof progress === "number" ? `${progress}%` : "0%";
+    }
+    if (runLog && Array.isArray(data?.log_tail)) {
+      runLog.textContent = data.log_tail.join("\n") || "No logs yet.";
+    }
+  };
+
+  const pollRunStatus = async (runId: string) => {
+    try {
+      const data = await requestJson(`/api/automation/run/${encodeURIComponent(runId)}`);
+      updateRunUI(data);
+      if (data?.status === "success" || data?.status === "failed") {
+        stopRunPolling();
+      }
+    } catch (err: any) {
+      if (runStatus) {
+        runStatus.textContent = err?.message || "Failed to fetch run status.";
+      }
+      localStorage.removeItem(runStorageKey);
+      stopRunPolling();
+    }
+  };
+
+  const startRunPolling = (runId: string) => {
+    stopRunPolling();
+    pollRunStatus(runId);
+    runPoller = window.setInterval(() => pollRunStatus(runId), 5000);
+  };
+
+  const existingRunId = localStorage.getItem(runStorageKey);
+  if (existingRunId) {
+    startRunPolling(existingRunId);
+  }
+
+  fetchCaseList("api");
+  fetchCaseList("web");
+}
+
 function init() {
   setupThemeToggle();
   updateReportMeta(undefined);
   loadPlans().catch((err) => console.error("loadPlans error", err));
   loadManagePlans().catch((err) => console.error("loadManagePlans error", err));
   initManagement();
+  initCreateWizards();
+  initAutomationManagement();
   
   // Expose initManageView globally for views.ts
   (window as any).initManageView = initManageView;
@@ -523,6 +1347,10 @@ function init() {
   document.getElementById("linkManage")?.addEventListener("click", (e) => {
     e.preventDefault();
     switchView("manage");
+  });
+  document.getElementById("linkAutomation")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    switchView("automation");
   });
   document.getElementById("linkHowTo")?.addEventListener("click", (e) => {
     e.preventDefault();

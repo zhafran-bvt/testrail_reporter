@@ -1356,6 +1356,7 @@ async function loadRunDetailsCases(runId: number) {
   const errorState = document.getElementById("runDetailsCasesErrorState");
   const emptyState = document.getElementById("runDetailsCasesEmptyState");
   const casesList = document.getElementById("runDetailsCasesList");
+  const summary = document.getElementById("runDetailsSummary");
 
   if (!loadingState || !errorState || !emptyState || !casesList) return;
 
@@ -1364,6 +1365,8 @@ async function loadRunDetailsCases(runId: number) {
   errorState.classList.add("hidden");
   emptyState.classList.add("hidden");
   casesList.classList.add("hidden");
+  if (summary) summary.classList.add("hidden");
+  resetRunEvidencePanel();
 
   try {
     // Fetch test cases from API (Requirement 3.3)
@@ -1395,6 +1398,121 @@ async function loadRunDetailsCases(runId: number) {
   }
 }
 
+function resetRunEvidencePanel() {
+  const meta = document.getElementById("runDetailsEvidenceMeta");
+  const list = document.getElementById("runDetailsEvidenceList");
+  const empty = document.getElementById("runDetailsEvidenceEmpty");
+  const loading = document.getElementById("runDetailsEvidenceLoading");
+  currentEvidenceTestId = null;
+  if (meta) meta.textContent = "Select a test to view attachments.";
+  if (list) list.innerHTML = "";
+  if (empty) {
+    empty.textContent = "No attachments for this test.";
+    empty.classList.add("hidden");
+  }
+  if (loading) loading.classList.add("hidden");
+}
+
+function updateRunSummary(tests: any[]) {
+  const summary = document.getElementById("runDetailsSummary");
+  const passRateEl = document.getElementById("runSummaryPassRate");
+  const failedEl = document.getElementById("runSummaryFailed");
+  const blockedEl = document.getElementById("runSummaryBlocked");
+  const untestedEl = document.getElementById("runSummaryUntested");
+  if (!summary || !passRateEl || !failedEl || !blockedEl || !untestedEl) return;
+
+  const counts = {
+    passed: 0,
+    failed: 0,
+    blocked: 0,
+    untested: 0,
+  };
+  tests.forEach((test) => {
+    const statusId = Number(test.status_id || 3);
+    if (statusId === 1) counts.passed += 1;
+    else if (statusId === 5) counts.failed += 1;
+    else if (statusId === 2) counts.blocked += 1;
+    else if (statusId === 3) counts.untested += 1;
+  });
+
+  const total = tests.length;
+  const passRate = total ? Math.round((counts.passed / total) * 100) : 0;
+  passRateEl.textContent = `${passRate}%`;
+  failedEl.textContent = String(counts.failed);
+  blockedEl.textContent = String(counts.blocked);
+  untestedEl.textContent = String(counts.untested);
+  summary.classList.remove("hidden");
+}
+
+async function loadRunEvidence(testId: number, testTitle: string) {
+  const meta = document.getElementById("runDetailsEvidenceMeta");
+  const list = document.getElementById("runDetailsEvidenceList");
+  const empty = document.getElementById("runDetailsEvidenceEmpty");
+  const loading = document.getElementById("runDetailsEvidenceLoading");
+  if (!meta || !list || !empty || !loading) return;
+
+  currentEvidenceTestId = testId;
+  meta.textContent = testTitle ? `Test ${testId} - ${testTitle}` : `Test ${testId}`;
+  list.innerHTML = "";
+  empty.classList.add("hidden");
+  loading.classList.remove("hidden");
+
+  try {
+    const response = await requestJson(`/api/manage/test/${testId}/attachments`);
+    if (currentEvidenceTestId !== testId) return;
+    const attachments = response.attachments || [];
+    loading.classList.add("hidden");
+    if (attachments.length === 0) {
+      empty.textContent = "No attachments for this test.";
+      empty.classList.remove("hidden");
+      return;
+    }
+    list.innerHTML = attachments.map((attachment: any) => {
+      const rawName = attachment.filename || attachment.name || "Attachment";
+      const fileName = escapeHtml(rawName);
+      const lowerName = String(rawName || "").toLowerCase();
+      const fileSize = formatFileSize(attachment.size || 0);
+      const contentType = attachment.content_type || "application/octet-stream";
+      const icon = getFileIcon(contentType);
+      const isImage = contentType.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(lowerName);
+      const isVideo = contentType.startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(lowerName);
+      const downloadName = encodeURIComponent(attachment.filename || attachment.name || `attachment_${attachment.id}`);
+      const downloadType = encodeURIComponent(contentType);
+      const downloadUrl = `/api/manage/attachment/${attachment.id}?filename=${downloadName}&content_type=${downloadType}`;
+      const previewUrl = (isImage || isVideo)
+        ? `/api/manage/attachment/${attachment.id}/preview?filename=${downloadName}&content_type=${downloadType}`
+        : "";
+      const thumbUrl = isImage ? `/api/manage/attachment/${attachment.id}/thumbnail` : "";
+      const resultLabel = attachment.result_id ? `Result #${attachment.result_id}` : "";
+
+      return `
+        <div class="evidence-item">
+          <div class="evidence-thumb">
+            ${isImage ? `
+              <img src="${thumbUrl}" alt="${fileName}" onerror="this.style.display='none'">
+            ` : `
+              <span aria-hidden="true">${icon}</span>
+            `}
+          </div>
+          <div class="evidence-meta">
+            <span style="font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</span>
+            <span style="font-size: 11px; color: var(--muted);">${fileSize}${resultLabel ? ` · ${resultLabel}` : ""}</span>
+          </div>
+          <div class="evidence-actions">
+            ${previewUrl ? `<a class="refresh-btn" href="${previewUrl}" target="_blank" rel="noopener" style="padding: 4px 8px; font-size: 11px;">Preview</a>` : ""}
+            <a class="refresh-btn" href="${downloadUrl}" target="_blank" rel="noopener" style="padding: 4px 8px; font-size: 11px;">Download</a>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err: any) {
+    if (currentEvidenceTestId !== testId) return;
+    loading.classList.add("hidden");
+    empty.textContent = err?.message || "Failed to load attachments.";
+    empty.classList.remove("hidden");
+  }
+}
+
 // Track selected case IDs for bulk operations
 let selectedCaseIds: Set<number> = new Set();
 
@@ -1405,6 +1523,7 @@ let availableCasesData: any[] = [];
 // Track current test for adding result
 let currentTestId: number | null = null;
 let currentTestTitle: string = "";
+let currentEvidenceTestId: number | null = null;
 
 /**
  * Parse JSON stringify BDD format and convert to proper Gherkin format
@@ -2069,6 +2188,7 @@ function renderRunDetailsCases(tests: any[]) {
   // Clear selection when re-rendering
   selectedCaseIds.clear();
   updateBulkActionToolbar();
+  updateRunSummary(tests);
 
   // Render test case cards with checkboxes and edit button (removed delete button)
   casesList.innerHTML = tests
@@ -2111,6 +2231,9 @@ function renderRunDetailsCases(tests: any[]) {
             <button type="button" class="btn-edit add-result-btn-modal" data-test-id="${testId}" data-test-title="${escapeHtml(test.title || '')}" aria-label="Add result for ${testTitle}" aria-describedby="test-title-${testId}" style="background: var(--primary); color: white; border-color: var(--primary);">
               <span class="icon" aria-hidden="true">✅</span> Add Result
             </button>
+            <button type="button" class="btn-edit view-evidence-btn" data-test-id="${testId}" data-test-title="${escapeHtml(test.title || '')}" aria-label="View evidence for ${testTitle}" aria-describedby="test-title-${testId}">
+              <span class="icon" aria-hidden="true">📎</span> Evidence
+            </button>
             <button type="button" class="btn-edit edit-case-btn-modal" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || '')}" data-case-refs="${escapeHtml(test.refs || '')}" aria-label="Edit case ${testTitle}" aria-describedby="test-title-${testId}">
               <span class="icon" aria-hidden="true">✏️</span> Edit
             </button>
@@ -2130,6 +2253,18 @@ function renderRunDetailsCases(tests: any[]) {
       const target = e.target as HTMLInputElement;
       const caseId = parseInt(target.dataset.caseId || "0", 10);
       toggleCaseSelection(caseId, target.checked);
+    });
+  });
+
+  const evidenceButtons = casesList.querySelectorAll(".view-evidence-btn") as NodeListOf<HTMLButtonElement>;
+  evidenceButtons.forEach(button => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      const target = event.currentTarget as HTMLButtonElement;
+      const testId = Number(target.dataset.testId || "0");
+      const testTitle = target.dataset.testTitle || "";
+      if (!Number.isFinite(testId) || testId <= 0) return;
+      loadRunEvidence(testId, testTitle);
     });
   });
 
@@ -2502,32 +2637,6 @@ export function initManagement() {
       }
     }
   });
-
-  // Create Section toggle button event listener
-  const createSectionToggle = document.querySelector(".create-section-toggle");
-  const createSectionContent = document.getElementById("createSectionContent");
-  
-  if (createSectionToggle && createSectionContent) {
-    createSectionToggle.addEventListener("click", () => {
-      const isExpanded = createSectionToggle.getAttribute("aria-expanded") === "true";
-      
-      // Toggle the expanded state
-      createSectionToggle.setAttribute("aria-expanded", isExpanded ? "false" : "true");
-      
-      // Toggle the content visibility
-      if (isExpanded) {
-        createSectionContent.classList.add("hidden");
-      } else {
-        createSectionContent.classList.remove("hidden");
-      }
-      
-      // Update the toggle indicator
-      const indicator = createSectionToggle.querySelector(".toggle-indicator");
-      if (indicator) {
-        indicator.textContent = isExpanded ? "▼" : "▲";
-      }
-    });
-  }
 
   // Refresh button event listeners for new Manage section
   document.getElementById("refreshPlansBtn")?.addEventListener("click", refreshPlanList);

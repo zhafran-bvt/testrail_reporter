@@ -96,7 +96,7 @@ class TestPlansSubsection(BaseAPITestCase):
         self.assertIn("Create your first plan above", html)
 
         # Verify action button exists
-        self.assertIn("expandCreateSection()", html)
+        self.assertIn("focusCreateTabs()", html)
 
     def test_plans_refresh_button_exists(self):
         """

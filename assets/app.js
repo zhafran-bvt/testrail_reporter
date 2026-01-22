@@ -72,18 +72,22 @@
   function switchView(target) {
     const reporter = document.getElementById("reporterView");
     const manage = document.getElementById("manageView");
+    const automation = document.getElementById("automationView");
     const howto = document.getElementById("howToView");
     const dashboard = document.getElementById("dashboardView");
     const linkReporter = document.getElementById("linkReporter");
     const linkManage = document.getElementById("linkManage");
+    const linkAutomation = document.getElementById("linkAutomation");
     const linkHowto = document.getElementById("linkHowTo");
     const linkDashboard = document.getElementById("linkDashboard");
     reporter == null ? void 0 : reporter.classList.add("hidden");
     manage == null ? void 0 : manage.classList.add("hidden");
+    automation == null ? void 0 : automation.classList.add("hidden");
     howto == null ? void 0 : howto.classList.add("hidden");
     dashboard == null ? void 0 : dashboard.classList.add("hidden");
     linkReporter == null ? void 0 : linkReporter.classList.remove("active");
     linkManage == null ? void 0 : linkManage.classList.remove("active");
+    linkAutomation == null ? void 0 : linkAutomation.classList.remove("active");
     linkHowto == null ? void 0 : linkHowto.classList.remove("active");
     linkDashboard == null ? void 0 : linkDashboard.classList.remove("active");
     if (target === "manage") {
@@ -92,6 +96,9 @@
       if (typeof window.initManageView === "function") {
         window.initManageView();
       }
+    } else if (target === "automation") {
+      automation == null ? void 0 : automation.classList.remove("hidden");
+      linkAutomation == null ? void 0 : linkAutomation.classList.add("active");
     } else if (target === "howto") {
       howto == null ? void 0 : howto.classList.remove("hidden");
       linkHowto == null ? void 0 : linkHowto.classList.add("active");
@@ -2002,11 +2009,14 @@
     const errorState = document.getElementById("runDetailsCasesErrorState");
     const emptyState = document.getElementById("runDetailsCasesEmptyState");
     const casesList = document.getElementById("runDetailsCasesList");
+    const summary = document.getElementById("runDetailsSummary");
     if (!loadingState || !errorState || !emptyState || !casesList) return;
     loadingState.classList.remove("hidden");
     errorState.classList.add("hidden");
     emptyState.classList.add("hidden");
     casesList.classList.add("hidden");
+    if (summary) summary.classList.add("hidden");
+    resetRunEvidencePanel();
     try {
       const data = await requestJson(`/api/tests/${runId}`);
       const tests = Array.isArray(data.tests) ? data.tests : [];
@@ -2026,11 +2036,117 @@
       showToast((err == null ? void 0 : err.message) || "Failed to load test cases", "error");
     }
   }
+  function resetRunEvidencePanel() {
+    const meta = document.getElementById("runDetailsEvidenceMeta");
+    const list = document.getElementById("runDetailsEvidenceList");
+    const empty = document.getElementById("runDetailsEvidenceEmpty");
+    const loading = document.getElementById("runDetailsEvidenceLoading");
+    currentEvidenceTestId = null;
+    if (meta) meta.textContent = "Select a test to view attachments.";
+    if (list) list.innerHTML = "";
+    if (empty) {
+      empty.textContent = "No attachments for this test.";
+      empty.classList.add("hidden");
+    }
+    if (loading) loading.classList.add("hidden");
+  }
+  function updateRunSummary2(tests) {
+    const summary = document.getElementById("runDetailsSummary");
+    const passRateEl = document.getElementById("runSummaryPassRate");
+    const failedEl = document.getElementById("runSummaryFailed");
+    const blockedEl = document.getElementById("runSummaryBlocked");
+    const untestedEl = document.getElementById("runSummaryUntested");
+    if (!summary || !passRateEl || !failedEl || !blockedEl || !untestedEl) return;
+    const counts = {
+      passed: 0,
+      failed: 0,
+      blocked: 0,
+      untested: 0
+    };
+    tests.forEach((test) => {
+      const statusId = Number(test.status_id || 3);
+      if (statusId === 1) counts.passed += 1;
+      else if (statusId === 5) counts.failed += 1;
+      else if (statusId === 2) counts.blocked += 1;
+      else if (statusId === 3) counts.untested += 1;
+    });
+    const total = tests.length;
+    const passRate = total ? Math.round(counts.passed / total * 100) : 0;
+    passRateEl.textContent = `${passRate}%`;
+    failedEl.textContent = String(counts.failed);
+    blockedEl.textContent = String(counts.blocked);
+    untestedEl.textContent = String(counts.untested);
+    summary.classList.remove("hidden");
+  }
+  async function loadRunEvidence(testId, testTitle) {
+    const meta = document.getElementById("runDetailsEvidenceMeta");
+    const list = document.getElementById("runDetailsEvidenceList");
+    const empty = document.getElementById("runDetailsEvidenceEmpty");
+    const loading = document.getElementById("runDetailsEvidenceLoading");
+    if (!meta || !list || !empty || !loading) return;
+    currentEvidenceTestId = testId;
+    meta.textContent = testTitle ? `Test ${testId} - ${testTitle}` : `Test ${testId}`;
+    list.innerHTML = "";
+    empty.classList.add("hidden");
+    loading.classList.remove("hidden");
+    try {
+      const response = await requestJson(`/api/manage/test/${testId}/attachments`);
+      if (currentEvidenceTestId !== testId) return;
+      const attachments = response.attachments || [];
+      loading.classList.add("hidden");
+      if (attachments.length === 0) {
+        empty.textContent = "No attachments for this test.";
+        empty.classList.remove("hidden");
+        return;
+      }
+      list.innerHTML = attachments.map((attachment) => {
+        const rawName = attachment.filename || attachment.name || "Attachment";
+        const fileName = escapeHtml(rawName);
+        const lowerName = String(rawName || "").toLowerCase();
+        const fileSize = formatFileSize(attachment.size || 0);
+        const contentType = attachment.content_type || "application/octet-stream";
+        const icon = getFileIcon(contentType);
+        const isImage = contentType.startsWith("image/") || /\.(png|jpe?g|gif|webp)$/i.test(lowerName);
+        const isVideo = contentType.startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(lowerName);
+        const downloadName = encodeURIComponent(attachment.filename || attachment.name || `attachment_${attachment.id}`);
+        const downloadType = encodeURIComponent(contentType);
+        const downloadUrl = `/api/manage/attachment/${attachment.id}?filename=${downloadName}&content_type=${downloadType}`;
+        const previewUrl = isImage || isVideo ? `/api/manage/attachment/${attachment.id}/preview?filename=${downloadName}&content_type=${downloadType}` : "";
+        const thumbUrl = isImage ? `/api/manage/attachment/${attachment.id}/thumbnail` : "";
+        const resultLabel = attachment.result_id ? `Result #${attachment.result_id}` : "";
+        return `
+        <div class="evidence-item">
+          <div class="evidence-thumb">
+            ${isImage ? `
+              <img src="${thumbUrl}" alt="${fileName}" onerror="this.style.display='none'">
+            ` : `
+              <span aria-hidden="true">${icon}</span>
+            `}
+          </div>
+          <div class="evidence-meta">
+            <span style="font-size: 12px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${fileName}</span>
+            <span style="font-size: 11px; color: var(--muted);">${fileSize}${resultLabel ? ` \xB7 ${resultLabel}` : ""}</span>
+          </div>
+          <div class="evidence-actions">
+            ${previewUrl ? `<a class="refresh-btn" href="${previewUrl}" target="_blank" rel="noopener" style="padding: 4px 8px; font-size: 11px;">Preview</a>` : ""}
+            <a class="refresh-btn" href="${downloadUrl}" target="_blank" rel="noopener" style="padding: 4px 8px; font-size: 11px;">Download</a>
+          </div>
+        </div>
+      `;
+      }).join("");
+    } catch (err) {
+      if (currentEvidenceTestId !== testId) return;
+      loading.classList.add("hidden");
+      empty.textContent = (err == null ? void 0 : err.message) || "Failed to load attachments.";
+      empty.classList.remove("hidden");
+    }
+  }
   var selectedCaseIds = /* @__PURE__ */ new Set();
   var selectedAddCaseIds = /* @__PURE__ */ new Set();
   var availableCasesData = [];
   var currentTestId = null;
   var currentTestTitle = "";
+  var currentEvidenceTestId = null;
   function parseJsonStringifyToGherkin(jsonString) {
     if (!jsonString || jsonString.trim() === "") {
       return "";
@@ -2481,6 +2597,7 @@ Note: This will only remove them from the run, not delete them from the project.
     if (errorState) errorState.classList.add("hidden");
     selectedCaseIds.clear();
     updateBulkActionToolbar();
+    updateRunSummary2(tests);
     casesList.innerHTML = tests.map((test) => {
       const testTitle = escapeHtml(test.title || `Test ${test.id}`);
       const testId = test.id;
@@ -2519,6 +2636,9 @@ Note: This will only remove them from the run, not delete them from the project.
             <button type="button" class="btn-edit add-result-btn-modal" data-test-id="${testId}" data-test-title="${escapeHtml(test.title || "")}" aria-label="Add result for ${testTitle}" aria-describedby="test-title-${testId}" style="background: var(--primary); color: white; border-color: var(--primary);">
               <span class="icon" aria-hidden="true">\u2705</span> Add Result
             </button>
+            <button type="button" class="btn-edit view-evidence-btn" data-test-id="${testId}" data-test-title="${escapeHtml(test.title || "")}" aria-label="View evidence for ${testTitle}" aria-describedby="test-title-${testId}">
+              <span class="icon" aria-hidden="true">\u{1F4CE}</span> Evidence
+            </button>
             <button type="button" class="btn-edit edit-case-btn-modal" data-case-id="${caseId}" data-case-title="${escapeHtml(test.title || "")}" data-case-refs="${escapeHtml(test.refs || "")}" aria-label="Edit case ${testTitle}" aria-describedby="test-title-${testId}">
               <span class="icon" aria-hidden="true">\u270F\uFE0F</span> Edit
             </button>
@@ -2533,6 +2653,17 @@ Note: This will only remove them from the run, not delete them from the project.
         const target = e.target;
         const caseId = parseInt(target.dataset.caseId || "0", 10);
         toggleCaseSelection(caseId, target.checked);
+      });
+    });
+    const evidenceButtons = casesList.querySelectorAll(".view-evidence-btn");
+    evidenceButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const target = event.currentTarget;
+        const testId = Number(target.dataset.testId || "0");
+        const testTitle = target.dataset.testTitle || "";
+        if (!Number.isFinite(testId) || testId <= 0) return;
+        loadRunEvidence(testId, testTitle);
       });
     });
   }
@@ -2710,23 +2841,6 @@ Note: This will only remove them from the run, not delete them from the project.
         }
       }
     });
-    const createSectionToggle = document.querySelector(".create-section-toggle");
-    const createSectionContent = document.getElementById("createSectionContent");
-    if (createSectionToggle && createSectionContent) {
-      createSectionToggle.addEventListener("click", () => {
-        const isExpanded = createSectionToggle.getAttribute("aria-expanded") === "true";
-        createSectionToggle.setAttribute("aria-expanded", isExpanded ? "false" : "true");
-        if (isExpanded) {
-          createSectionContent.classList.add("hidden");
-        } else {
-          createSectionContent.classList.remove("hidden");
-        }
-        const indicator = createSectionToggle.querySelector(".toggle-indicator");
-        if (indicator) {
-          indicator.textContent = isExpanded ? "\u25BC" : "\u25B2";
-        }
-      });
-    }
     (_e = document.getElementById("refreshPlansBtn")) == null ? void 0 : _e.addEventListener("click", refreshPlanList);
     const plansSearchInput = document.getElementById("plansSearch");
     if (plansSearchInput) {
@@ -4034,6 +4148,7 @@ Note: This will only remove them from the run, not delete them from the project.
       if (descEl) descEl.value = "";
       if (milestoneEl) milestoneEl.value = "";
       await refreshPlanList();
+      resetCreateWizard("planCreateForm");
     } catch (err) {
       showToast((err == null ? void 0 : err.message) || "Failed to create plan", "error");
     }
@@ -4086,6 +4201,7 @@ Note: This will only remove them from the run, not delete them from the project.
       resetSelectedCases();
       updateCasePickerStatus();
       applySelectionToList();
+      resetCreateWizard("runCreateForm");
     } catch (err) {
       showToast((err == null ? void 0 : err.message) || "Failed to create run", "error");
     }
@@ -4118,6 +4234,7 @@ Note: This will only remove them from the run, not delete them from the project.
       if (caseTitleEl) caseTitleEl.value = "";
       if (caseRefs) caseRefs.value = "";
       if (caseBdd) caseBdd.value = "";
+      resetCreateWizard("caseCreateForm");
     } catch (err) {
       showToast((err == null ? void 0 : err.message) || "Failed to create case", "error");
     }
@@ -4184,13 +4301,741 @@ Note: This will only remove them from the run, not delete them from the project.
       }
     }
   };
+  function formatSummaryText(value) {
+    const cleaned = value.trim().replace(/\s+/g, " ");
+    if (!cleaned) return "\u2014";
+    if (cleaned.length <= 120) return cleaned;
+    return `${cleaned.slice(0, 117)}...`;
+  }
+  function formatBddSummary(value) {
+    const cleaned = value.trim();
+    if (!cleaned) return "\u2014";
+    const lines = cleaned.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (lines.length > 3) return `${lines.length} steps`;
+    return formatSummaryText(lines.join(" / "));
+  }
+  function getWizardSummaryValue(form, key) {
+    var _a, _b, _c, _d;
+    if (key === "runScope") {
+      const includeAll = (_b = (_a = document.getElementById("runIncludeAll")) == null ? void 0 : _a.checked) != null ? _b : false;
+      const manualIds = parseIdList(((_c = document.getElementById("runCaseIds")) == null ? void 0 : _c.value) || "");
+      const selectedCount = getSelectedCases().size;
+      const manualCount = manualIds.filter((id) => Number.isFinite(id)).length + selectedCount;
+      if (manualCount > 0) {
+        return `Manual selection (${manualCount} case${manualCount === 1 ? "" : "s"})`;
+      }
+      return includeAll ? "All cases" : "Manual selection";
+    }
+    if (key === "caseBdd") {
+      const bddField = document.getElementById("caseBdd");
+      return bddField ? formatBddSummary(bddField.value) : "\u2014";
+    }
+    const field = form.querySelector(`#${key}`);
+    if (!field) return "\u2014";
+    if (field instanceof HTMLSelectElement) {
+      const option = field.selectedOptions[0];
+      return ((_d = option == null ? void 0 : option.textContent) == null ? void 0 : _d.trim()) || (option == null ? void 0 : option.value) || "\u2014";
+    }
+    if (field instanceof HTMLInputElement && field.type === "checkbox") {
+      return field.checked ? "Yes" : "No";
+    }
+    return formatSummaryText(field.value || "");
+  }
+  function updateWizardSummary(form) {
+    const summaryEls = Array.from(form.querySelectorAll("[data-summary]"));
+    summaryEls.forEach((el) => {
+      const key = el.dataset.summary;
+      if (!key) return;
+      el.textContent = getWizardSummaryValue(form, key);
+    });
+  }
+  function validateWizardStep(stepContent) {
+    const fields = Array.from(stepContent.querySelectorAll(
+      "input, select, textarea"
+    ));
+    let isValid = true;
+    let firstInvalid = null;
+    fields.forEach((field) => {
+      const required = field.hasAttribute("required") || field.getAttribute("aria-required") === "true";
+      if (!required || field.disabled) {
+        field.classList.remove("input-invalid");
+        return;
+      }
+      if (!field.checkValidity()) {
+        isValid = false;
+        field.classList.add("input-invalid");
+        if (!firstInvalid) firstInvalid = field;
+      } else {
+        field.classList.remove("input-invalid");
+      }
+    });
+    if (firstInvalid) {
+      firstInvalid.reportValidity();
+    }
+    return isValid;
+  }
+  function applyWizardStep(form, step) {
+    const steps = Array.from(form.querySelectorAll(".create-step-content"));
+    const chips = Array.from(form.querySelectorAll(".create-step-chip"));
+    if (!steps.length || !chips.length) return;
+    const totalSteps = steps.length;
+    const nextStep = Math.max(1, Math.min(totalSteps, step));
+    form.dataset.currentStep = String(nextStep);
+    form.dataset.totalSteps = String(totalSteps);
+    steps.forEach((content) => {
+      const contentStep = Number(content.dataset.step || "0");
+      content.classList.toggle("is-active", contentStep === nextStep);
+    });
+    chips.forEach((chip) => {
+      const chipStep = Number(chip.dataset.step || "0");
+      const isActive = chipStep === nextStep;
+      chip.classList.toggle("is-active", isActive);
+      chip.classList.toggle("is-complete", chipStep < nextStep);
+      chip.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    updateWizardSummary(form);
+  }
+  function initCreateWizards() {
+    const forms = Array.from(document.querySelectorAll("form[data-wizard]"));
+    forms.forEach((form) => {
+      const steps = Array.from(form.querySelectorAll(".create-step-content"));
+      const chips = Array.from(form.querySelectorAll(".create-step-chip"));
+      if (!steps.length || !chips.length) return;
+      const getCurrentStep = () => Number(form.dataset.currentStep || "1");
+      const goToStep = (step) => {
+        applyWizardStep(form, step);
+      };
+      const goNext = () => {
+        const currentStep = getCurrentStep();
+        const currentContent = steps[currentStep - 1];
+        if (!currentContent || !validateWizardStep(currentContent)) return;
+        goToStep(currentStep + 1);
+      };
+      const goPrev = () => {
+        const currentStep = getCurrentStep();
+        goToStep(currentStep - 1);
+      };
+      form.querySelectorAll("[data-step-next]").forEach((btn) => {
+        btn.addEventListener("click", (event) => {
+          event.preventDefault();
+          goNext();
+        });
+      });
+      form.querySelectorAll("[data-step-prev]").forEach((btn) => {
+        btn.addEventListener("click", (event) => {
+          event.preventDefault();
+          goPrev();
+        });
+      });
+      chips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+          const targetStep = Number(chip.dataset.step || "1");
+          const currentStep = getCurrentStep();
+          if (targetStep === currentStep) return;
+          if (targetStep < currentStep) {
+            goToStep(targetStep);
+            return;
+          }
+          let canAdvance = true;
+          for (let i = 0; i < targetStep - 1; i += 1) {
+            if (!validateWizardStep(steps[i])) {
+              canAdvance = false;
+              break;
+            }
+          }
+          if (canAdvance) {
+            goToStep(targetStep);
+          }
+        });
+      });
+      form.addEventListener("submit", (event) => {
+        const currentStep = getCurrentStep();
+        if (currentStep < steps.length) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          goNext();
+        }
+      });
+      form.addEventListener("input", (event) => {
+        const target = event.target;
+        if (target && "checkValidity" in target && target.classList.contains("input-invalid")) {
+          if (target.checkValidity()) {
+            target.classList.remove("input-invalid");
+          }
+        }
+        updateWizardSummary(form);
+      });
+      form.addEventListener("change", () => updateWizardSummary(form));
+      applyWizardStep(form, 1);
+    });
+  }
+  function resetCreateWizard(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    form.querySelectorAll(".input-invalid").forEach((el) => el.classList.remove("input-invalid"));
+    applyWizardStep(form, 1);
+  }
+  function stripAutomationHtml(value) {
+    const lowered = value.toLowerCase();
+    if (!lowered.includes("<p") && !lowered.includes("<br") && !lowered.includes("</")) {
+      return value;
+    }
+    let text = value.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n").replace(/<\/div>/gi, "\n");
+    text = text.replace(/<[^>]+>/g, "");
+    const textarea = document.createElement("textarea");
+    textarea.innerHTML = text;
+    return textarea.value;
+  }
+  function stripJsonFence(value) {
+    const trimmed = value.trim();
+    const match = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (match) {
+      return match[1].trim();
+    }
+    return value;
+  }
+  function normalizeAutomationPayload(value, stripHtml) {
+    let text = value;
+    if (stripHtml) {
+      text = stripAutomationHtml(text);
+    }
+    text = stripJsonFence(text);
+    return text.trim();
+  }
+  function formatAutomationPayload(value) {
+    if (value === null || value === void 0) return "";
+    if (typeof value === "string") {
+      const normalized = normalizeAutomationPayload(value, true);
+      if (!normalized) return "";
+      try {
+        return JSON.stringify(JSON.parse(normalized), null, 2);
+      } catch (e) {
+        return normalized;
+      }
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return String(value);
+    }
+  }
+  function parseAutomationPayload(text) {
+    const normalized = normalizeAutomationPayload(text, false);
+    if (!normalized) return "";
+    try {
+      return JSON.parse(normalized);
+    } catch (e) {
+      return normalized;
+    }
+  }
+  function initAutomationManagement() {
+    const casesByType = { api: [], web: [] };
+    const caseMaps = {
+      api: /* @__PURE__ */ new Map(),
+      web: /* @__PURE__ */ new Map()
+    };
+    const apiSearch = document.getElementById("automationApiSearch");
+    const webSearch = document.getElementById("automationWebSearch");
+    const apiList = document.getElementById("automationApiCaseList");
+    const webList = document.getElementById("automationWebCaseList");
+    const apiRefreshBtn = document.getElementById("automationApiRefreshBtn");
+    const webRefreshBtn = document.getElementById("automationWebRefreshBtn");
+    const runApp = document.getElementById("automationRunApp");
+    const runType = document.getElementById("automationRunType");
+    const runEnv = document.getElementById("automationRunEnv");
+    const runTag = document.getElementById("automationRunTag");
+    const allureLabel = document.getElementById("automationAllureLabel");
+    const runParallel = document.getElementById("automationRunParallel");
+    const runUseSelected = document.getElementById("automationRunUseSelectedBtn");
+    const runBtn = document.getElementById("automationRunBtn");
+    const runStatus = document.getElementById("automationRunStatus");
+    const runProgressBar = document.getElementById("automationRunProgressBar");
+    const runLog = document.getElementById("automationRunLog");
+    const runStorageKey = "automationRunId";
+    let runPoller = null;
+    const allureBtn = document.getElementById("automationAllureBtn");
+    const allureStatus = document.getElementById("automationAllureStatus");
+    const allureLink = document.getElementById("automationAllureLink");
+    const repoWarning = document.getElementById("automationRepoWarning");
+    let canLoadCases = true;
+    const apiCaseInput = document.getElementById("automationApiCaseId");
+    const apiLoadBtn = document.getElementById("automationApiLoadBtn");
+    const apiSaveBtn = document.getElementById("automationApiSaveBtn");
+    const apiEditor = document.getElementById("automationApiPayloadEditor");
+    const apiTitle = document.getElementById("automationApiCaseTitle");
+    const apiTags = document.getElementById("automationApiTags");
+    const apiFeaturePath = document.getElementById("automationApiFeaturePath");
+    const webCaseInput = document.getElementById("automationWebCaseId");
+    const webLoadBtn = document.getElementById("automationWebLoadBtn");
+    const webSaveBtn = document.getElementById("automationWebSaveBtn");
+    const webEditor = document.getElementById("automationWebInputsEditor");
+    const webTitle = document.getElementById("automationWebCaseTitle");
+    const webTags = document.getElementById("automationWebTags");
+    const webFeaturePath = document.getElementById("automationWebFeaturePath");
+    const webPreview = document.getElementById("automationWebPreview");
+    let selectedCase = null;
+    const renderTags = (container, kind, item) => {
+      if (!container) return;
+      const tags = /* @__PURE__ */ new Set();
+      tags.add(kind === "api" ? "@api" : "@e2e");
+      tags.add(`@C${item.id}`);
+      (item.tags || []).forEach((tag) => {
+        if (!tag.startsWith("@C")) tags.add(tag);
+      });
+      if (item.feature_group) {
+        tags.add(item.feature_group);
+      }
+      container.innerHTML = "";
+      Array.from(tags).forEach((tag) => {
+        const span = document.createElement("span");
+        span.className = "automation-tag";
+        span.textContent = tag;
+        container.appendChild(span);
+      });
+    };
+    const applyCaseMeta = (kind, item) => {
+      const titleText = `C${item.id} \u2014 ${item.title || "Untitled case"}`;
+      if (kind === "api") {
+        if (apiTitle) apiTitle.textContent = titleText;
+        if (apiFeaturePath) apiFeaturePath.textContent = item.feature_path || "\u2014";
+        renderTags(apiTags, "api", item);
+      } else {
+        if (webTitle) webTitle.textContent = titleText;
+        if (webFeaturePath) webFeaturePath.textContent = item.feature_path || "\u2014";
+        renderTags(webTags, "web", item);
+      }
+    };
+    const ensureSelectedCard = (listEl, card) => {
+      if (!listEl || !card) return;
+      listEl.querySelectorAll(".automation-case-card").forEach((el) => {
+        el.classList.remove("is-active");
+      });
+      card.classList.add("is-active");
+    };
+    const renderCaseList = (kind, list) => {
+      const listEl = kind === "api" ? apiList : webList;
+      if (!listEl) return;
+      listEl.innerHTML = "";
+      if (!list.length) {
+        const empty = document.createElement("div");
+        empty.className = "automation-case-card";
+        empty.textContent = "No cases found.";
+        listEl.appendChild(empty);
+        return;
+      }
+      list.forEach((item) => {
+        const card = document.createElement("div");
+        card.className = "automation-case-card";
+        card.dataset.automationCase = "true";
+        card.dataset.caseId = String(item.id);
+        card.dataset.caseType = kind;
+        card.dataset.caseTitle = item.title || "";
+        card.dataset.featurePath = item.feature_path || "";
+        card.dataset.feature = item.feature || "";
+        card.dataset.featureGroup = item.feature_group || "";
+        card.dataset.method = item.method || "";
+        card.dataset.endpoint = item.endpoint || "";
+        card.dataset.tags = JSON.stringify(item.tags || []);
+        const title = document.createElement("div");
+        title.className = "automation-case-title";
+        title.textContent = `C${item.id} \u2014 ${item.title || "Untitled case"}`;
+        const featureLine = document.createElement("div");
+        featureLine.className = "automation-case-meta-line";
+        featureLine.textContent = `Feature: ${item.feature || item.feature_group || "\u2014"}`;
+        const detailLine = document.createElement("div");
+        detailLine.className = "automation-case-meta-line";
+        if (kind === "api") {
+          const endpointLabel = item.endpoint ? `${item.method ? `${item.method} ` : ""}${item.endpoint}` : item.feature_path || "\u2014";
+          detailLine.textContent = `Endpoint: ${endpointLabel}`;
+        } else {
+          detailLine.textContent = `File: ${item.feature_path || "\u2014"}`;
+        }
+        const actions = document.createElement("div");
+        actions.className = "automation-case-actions";
+        const openBtn = document.createElement("button");
+        openBtn.type = "button";
+        openBtn.className = "refresh-btn";
+        openBtn.dataset.action = "open";
+        openBtn.textContent = kind === "api" ? "Open Payload" : "Open Inputs";
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "refresh-btn";
+        copyBtn.dataset.action = "copy";
+        copyBtn.textContent = "Copy Case ID";
+        actions.appendChild(openBtn);
+        actions.appendChild(copyBtn);
+        card.appendChild(title);
+        card.appendChild(featureLine);
+        card.appendChild(detailLine);
+        card.appendChild(actions);
+        listEl.appendChild(card);
+      });
+    };
+    const updateMetaFromId = (kind, caseId) => {
+      const item = caseMaps[kind].get(caseId);
+      if (!item) {
+        const fallback = { id: caseId, title: `Case ${caseId}` };
+        applyCaseMeta(kind, fallback);
+        return;
+      }
+      applyCaseMeta(kind, item);
+    };
+    const loadCase = async (kind) => {
+      const input = kind === "api" ? apiCaseInput : webCaseInput;
+      if (!input) return;
+      const caseId = parseIntMaybe(input.value);
+      if (!caseId) {
+        showToast("Provide a valid case ID.", "error");
+        return;
+      }
+      try {
+        const data = await requestJson(`/api/automation/case/${caseId}`);
+        if (kind === "api") {
+          updateMetaFromId("api", caseId);
+          if (apiEditor) apiEditor.value = formatAutomationPayload((data == null ? void 0 : data.api_payload) || "");
+        } else {
+          updateMetaFromId("web", caseId);
+          if (webEditor) webEditor.value = formatAutomationPayload((data == null ? void 0 : data.web_inputs) || "");
+          if (webPreview && webEditor) {
+            webPreview.textContent = webEditor.value || "{}";
+          }
+        }
+        selectedCase = { id: caseId, kind };
+        showToast(`Loaded case C${caseId}`, "success");
+      } catch (err) {
+        showToast((err == null ? void 0 : err.message) || "Failed to load case", "error");
+      }
+    };
+    const saveCase = async (kind) => {
+      const input = kind === "api" ? apiCaseInput : webCaseInput;
+      const editor = kind === "api" ? apiEditor : webEditor;
+      if (!input || !editor) return;
+      const caseId = parseIntMaybe(input.value);
+      if (!caseId) {
+        showToast("Provide a valid case ID.", "error");
+        return;
+      }
+      const payloadValue = parseAutomationPayload(editor.value);
+      const body = kind === "api" ? { api_payload: payloadValue } : { web_inputs: payloadValue };
+      try {
+        await requestJson(`/api/automation/case/${caseId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        if (kind === "web" && webPreview) {
+          webPreview.textContent = editor.value || "{}";
+        }
+        showToast(`Saved automation data for C${caseId}`, "success");
+      } catch (err) {
+        showToast((err == null ? void 0 : err.message) || "Failed to save automation data", "error");
+      }
+    };
+    apiLoadBtn == null ? void 0 : apiLoadBtn.addEventListener("click", () => loadCase("api"));
+    webLoadBtn == null ? void 0 : webLoadBtn.addEventListener("click", () => loadCase("web"));
+    apiSaveBtn == null ? void 0 : apiSaveBtn.addEventListener("click", () => saveCase("api"));
+    webSaveBtn == null ? void 0 : webSaveBtn.addEventListener("click", () => saveCase("web"));
+    const handleCaseListClick = (kind, event) => {
+      var _a;
+      const target = event.target;
+      const listEl = kind === "api" ? apiList : webList;
+      if (!target || !listEl) return;
+      const card = target.closest(".automation-case-card");
+      if (!card || !listEl.contains(card)) return;
+      const caseId = parseIntMaybe(card.dataset.caseId || "");
+      if (!caseId) return;
+      const action = (_a = target.closest("[data-action]")) == null ? void 0 : _a.dataset.action;
+      if (action === "copy") {
+        event.stopPropagation();
+        if (!navigator.clipboard) {
+          showToast("Clipboard not available", "error");
+          return;
+        }
+        navigator.clipboard.writeText(String(caseId)).then(() => showToast(`Copied C${caseId}`, "success")).catch(() => showToast("Failed to copy case ID", "error"));
+        return;
+      }
+      if (kind === "api" && apiCaseInput) apiCaseInput.value = String(caseId);
+      if (kind === "web" && webCaseInput) webCaseInput.value = String(caseId);
+      updateMetaFromId(kind, caseId);
+      ensureSelectedCard(listEl, card);
+      selectedCase = { id: caseId, kind };
+      loadCase(kind);
+    };
+    apiList == null ? void 0 : apiList.addEventListener("click", (event) => handleCaseListClick("api", event));
+    webList == null ? void 0 : webList.addEventListener("click", (event) => handleCaseListClick("web", event));
+    const fetchCaseList = async (kind) => {
+      if (!canLoadCases) {
+        const listEl = kind === "api" ? apiList : webList;
+        if (listEl) {
+          listEl.innerHTML = "";
+          const warning = document.createElement("div");
+          warning.className = "automation-case-card";
+          warning.textContent = "Feature files are not available on this host.";
+          listEl.appendChild(warning);
+        }
+        return;
+      }
+      try {
+        const data = await requestJson(
+          `/api/automation/cases?case_type=${kind}`
+        );
+        const list = Array.isArray(data == null ? void 0 : data.cases) ? data.cases : [];
+        casesByType[kind] = list;
+        caseMaps[kind] = new Map(list.map((item) => [item.id, item]));
+        renderCaseList(kind, list);
+      } catch (err) {
+        const listEl = kind === "api" ? apiList : webList;
+        if (listEl) {
+          listEl.innerHTML = "";
+          const errorCard = document.createElement("div");
+          errorCard.className = "automation-case-card";
+          errorCard.textContent = (err == null ? void 0 : err.message) || "Failed to load cases.";
+          listEl.appendChild(errorCard);
+        }
+      }
+    };
+    const filterCasesByQuery = (kind, query) => {
+      const normalized = query.trim().toLowerCase();
+      const list = casesByType[kind];
+      if (!normalized) {
+        renderCaseList(kind, list);
+        return;
+      }
+      const filtered = list.filter((item) => {
+        const idMatch = String(item.id).includes(normalized);
+        const titleMatch = (item.title || "").toLowerCase().includes(normalized);
+        const featureMatch = (item.feature || "").toLowerCase().includes(normalized);
+        return idMatch || titleMatch || featureMatch;
+      });
+      renderCaseList(kind, filtered);
+    };
+    apiSearch == null ? void 0 : apiSearch.addEventListener("input", () => {
+      filterCasesByQuery("api", apiSearch.value);
+    });
+    webSearch == null ? void 0 : webSearch.addEventListener("input", () => {
+      filterCasesByQuery("web", webSearch.value);
+    });
+    apiRefreshBtn == null ? void 0 : apiRefreshBtn.addEventListener("click", () => fetchCaseList("api"));
+    webRefreshBtn == null ? void 0 : webRefreshBtn.addEventListener("click", () => fetchCaseList("web"));
+    const applyAutomationStatus = (status) => {
+      const warnings = [];
+      const repoOk = Boolean(status == null ? void 0 : status.repo_root_ok);
+      const featuresOk = Boolean(status == null ? void 0 : status.features_root_ok);
+      const appOk = Boolean(status == null ? void 0 : status.app_root_ok);
+      const npmOk = Boolean(status == null ? void 0 : status.npm_available);
+      if (!repoOk) {
+        warnings.push("Automation repo not found. Set AUTOMATION_REPO_ROOT and mount the repo.");
+      }
+      if (!appOk) {
+        warnings.push("Automation app path not found inside the repo.");
+      }
+      if (!featuresOk) {
+        warnings.push("Feature files not found. Set AUTOMATION_FEATURES_ROOT.");
+      }
+      if (!npmOk) {
+        warnings.push("npm is not available in this environment.");
+      }
+      canLoadCases = featuresOk;
+      if (repoWarning) {
+        if (warnings.length) {
+          repoWarning.textContent = warnings.join(" ");
+          repoWarning.style.display = "block";
+        } else {
+          repoWarning.textContent = "";
+          repoWarning.style.display = "none";
+        }
+      }
+      const canRun = repoOk && appOk && npmOk;
+      if (runBtn) runBtn.disabled = !canRun;
+      if (allureBtn) allureBtn.disabled = !canRun;
+      if (!canRun && runStatus) {
+        runStatus.textContent = "Automation runner is unavailable on this host.";
+      }
+      if (!featuresOk) {
+        fetchCaseList("api");
+        fetchCaseList("web");
+      }
+    };
+    const loadAutomationStatus = async () => {
+      try {
+        const status = await requestJson("/api/automation/status");
+        applyAutomationStatus(status);
+      } catch (err) {
+        if (repoWarning) {
+          repoWarning.textContent = (err == null ? void 0 : err.message) || "Failed to load automation status.";
+          repoWarning.style.display = "block";
+        }
+      }
+    };
+    loadAutomationStatus();
+    runUseSelected == null ? void 0 : runUseSelected.addEventListener("click", () => {
+      if (!selectedCase) {
+        showToast("Select a case first.", "error");
+        return;
+      }
+      if (runTag) {
+        runTag.value = `@C${selectedCase.id}`;
+      }
+      if (runType) {
+        runType.value = selectedCase.kind === "api" ? "api" : "e2e";
+      }
+      if (runStatus) {
+        runStatus.textContent = `Ready to run C${selectedCase.id}.`;
+      }
+    });
+    runBtn == null ? void 0 : runBtn.addEventListener("click", async () => {
+      const wantsParallel = ((runParallel == null ? void 0 : runParallel.value) || "false") === "true";
+      if (wantsParallel) {
+        showToast("Parallel runs are not supported locally yet.", "error");
+        return;
+      }
+      const payload = {
+        app_name: (runApp == null ? void 0 : runApp.value) || "lokasi_intelligence",
+        test_type: (runType == null ? void 0 : runType.value) || "api",
+        test_tag: (runTag == null ? void 0 : runTag.value.trim()) || "",
+        environment: (runEnv == null ? void 0 : runEnv.value) || "staging",
+        parallel: wantsParallel
+      };
+      if (runStatus) {
+        runStatus.textContent = "Dispatching workflow...";
+      }
+      try {
+        const response = await requestJson("/api/automation/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const runId = (response == null ? void 0 : response.run_id) || "";
+        if (runId) {
+          localStorage.setItem(runStorageKey, runId);
+        }
+        if (runStatus) {
+          const logPath = (response == null ? void 0 : response.log_path) ? ` Logs: ${response.log_path}` : "";
+          const envPath = (response == null ? void 0 : response.env_path) ? ` Env: ${response.env_path}` : "";
+          runStatus.textContent = `Run started (PID ${(response == null ? void 0 : response.pid) || "?"}).${logPath}${envPath}`;
+        }
+        if (runProgressBar) {
+          runProgressBar.style.width = "0%";
+        }
+        if (runLog) {
+          runLog.textContent = "Waiting for logs...";
+        }
+        if (runId) {
+          startRunPolling(runId);
+        }
+        showToast("Automation run started.", "success");
+      } catch (err) {
+        if (runStatus) {
+          runStatus.textContent = (err == null ? void 0 : err.message) || "Dispatch failed.";
+        }
+        showToast((err == null ? void 0 : err.message) || "Failed to dispatch workflow.", "error");
+      }
+    });
+    allureBtn == null ? void 0 : allureBtn.addEventListener("click", async () => {
+      const payload = {
+        app_name: (runApp == null ? void 0 : runApp.value) || "lokasi_intelligence",
+        output_label: (allureLabel == null ? void 0 : allureLabel.value.trim()) || ""
+      };
+      if (allureStatus) {
+        allureStatus.textContent = "Generating Allure report...";
+      }
+      if (allureLink) {
+        allureLink.style.display = "none";
+        allureLink.removeAttribute("href");
+      }
+      try {
+        const response = await requestJson("/api/automation/allure-report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const url = (response == null ? void 0 : response.url) || "";
+        if (allureStatus) {
+          allureStatus.textContent = "Allure report generated.";
+        }
+        if (allureLink && url) {
+          allureLink.href = url;
+          allureLink.style.display = "inline-flex";
+          allureLink.textContent = "Open Allure Report";
+        }
+        showToast("Allure report generated.", "success");
+      } catch (err) {
+        if (allureStatus) {
+          allureStatus.textContent = (err == null ? void 0 : err.message) || "Allure report failed.";
+        }
+        showToast((err == null ? void 0 : err.message) || "Failed to generate Allure report.", "error");
+      }
+    });
+    const stopRunPolling = () => {
+      if (runPoller !== null) {
+        window.clearInterval(runPoller);
+        runPoller = null;
+      }
+    };
+    const updateRunUI = (data) => {
+      var _a;
+      const status = (data == null ? void 0 : data.status) || "unknown";
+      const completed = (_a = data == null ? void 0 : data.completed_cases) != null ? _a : 0;
+      const total = data == null ? void 0 : data.total_cases;
+      const progress = data == null ? void 0 : data.progress_percent;
+      const summaryParts = [`Status: ${status}`];
+      if (typeof total === "number") {
+        summaryParts.push(`Progress: ${completed}/${total}`);
+      } else {
+        summaryParts.push("Progress: n/a");
+      }
+      if (typeof progress === "number") {
+        summaryParts.push(`${progress}%`);
+      }
+      if (data == null ? void 0 : data.last_log_line) {
+        summaryParts.push(`Last: ${data.last_log_line}`);
+      }
+      if (runStatus) {
+        runStatus.textContent = summaryParts.join(" \xB7 ");
+      }
+      if (runProgressBar) {
+        runProgressBar.style.width = typeof progress === "number" ? `${progress}%` : "0%";
+      }
+      if (runLog && Array.isArray(data == null ? void 0 : data.log_tail)) {
+        runLog.textContent = data.log_tail.join("\n") || "No logs yet.";
+      }
+    };
+    const pollRunStatus = async (runId) => {
+      try {
+        const data = await requestJson(`/api/automation/run/${encodeURIComponent(runId)}`);
+        updateRunUI(data);
+        if ((data == null ? void 0 : data.status) === "success" || (data == null ? void 0 : data.status) === "failed") {
+          stopRunPolling();
+        }
+      } catch (err) {
+        if (runStatus) {
+          runStatus.textContent = (err == null ? void 0 : err.message) || "Failed to fetch run status.";
+        }
+        localStorage.removeItem(runStorageKey);
+        stopRunPolling();
+      }
+    };
+    const startRunPolling = (runId) => {
+      stopRunPolling();
+      pollRunStatus(runId);
+      runPoller = window.setInterval(() => pollRunStatus(runId), 5e3);
+    };
+    const existingRunId = localStorage.getItem(runStorageKey);
+    if (existingRunId) {
+      startRunPolling(existingRunId);
+    }
+    fetchCaseList("api");
+    fetchCaseList("web");
+  }
   function init() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
     setupThemeToggle();
     updateReportMeta(void 0);
     loadPlans().catch((err) => console.error("loadPlans error", err));
     loadManagePlans().catch((err) => console.error("loadManagePlans error", err));
     initManagement();
+    initCreateWizards();
+    initAutomationManagement();
     window.initManageView = initManageView;
     const runSearch = document.getElementById("runSearch");
     if (runSearch) {
@@ -4251,14 +5096,18 @@ Note: This will only remove them from the run, not delete them from the project.
       e.preventDefault();
       switchView("manage");
     });
-    (_q = document.getElementById("linkHowTo")) == null ? void 0 : _q.addEventListener("click", (e) => {
+    (_q = document.getElementById("linkAutomation")) == null ? void 0 : _q.addEventListener("click", (e) => {
+      e.preventDefault();
+      switchView("automation");
+    });
+    (_r = document.getElementById("linkHowTo")) == null ? void 0 : _r.addEventListener("click", (e) => {
       e.preventDefault();
       switchView("howto");
     });
-    (_r = document.getElementById("runProject")) == null ? void 0 : _r.addEventListener("change", () => {
+    (_s = document.getElementById("runProject")) == null ? void 0 : _s.addEventListener("change", () => {
       loadManagePlans();
     });
-    (_s = document.getElementById("caseProject")) == null ? void 0 : _s.addEventListener("change", () => {
+    (_t = document.getElementById("caseProject")) == null ? void 0 : _t.addEventListener("change", () => {
       loadManagePlans();
     });
     document.querySelectorAll(".panel-toggle").forEach((btn) => {

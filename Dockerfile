@@ -2,6 +2,9 @@
 # --- Build Stage (for development dependencies and running checks) ---
 FROM python:3.11 AS builder
 
+ARG ORBIS_AUTOMATION_REPO="https://github.com/bvarta-tech/orbis-test-automation.git"
+ARG ORBIS_AUTOMATION_REF="testrail-automation-management"
+
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -26,6 +29,11 @@ RUN if [ ! -f dataset_generator/file_generator.py ]; then \
       fi; \
     fi
 
+# Bake orbis-test-automation into the image so automation features work in deployed environments
+RUN if [ -n "$ORBIS_AUTOMATION_REPO" ]; then \
+      git clone --depth=1 --branch "$ORBIS_AUTOMATION_REF" --single-branch "$ORBIS_AUTOMATION_REPO" /opt/orbis-test-automation; \
+    fi
+
 # Run linting, formatting checks, type checking, and unit tests
 # Note: These commands will cause the build to fail if checks do not pass
 RUN ruff format --check .
@@ -38,14 +46,21 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ARG ORBIS_AUTOMATION_REPO="https://github.com/bvarta-tech/orbis-test-automation.git"
+ARG ORBIS_AUTOMATION_REF="testrail-automation-management"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PORT=8080
+    PORT=8080 \
+    AUTOMATION_REPO_ROOT=/opt/orbis-test-automation \
+    AUTOMATION_FEATURES_ROOT=/opt/orbis-test-automation/apps/lokasi_intelligence/cypress \
+    ORBIS_AUTOMATION_REPO=${ORBIS_AUTOMATION_REPO} \
+    ORBIS_AUTOMATION_REF=${ORBIS_AUTOMATION_REF}
 
-# System deps (ffmpeg for video transcoding, jemalloc for memory management)
+# System deps (ffmpeg for video transcoding, jemalloc for memory management, node/npm for automation)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates libjemalloc2 ffmpeg && rm -rf /var/lib/apt/lists/*
+    curl ca-certificates libjemalloc2 ffmpeg nodejs npm git && rm -rf /var/lib/apt/lists/*
 
 ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 \
     MALLOC_CONF="background_thread:true,dirty_decay_ms:400,muzzy_decay_ms:400"
@@ -64,8 +79,10 @@ COPY --from=builder /app/testrail_daily_report.py ./testrail_daily_report.py
 COPY --from=builder /app/.env.example ./.env.example
 COPY --from=builder /app/pyproject.toml ./pyproject.toml
 COPY --from=builder /app/Procfile ./Procfile
+COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /opt/orbis-test-automation /opt/orbis-test-automation
 
 EXPOSE 8080
 
-# Start the Uvicorn application (pytest removed)
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1 --timeout-keep-alive 120
+# Start the application (sync automation repo if configured)
+CMD ["/app/scripts/start.sh"]

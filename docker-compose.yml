@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  testrail:
+    build:
+      context: .
+      args:
+        ORBIS_AUTOMATION_REPO: ${ORBIS_AUTOMATION_REPO:-https://github.com/bvarta-tech/orbis-test-automation.git}
+        ORBIS_AUTOMATION_REF: ${ORBIS_AUTOMATION_REF:-testrail-automation-management}
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      AUTOMATION_REPO_ROOT: /opt/orbis-test-automation
+      AUTOMATION_FEATURES_ROOT: /opt/orbis-test-automation/apps/lokasi_intelligence/cypress
+      AUTOMATION_GIT_SYNC: ${AUTOMATION_GIT_SYNC:-0}
+      AUTOMATION_NPM_INSTALL: ${AUTOMATION_NPM_INSTALL:-1}
+    volumes:
+      - ../orbis-test-automation:/opt/orbis-test-automation:rw

@@ -1,22 +1,26 @@
-export function switchView(target: "reporter" | "manage" | "howto" | "dashboard") {
+export function switchView(target: "reporter" | "manage" | "howto" | "dashboard" | "automation") {
   const reporter = document.getElementById("reporterView");
   const manage = document.getElementById("manageView");
+  const automation = document.getElementById("automationView");
   const howto = document.getElementById("howToView");
   const dashboard = document.getElementById("dashboardView");
   const linkReporter = document.getElementById("linkReporter");
   const linkManage = document.getElementById("linkManage");
+  const linkAutomation = document.getElementById("linkAutomation");
   const linkHowto = document.getElementById("linkHowTo");
   const linkDashboard = document.getElementById("linkDashboard");
   
   // Hide all views
   reporter?.classList.add("hidden");
   manage?.classList.add("hidden");
+  automation?.classList.add("hidden");
   howto?.classList.add("hidden");
   dashboard?.classList.add("hidden");
   
   // Remove active state from all nav links
   linkReporter?.classList.remove("active");
   linkManage?.classList.remove("active");
+  linkAutomation?.classList.remove("active");
   linkHowto?.classList.remove("active");
   linkDashboard?.classList.remove("active");
   
@@ -28,6 +32,9 @@ export function switchView(target: "reporter" | "manage" | "howto" | "dashboard"
     if (typeof (window as any).initManageView === 'function') {
       (window as any).initManageView();
     }
+  } else if (target === "automation") {
+    automation?.classList.remove("hidden");
+    linkAutomation?.classList.add("active");
   } else if (target === "howto") {
     howto?.classList.remove("hidden");
     linkHowto?.classList.add("active");

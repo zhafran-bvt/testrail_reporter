@@ -1,17 +1,23 @@
 """Management API endpoints for CRUD operations."""
 
+import os
 import tempfile
 import time
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, cast
 
 import requests
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, Response
+from PIL import Image
+from starlette.background import BackgroundTask
 
 import app.core.dependencies as dependencies
 from app.core.config import config
 from app.core.dependencies import require_write_enabled
 from app.models.requests import AddTestResult, ManageCase, ManagePlan, ManageRun, UpdateCase, UpdatePlan, UpdateRun
+from testrail_client import AttachmentTooLarge
 
 router = APIRouter(prefix="/api/manage", tags=["management"])
 
@@ -21,6 +27,14 @@ def _resolve_testrail_client(request: Request):
     if override:
         return override()
     return dependencies.get_testrail_client()
+
+
+def _attachment_download_limit() -> int | None:
+    try:
+        limit = int(os.getenv("ATTACHMENT_MAX_BYTES", "0"))
+    except ValueError:
+        limit = 0
+    return limit if limit > 0 else None
 
 
 @router.post("/plan")
@@ -485,6 +499,165 @@ def get_case_attachments(case_id: int, client=Depends(_resolve_testrail_client))
         raise HTTPException(status_code=502, detail=f"Error connecting to TestRail API: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch attachments: {str(e)}")
+
+
+@router.get("/test/{test_id}/attachments")
+def get_test_attachments(test_id: int, client=Depends(_resolve_testrail_client)):
+    """Get list of attachments for a test (including result evidence)."""
+    if test_id < 1:
+        raise HTTPException(status_code=400, detail="Test ID must be positive")
+
+    try:
+        attachments = client.get_attachments_for_test(test_id)
+
+        seen_ids = set()
+        attachment_list = []
+        for att in attachments:
+            att_id = att.get("id")
+            if att_id is None or att_id in seen_ids:
+                continue
+
+            seen_ids.add(att_id)
+
+            att_name = att.get("name") or att.get("filename") or f"Attachment {att_id}"
+            att_fname = att.get("filename") or att.get("name") or f"attachment_{att_id}"
+            attachment_list.append(
+                {
+                    "id": att_id,
+                    "name": att_name,
+                    "filename": att_fname,
+                    "size": att.get("size") or 0,
+                    "content_type": att.get("content_type") or "application/octet-stream",
+                    "created_on": att.get("created_on") or 0,
+                    "result_id": att.get("result_id"),
+                }
+            )
+
+        return {
+            "attachments": attachment_list,
+            "count": len(attachment_list),
+        }
+
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch attachments: {str(e)}")
+
+
+@router.get("/attachment/{attachment_id}")
+def download_attachment_file(
+    attachment_id: int,
+    filename: str | None = None,
+    content_type: str | None = None,
+    client=Depends(_resolve_testrail_client),
+):
+    """Download a test case attachment file by attachment ID."""
+    if attachment_id < 1:
+        raise HTTPException(status_code=400, detail="Attachment ID must be positive")
+
+    try:
+        size_limit = _attachment_download_limit()
+        tmp_path, detected_type = client.download_attachment(attachment_id, size_limit=size_limit)
+        media_type = content_type or detected_type or "application/octet-stream"
+        download_name = filename or f"attachment_{attachment_id}"
+
+        def _cleanup():
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        return FileResponse(
+            tmp_path,
+            media_type=media_type,
+            filename=download_name,
+            background=BackgroundTask(_cleanup),
+        )
+    except AttachmentTooLarge as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download attachment: {str(e)}")
+
+
+@router.get("/attachment/{attachment_id}/preview")
+def preview_attachment_file(
+    attachment_id: int,
+    filename: str | None = None,
+    content_type: str | None = None,
+    client=Depends(_resolve_testrail_client),
+):
+    """Preview an attachment inline by attachment ID."""
+    if attachment_id < 1:
+        raise HTTPException(status_code=400, detail="Attachment ID must be positive")
+
+    try:
+        size_limit = _attachment_download_limit()
+        tmp_path, detected_type = client.download_attachment(attachment_id, size_limit=size_limit)
+        media_type = content_type or detected_type or "application/octet-stream"
+        preview_name = filename or f"attachment_{attachment_id}"
+
+        def _cleanup():
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        headers = {"Content-Disposition": f'inline; filename="{preview_name}"'}
+        return FileResponse(
+            tmp_path,
+            media_type=media_type,
+            headers=headers,
+            background=BackgroundTask(_cleanup),
+        )
+    except AttachmentTooLarge as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to preview attachment: {str(e)}")
+
+
+@router.get("/attachment/{attachment_id}/thumbnail")
+def download_attachment_thumbnail(attachment_id: int, client=Depends(_resolve_testrail_client)):
+    """Generate a small thumbnail for image attachments."""
+    if attachment_id < 1:
+        raise HTTPException(status_code=400, detail="Attachment ID must be positive")
+
+    try:
+        size_limit = _attachment_download_limit()
+        tmp_path, detected_type = client.download_attachment(attachment_id, size_limit=size_limit)
+        if not (detected_type or "").startswith("image/"):
+            raise HTTPException(status_code=415, detail="Attachment is not an image")
+
+        try:
+            with Image.open(tmp_path) as img:
+                img = img.convert("RGB")
+                resampling = getattr(Image, "Resampling", None)
+                if resampling is not None:
+                    resample = resampling.LANCZOS
+                else:
+                    resample = getattr(Image, "LANCZOS", 1)
+                img.thumbnail((160, 160), resample)
+                buffer = BytesIO()
+                img.save(buffer, format="JPEG", quality=70, optimize=True)
+                payload = buffer.getvalue()
+        finally:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        return Response(content=payload, media_type="image/jpeg")
+    except AttachmentTooLarge as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"TestRail API error: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate thumbnail: {str(e)}")
 
 
 @router.delete("/plan/{plan_id}")

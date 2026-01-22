@@ -545,10 +545,11 @@ class TestManagementViewHTMLStructure:
         assert response.status_code == 200
         html = response.text
 
-        # Verify Create section exists
-        assert 'class="create-section"' in html
-        assert 'class="create-section-toggle"' in html
-        assert 'id="createSectionContent"' in html
+        # Verify Create tabs exist
+        assert 'class="manage-create-tabs"' in html
+        assert 'class="manage-tablist"' in html
+        assert 'id="tabCreatePlan"' in html
+        assert 'id="createPlanTab"' in html
 
         # Verify Manage section exists
         assert 'class="manage-section"' in html
