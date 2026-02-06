@@ -143,7 +143,6 @@ def get_runs(plan: int | None = None, project: int = 1, runs_cache=Depends(_reso
                 }
             )
     runs.sort(key=lambda item: (item.get("is_completed", 0), item.get("name", "")))
-    print(f"[api_runs] plan={plan} returned {len(runs)} runs", flush=True)
     base_payload = {"count": len(runs), "runs": runs}
     expires_at = runs_cache.set(cache_key, base_payload)
     data = base_payload.copy()

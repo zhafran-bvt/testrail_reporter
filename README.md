@@ -73,6 +73,13 @@ uvicorn app.main:app --reload
 
 Open UI: `http://127.0.0.1:8000/` (alias: `/ui`)
 
+### Sidebar Menu Navigation (for contributors)
+
+- The sidebar view switch is controlled centrally by `switchView(...)` in `src/views.ts`.
+- Sidebar click handlers are wired in `src/app.ts` (`linkReporter`, `linkDashboard`, `linkManage`, `linkAutomation`, `linkDataset`, `linkHowTo`).
+- Dataset view content is rendered lazily by `assets/dataset-nav.js` through `window.showDatasetView()`, but the active view state still comes from `switchView(...)`.
+- Avoid adding additional inline nav handlers in `templates/index.html`; it causes conflicting active states and hidden/show logic.
+
 API endpoints:
 - `GET /api/report?project=1&plan=241` → generates and returns `{ path, url }`
 - `GET /api/report?project=1&run=1234` → generates and returns `{ path, url }`
@@ -222,6 +229,7 @@ Runtime sync (no rebuild):
 - Set `AUTOMATION_GIT_SYNC=1` to `git fetch` + reset to `ORBIS_AUTOMATION_REF` on container start.
 - Use `AUTOMATION_APP_PATH` if the Cypress app path is not `apps/lokasi_intelligence`.
 - `AUTOMATION_NPM_INSTALL=1` installs deps when `node_modules` is missing (default on).
+- For private repos, set `GIT_SSH_PRIVATE_KEY` (or `GIT_SSH_PRIVATE_KEY_B64`) and use an SSH repo URL.
 
 Example Docker run (host path `/opt/orbis-test-automation`), if you want to **override** the baked repo with a local checkout:
 

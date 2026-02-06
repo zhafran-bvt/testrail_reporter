@@ -14,6 +14,28 @@ ORBIS_AUTOMATION_REPO="${ORBIS_AUTOMATION_REPO:-https://github.com/bvarta-tech/o
 ORBIS_AUTOMATION_REF="${ORBIS_AUTOMATION_REF:-main}"
 AUTOMATION_GIT_SYNC="$(normalize_bool "${AUTOMATION_GIT_SYNC:-0}")"
 AUTOMATION_NPM_INSTALL="$(normalize_bool "${AUTOMATION_NPM_INSTALL:-1}")"
+GIT_SSH_PRIVATE_KEY="${GIT_SSH_PRIVATE_KEY:-}"
+GIT_SSH_PRIVATE_KEY_B64="${GIT_SSH_PRIVATE_KEY_B64:-}"
+
+setup_git_ssh() {
+  if [ -z "$GIT_SSH_PRIVATE_KEY" ] && [ -z "$GIT_SSH_PRIVATE_KEY_B64" ]; then
+    return 0
+  fi
+
+  mkdir -p /root/.ssh
+  chmod 700 /root/.ssh
+
+  local key_file="/root/.ssh/id_ed25519"
+  if [ -n "$GIT_SSH_PRIVATE_KEY_B64" ]; then
+    echo "$GIT_SSH_PRIVATE_KEY_B64" | base64 -d > "$key_file"
+  else
+    printf "%s\n" "$GIT_SSH_PRIVATE_KEY" > "$key_file"
+  fi
+
+  chmod 600 "$key_file"
+  ssh-keyscan github.com >> /root/.ssh/known_hosts 2>/dev/null || true
+  export GIT_SSH_COMMAND="ssh -i $key_file -o StrictHostKeyChecking=yes"
+}
 
 if [ -z "${AUTOMATION_APP_PATH:-}" ]; then
   if [ -n "$AUTOMATION_FEATURES_ROOT" ]; then
@@ -22,6 +44,8 @@ if [ -z "${AUTOMATION_APP_PATH:-}" ]; then
     AUTOMATION_APP_PATH="${AUTOMATION_REPO_ROOT}/apps/lokasi_intelligence"
   fi
 fi
+
+setup_git_ssh
 
 if [ ! -d "$AUTOMATION_REPO_ROOT/.git" ]; then
   if [ -n "$ORBIS_AUTOMATION_REPO" ]; then

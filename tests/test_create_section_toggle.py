@@ -69,37 +69,36 @@ class TestCreateSectionToggle(BaseAPITestCase):
 
     def test_tab_init_functions_exist(self):
         """Test that Create tab initialization functions exist in JavaScript."""
-        response = self.client.get("/")
+        response = self.client.get("/assets/app.js")
         self.assertEqual(response.status_code, 200)
 
-        html = response.text
+        js = response.text
 
         # Verify init functions are defined
-        self.assertIn("function initScopedTabs", html)
-        self.assertIn("function initCreateTabs()", html)
-        self.assertIn("function initAutomationTabs()", html)
+        self.assertIn("function initScopedTabs", js)
+        self.assertIn("function initManageTabs", js)
 
     def test_tab_activation_function_exists(self):
         """Test that tab activation logic exists (Requirement 6.1)."""
-        response = self.client.get("/")
+        response = self.client.get("/assets/app.js")
         self.assertEqual(response.status_code, 200)
 
-        html = response.text
+        js = response.text
 
         # Verify activation function exists in scoped tabs
-        self.assertIn("function activateTab(button)", html)
-        self.assertIn("aria-selected", html)
-        self.assertIn("classList.toggle('is-active'", html)
+        self.assertIn("activateTab", js)
+        self.assertIn("aria-selected", js)
+        self.assertIn('classList.toggle("is-active"', js)
 
     def test_click_event_listener(self):
         """Test that click event listener is attached to tab buttons (Requirement 6.2)."""
-        response = self.client.get("/")
+        response = self.client.get("/assets/app.js")
         self.assertEqual(response.status_code, 200)
 
-        html = response.text
+        js = response.text
 
         # Verify click event listener is added
-        self.assertIn("addEventListener('click', () => activateTab(btn))", html)
+        self.assertIn('addEventListener("click", () => activateTab(btn))', js)
 
     def test_keyboard_support(self):
         """Test that tab buttons are keyboard accessible (Requirement 11.3)."""
@@ -115,16 +114,16 @@ class TestCreateSectionToggle(BaseAPITestCase):
 
     def test_focus_create_tabs_function(self):
         """Test that focusCreateTabs helper exists for empty state CTA."""
-        response = self.client.get("/")
+        response = self.client.get("/assets/app.js")
         self.assertEqual(response.status_code, 200)
 
-        html = response.text
+        js = response.text
 
         # Verify focus helper is defined and exported
-        self.assertIn("function focusCreateTabs()", html)
-        self.assertIn("window.focusCreateTabs = focusCreateTabs", html)
-        self.assertIn("scrollIntoView", html)
-        self.assertIn("focus()", html)
+        self.assertIn("function focusCreateTabs()", js)
+        self.assertIn("window.focusCreateTabs = focusCreateTabs", js)
+        self.assertIn("scrollIntoView", js)
+        self.assertIn("planTab.focus()", js)
 
     def test_smooth_animation_css(self):
         """Test that tab transition CSS is present."""
@@ -167,17 +166,16 @@ class TestCreateSectionToggle(BaseAPITestCase):
 
     def test_dom_ready_initialization(self):
         """Test that initialization happens on DOMContentLoaded."""
-        response = self.client.get("/")
+        response = self.client.get("/assets/app.js")
         self.assertEqual(response.status_code, 200)
 
-        html = response.text
+        js = response.text
 
         # Verify DOMContentLoaded event listener
-        self.assertIn("addEventListener('DOMContentLoaded'", html)
+        self.assertIn('addEventListener("DOMContentLoaded", init)', js)
 
         # Verify initialization sets default state
-        self.assertIn("initCreateTabs()", html)
-        self.assertIn("initAutomationTabs()", html)
+        self.assertIn("initManageTabs()", js)
 
     def test_create_forms_stepper_structure(self):
         """Test that create forms stepper structure exists."""

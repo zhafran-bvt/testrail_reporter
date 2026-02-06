@@ -1,12 +1,14 @@
-export function switchView(target: "reporter" | "manage" | "howto" | "dashboard" | "automation") {
+export function switchView(target: "reporter" | "manage" | "howto" | "dashboard" | "automation" | "dataset") {
   const reporter = document.getElementById("reporterView");
   const manage = document.getElementById("manageView");
   const automation = document.getElementById("automationView");
+  const dataset = document.getElementById("datasetView");
   const howto = document.getElementById("howToView");
   const dashboard = document.getElementById("dashboardView");
   const linkReporter = document.getElementById("linkReporter");
   const linkManage = document.getElementById("linkManage");
   const linkAutomation = document.getElementById("linkAutomation");
+  const linkDataset = document.getElementById("linkDataset");
   const linkHowto = document.getElementById("linkHowTo");
   const linkDashboard = document.getElementById("linkDashboard");
   
@@ -14,6 +16,7 @@ export function switchView(target: "reporter" | "manage" | "howto" | "dashboard"
   reporter?.classList.add("hidden");
   manage?.classList.add("hidden");
   automation?.classList.add("hidden");
+  dataset?.classList.add("hidden");
   howto?.classList.add("hidden");
   dashboard?.classList.add("hidden");
   
@@ -21,6 +24,7 @@ export function switchView(target: "reporter" | "manage" | "howto" | "dashboard"
   linkReporter?.classList.remove("active");
   linkManage?.classList.remove("active");
   linkAutomation?.classList.remove("active");
+  linkDataset?.classList.remove("active");
   linkHowto?.classList.remove("active");
   linkDashboard?.classList.remove("active");
   
@@ -35,6 +39,12 @@ export function switchView(target: "reporter" | "manage" | "howto" | "dashboard"
   } else if (target === "automation") {
     automation?.classList.remove("hidden");
     linkAutomation?.classList.add("active");
+  } else if (target === "dataset") {
+    dataset?.classList.remove("hidden");
+    linkDataset?.classList.add("active");
+    if (typeof (window as any).showDatasetView === "function") {
+      (window as any).showDatasetView();
+    }
   } else if (target === "howto") {
     howto?.classList.remove("hidden");
     linkHowto?.classList.add("active");

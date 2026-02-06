@@ -1,66 +1,22 @@
-/* Dataset Generator Navigation Styles */
-/* This ensures the existing menu item works correctly */
+/* Dataset Generator specific styles */
 
-/* The dataset link already exists in HTML, just ensure it's styled properly */
+/* Keep dataset nav item consistent with base nav styles */
 #linkDataset {
     display: flex !important;
     align-items: center !important;
-    gap: 10px !important;
-    padding: 10px 12px !important;
-    border-radius: 12px !important;
-    color: #0f172a !important;
-    text-decoration: none !important;
-    font-weight: 600 !important;
-    margin-bottom: 8px !important;
-    transition: background .12s ease, color .12s ease !important;
-    cursor: pointer !important;
 }
-
-#linkDataset:hover {
-    background: #e2f3f3 !important;
-    color: #0f766e !important;
-}
-
-#linkDataset.active {
-    background: #0f766e !important;
-    color: #fff !important;
-}
-
-#linkDataset svg {
-    width: 18px !important;
-    height: 18px !important;
-}
-
-/* Dataset content is now injected into .content div, inheriting its layout */
 
 #datasetView.hidden {
     display: none !important;
 }
 
-/* Ensure the nav-shell grid layout works correctly */
-.nav-shell {
-    display: grid !important;
-    grid-template-columns: 220px 1fr !important;
-    min-height: calc(100vh - 70px) !important;
-}
-
-/* Dataset content styling when injected into .content div */
-.content code {
+/* Dataset content styling */
+#datasetView code {
     background: rgba(0, 0, 0, 0.1) !important;
     padding: 2px 6px !important;
     border-radius: 4px !important;
     font-family: 'Consolas', 'Monaco', monospace !important;
     font-size: 13px !important;
-}
-
-/* Ensure buttons in dataset content are styled properly */
-.content button {
-    transition: all 0.15s ease !important;
-}
-
-.content button:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Dataset form specific styles */
@@ -151,7 +107,7 @@
         grid-template-columns: 1fr !important;
     }
     
-    .content .card {
+    #datasetView .card {
         max-width: 100% !important;
         padding: 20px !important;
     }

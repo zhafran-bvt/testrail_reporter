@@ -6,46 +6,34 @@ console.log('Dataset navigation script loaded');
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded, setting up dataset navigation');
     
-    // Define the showDatasetView function that the onclick handler expects
+    // Dataset view is now switched by src/views.ts; this hook only renders dataset UI.
     window.showDatasetView = function() {
         console.log('showDatasetView called');
-        
-        // Hide all other views first
-        document.querySelectorAll('#reporterView, #dashboardView, #manageView, #howToView, #datasetView').forEach(view => {
-            if (view) view.classList.add('hidden');
-        });
-        
-        // Inject dataset content into the main .content div (like Reporter view)
-        const contentDiv = document.querySelector('.content');
-        if (contentDiv) {
-            // Store original content if needed for restoration
-            if (!contentDiv.dataset.originalContent) {
-                contentDiv.dataset.originalContent = contentDiv.innerHTML;
-            }
-            
-            // Replace content with dataset generator
-            contentDiv.innerHTML = getDatasetGeneratorHTML();
-            
-            // Set up form handlers
-            setupDatasetForm();
+
+        const datasetView = document.getElementById('datasetView');
+        if (!datasetView) {
+            console.warn('Dataset view container not found');
+            return;
         }
-        
-        const datasetLink = document.getElementById('linkDataset');
-        if (datasetLink) {
-            // Remove active class from all nav items
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.remove('active');
-            });
-            // Add active class to dataset link
-            datasetLink.classList.add('active');
+        const content = document.querySelector('.content');
+        if (content && content.firstElementChild !== datasetView) {
+            content.insertBefore(datasetView, content.firstElementChild);
+        }
+
+        if (datasetView.dataset.initialized !== 'true') {
+            datasetView.innerHTML = getDatasetGeneratorHTML();
+            setupDatasetForm();
+            datasetView.dataset.initialized = 'true';
         }
     };
     
     // Function to generate the dataset generator HTML
     function getDatasetGeneratorHTML() {
         return `
-            <h1 style="text-align: center; margin-bottom: 8px;">Dataset Generator</h1>
-            <p class="subtitle" style="text-align: center; margin-bottom: 24px;">Generate synthetic geospatial datasets for testing purposes.</p>
+            <div class="dataset-hero">
+                <h1>Dataset Generator</h1>
+                <p class="subtitle">Generate synthetic geospatial datasets for testing workflows.</p>
+            </div>
             
             <div class="grid-panels" style="grid-template-columns: 2fr 1.25fr; gap: 16px; align-items: start;">
                 <div class="card">
@@ -333,83 +321,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
     }
-    
-    // Define view switching function
-    function showView(viewId) {
-        console.log('Switching to view:', viewId);
-        
-        if (viewId === 'datasetView') {
-            // Dataset view is handled by showDatasetView function
-            showDatasetView();
-            return;
-        }
-        
-        // Restore original content if we're switching away from dataset view
-        const contentDiv = document.querySelector('.content');
-        if (contentDiv && contentDiv.dataset.originalContent) {
-            contentDiv.innerHTML = contentDiv.dataset.originalContent;
-            delete contentDiv.dataset.originalContent;
-        }
-        
-        // List of all possible views
-        const allViews = ['reporterView', 'dashboardView', 'manageView', 'datasetView', 'howToView'];
-        
-        // Hide all views
-        allViews.forEach(id => {
-            const view = document.getElementById(id);
-            if (view) {
-                view.classList.add('hidden');
-            }
-        });
-        
-        // Show target view
-        const targetView = document.getElementById(viewId);
-        if (targetView) {
-            targetView.classList.remove('hidden');
-            console.log('Successfully switched to view:', viewId);
-        } else {
-            console.error('View not found:', viewId);
-        }
-        
-        // Update navigation active states
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-        });
-    }
-    
-    // Set up click handlers for all navigation items
-    const navItems = {
-        'linkReporter': 'reporterView',
-        'linkDashboard': 'dashboardView',
-        'linkManage': 'manageView',
-        'linkHowTo': 'howToView'
-    };
-    
-    Object.entries(navItems).forEach(([linkId, viewId]) => {
-        const link = document.getElementById(linkId);
-        if (link) {
-            // Remove any existing click handlers
-            link.onclick = null;
-            
-            // Add new click handler
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                console.log('Navigation clicked:', linkId, '->', viewId);
-                showView(viewId);
-                this.classList.add('active');
-            });
-            
-            console.log('Click handler added for:', linkId);
-        }
-    });
-    
-    // Show reporter view by default
-    showView('reporterView');
-    const reporterLink = document.getElementById('linkReporter');
-    if (reporterLink) {
-        reporterLink.classList.add('active');
-    }
-    
     console.log('Dataset navigation setup complete');
 });
 

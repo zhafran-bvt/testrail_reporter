@@ -662,6 +662,45 @@ function resetCreateWizard(formId: string) {
   applyWizardStep(form, 1);
 }
 
+function initScopedTabs(container: Element | null) {
+  if (!container) return;
+  const tabButtons = Array.from(container.querySelectorAll<HTMLButtonElement>(".manage-tab"));
+  const panels = Array.from(container.querySelectorAll<HTMLElement>(".manage-tab-panel"));
+  if (!tabButtons.length || !panels.length) return;
+
+  const activateTab = (button: HTMLButtonElement) => {
+    const targetId = button.getAttribute("aria-controls");
+    tabButtons.forEach((btn) => {
+      const active = btn === button;
+      btn.classList.toggle("is-active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    panels.forEach((panel) => {
+      panel.classList.toggle("is-active", panel.id === targetId);
+    });
+  };
+
+  tabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => activateTab(btn));
+  });
+}
+
+function focusCreateTabs() {
+  const container = document.querySelector(".manage-create-tabs");
+  if (!container) return;
+  const planTab = container.querySelector<HTMLButtonElement>("#tabCreatePlan");
+  if (planTab) {
+    planTab.click();
+    planTab.focus();
+  }
+  container.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function initManageTabs() {
+  initScopedTabs(document.querySelector(".manage-create-tabs"));
+  initScopedTabs(document.querySelector(".automation-tabs"));
+}
+
 function stripAutomationHtml(value: string) {
   const lowered = value.toLowerCase();
   if (!lowered.includes("<p") && !lowered.includes("<br") && !lowered.includes("</")) {
@@ -751,13 +790,24 @@ function initAutomationManagement() {
   const runTag = document.getElementById("automationRunTag") as HTMLInputElement | null;
   const allureLabel = document.getElementById("automationAllureLabel") as HTMLInputElement | null;
   const runParallel = document.getElementById("automationRunParallel") as HTMLSelectElement | null;
+  const runHeaded = document.getElementById("automationRunHeaded") as HTMLSelectElement | null;
   const runUseSelected = document.getElementById("automationRunUseSelectedBtn") as HTMLButtonElement | null;
   const runBtn = document.getElementById("automationRunBtn") as HTMLButtonElement | null;
+  const runStopBtn = document.getElementById("automationRunStopBtn") as HTMLButtonElement | null;
+  const runCopyCmdBtn = document.getElementById("automationRunCopyCmdBtn") as HTMLButtonElement | null;
+  const runDownloadLogBtn = document.getElementById("automationRunDownloadLogBtn") as HTMLButtonElement | null;
+  const runCopyLogBtn = document.getElementById("automationRunCopyLogBtn") as HTMLButtonElement | null;
+  const runErrorsOnlyToggle = document.getElementById("automationRunErrorsOnly") as HTMLInputElement | null;
   const runStatus = document.getElementById("automationRunStatus");
   const runProgressBar = document.getElementById("automationRunProgressBar") as HTMLElement | null;
   const runLog = document.getElementById("automationRunLog");
+  const runHistoryList = document.getElementById("automationRunHistory");
+  const runHistoryRefreshBtn = document.getElementById("automationRunHistoryRefreshBtn") as HTMLButtonElement | null;
   const runStorageKey = "automationRunId";
   let runPoller: number | null = null;
+  let lastRunId: string | null = null;
+  let lastRunCommand: string | null = null;
+  let lastRunLogLines: string[] = [];
 
   const allureBtn = document.getElementById("automationAllureBtn") as HTMLButtonElement | null;
   const allureStatus = document.getElementById("automationAllureStatus");
@@ -784,6 +834,7 @@ function initAutomationManagement() {
   const webPreview = document.getElementById("automationWebPreview");
 
   let selectedCase: { id: number; kind: "api" | "web" } | null = null;
+  const logErrorRegex = /(error|failed|exception|traceback|cypresserror)/i;
 
   const renderTags = (container: HTMLElement | null, kind: "api" | "web", item: AutomationCaseListItem) => {
     if (!container) return;
@@ -1109,6 +1160,77 @@ function initAutomationManagement() {
   };
 
   loadAutomationStatus();
+  const filterLogLines = (lines: string[], errorsOnly: boolean) => {
+    if (!errorsOnly) return lines;
+    return lines.filter((line) => logErrorRegex.test(line));
+  };
+
+  const updateLogView = () => {
+    if (!runLog) return;
+    const errorsOnly = runErrorsOnlyToggle?.checked ?? false;
+    const lines = filterLogLines(lastRunLogLines, errorsOnly);
+    runLog.textContent = lines.join("\n") || "No logs yet.";
+  };
+
+  const updateRunActions = (status: string | undefined, runId?: string | null) => {
+    const active = status === "running" || status === "stopping";
+    if (runStopBtn) runStopBtn.disabled = !active || !runId;
+    if (runCopyCmdBtn) runCopyCmdBtn.disabled = !lastRunCommand;
+    if (runDownloadLogBtn) runDownloadLogBtn.disabled = !runId;
+    if (runCopyLogBtn) runCopyLogBtn.disabled = !lastRunLogLines.length;
+  };
+
+  const renderRunHistory = (runs: any[]) => {
+    if (!runHistoryList) return;
+    runHistoryList.innerHTML = "";
+    if (!runs.length) {
+      const empty = document.createElement("div");
+      empty.className = "automation-case-card";
+      empty.textContent = "No runs yet.";
+      runHistoryList.appendChild(empty);
+      return;
+    }
+    runs.forEach((run) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "automation-case-card automation-run-card";
+      card.dataset.runId = run.run_id;
+      if (run.run_id === lastRunId) {
+        card.classList.add("is-active");
+      }
+
+      const title = document.createElement("div");
+      title.className = "automation-case-title";
+      title.textContent = `${(run.test_type || "run").toUpperCase()} · ${run.environment || "env"} · ${run.app || "app"}`;
+
+      const meta = document.createElement("div");
+      meta.className = "automation-case-meta-line";
+      const tagLabel = run.test_tag ? `Tag: ${run.test_tag}` : "Tag: all";
+      const startedAt = run.started_at ? formatRelativeTime(new Date(run.started_at)) : "unknown";
+      meta.textContent = `${tagLabel} · ${startedAt}`;
+
+      const detail = document.createElement("div");
+      detail.className = "automation-case-meta-line";
+      const progress = run.progress_percent != null ? `${run.progress_percent}%` : "n/a";
+      detail.textContent = `Status: ${run.status || "unknown"} · Progress: ${progress}`;
+
+      card.appendChild(title);
+      card.appendChild(meta);
+      card.appendChild(detail);
+      runHistoryList.appendChild(card);
+    });
+  };
+
+  const fetchRunHistory = async () => {
+    try {
+      const data = await requestJson("/api/automation/runs");
+      renderRunHistory(data?.runs || []);
+    } catch {
+      renderRunHistory([]);
+    }
+  };
+
+  updateRunActions("idle", null);
 
   runUseSelected?.addEventListener("click", () => {
     if (!selectedCase) {
@@ -1126,18 +1248,40 @@ function initAutomationManagement() {
     }
   });
 
+  const syncHeadedToggle = () => {
+    if (!runHeaded) return;
+    const typeValue = (runType?.value || "api").toLowerCase();
+    const enableHeaded = typeValue === "e2e" || typeValue === "all";
+    runHeaded.disabled = !enableHeaded;
+    if (!enableHeaded) {
+      runHeaded.value = "false";
+    }
+  };
+
+  runType?.addEventListener("change", syncHeadedToggle);
+  runType?.addEventListener("input", syncHeadedToggle);
+  document.addEventListener("change", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.id === "automationRunType") {
+      syncHeadedToggle();
+    }
+  });
+  syncHeadedToggle();
+
   runBtn?.addEventListener("click", async () => {
     const wantsParallel = (runParallel?.value || "false") === "true";
     if (wantsParallel) {
       showToast("Parallel runs are not supported locally yet.", "error");
       return;
     }
+    const wantsHeaded = (runHeaded?.value || "false") === "true";
     const payload = {
       app_name: runApp?.value || "lokasi_intelligence",
       test_type: runType?.value || "api",
       test_tag: runTag?.value.trim() || "",
       environment: runEnv?.value || "staging",
       parallel: wantsParallel,
+      headed: wantsHeaded,
     };
 
     if (runStatus) {
@@ -1150,6 +1294,7 @@ function initAutomationManagement() {
         body: JSON.stringify(payload),
       });
       const runId = response?.run_id || "";
+      lastRunCommand = response?.command || null;
       if (runId) {
         localStorage.setItem(runStorageKey, runId);
       }
@@ -1167,12 +1312,65 @@ function initAutomationManagement() {
       if (runId) {
         startRunPolling(runId);
       }
+      fetchRunHistory();
       showToast("Automation run started.", "success");
     } catch (err: any) {
       if (runStatus) {
         runStatus.textContent = err?.message || "Dispatch failed.";
       }
       showToast(err?.message || "Failed to dispatch workflow.", "error");
+    }
+  });
+
+  runStopBtn?.addEventListener("click", async () => {
+    if (!lastRunId) {
+      showToast("No active run selected.", "error");
+      return;
+    }
+    try {
+      await requestJson(`/api/automation/run/${encodeURIComponent(lastRunId)}/stop`, {
+        method: "POST",
+      });
+      showToast("Stop requested.", "info");
+      pollRunStatus(lastRunId);
+      fetchRunHistory();
+    } catch (err: any) {
+      showToast(err?.message || "Failed to stop run.", "error");
+    }
+  });
+
+  runCopyCmdBtn?.addEventListener("click", async () => {
+    if (!lastRunCommand) {
+      showToast("No command available.", "error");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(lastRunCommand);
+      showToast("Command copied.", "success");
+    } catch {
+      showToast("Failed to copy command.", "error");
+    }
+  });
+
+  runDownloadLogBtn?.addEventListener("click", () => {
+    if (!lastRunId) {
+      showToast("No run selected.", "error");
+      return;
+    }
+    const url = `/api/automation/run/${encodeURIComponent(lastRunId)}/log?download=1`;
+    window.open(url, "_blank", "noopener");
+  });
+
+  runCopyLogBtn?.addEventListener("click", async () => {
+    if (!runLog?.textContent) {
+      showToast("No log output available.", "error");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(runLog.textContent);
+      showToast("Log copied.", "success");
+    } catch {
+      showToast("Failed to copy log.", "error");
     }
   });
 
@@ -1221,10 +1419,11 @@ function initAutomationManagement() {
 
   const updateRunUI = (data: any) => {
     const status = data?.status || "unknown";
+    const statusLabel = status.replace(/_/g, " ");
     const completed = data?.completed_cases ?? 0;
     const total = data?.total_cases;
     const progress = data?.progress_percent;
-    const summaryParts = [`Status: ${status}`];
+    const summaryParts = [`Status: ${statusLabel}`];
     if (typeof total === "number") {
       summaryParts.push(`Progress: ${completed}/${total}`);
     } else {
@@ -1242,16 +1441,21 @@ function initAutomationManagement() {
     if (runProgressBar) {
       runProgressBar.style.width = typeof progress === "number" ? `${progress}%` : "0%";
     }
-    if (runLog && Array.isArray(data?.log_tail)) {
-      runLog.textContent = data.log_tail.join("\n") || "No logs yet.";
-    }
+    lastRunCommand = data?.command || lastRunCommand;
+    lastRunLogLines = Array.isArray(data?.log_tail) ? data.log_tail : [];
+    updateLogView();
+    updateRunActions(status, lastRunId);
   };
 
   const pollRunStatus = async (runId: string) => {
     try {
-      const data = await requestJson(`/api/automation/run/${encodeURIComponent(runId)}`);
+      const errorsOnly = runErrorsOnlyToggle?.checked ? "true" : "false";
+      const data = await requestJson(
+        `/api/automation/run/${encodeURIComponent(runId)}?errors_only=${errorsOnly}`
+      );
       updateRunUI(data);
-      if (data?.status === "success" || data?.status === "failed") {
+      fetchRunHistory();
+      if (data?.status === "success" || data?.status === "failed" || data?.status === "completed_with_failures" || data?.status === "stopped") {
         stopRunPolling();
       }
     } catch (err: any) {
@@ -1265,6 +1469,7 @@ function initAutomationManagement() {
 
   const startRunPolling = (runId: string) => {
     stopRunPolling();
+    lastRunId = runId;
     pollRunStatus(runId);
     runPoller = window.setInterval(() => pollRunStatus(runId), 5000);
   };
@@ -1274,13 +1479,36 @@ function initAutomationManagement() {
     startRunPolling(existingRunId);
   }
 
+  runErrorsOnlyToggle?.addEventListener("change", () => {
+    if (lastRunId) {
+      pollRunStatus(lastRunId);
+    } else {
+      updateLogView();
+    }
+  });
+
+  runHistoryRefreshBtn?.addEventListener("click", fetchRunHistory);
+
+  runHistoryList?.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement | null;
+    const card = target?.closest<HTMLElement>(".automation-run-card");
+    const runId = card?.dataset.runId;
+    if (!runId) return;
+    localStorage.setItem(runStorageKey, runId);
+    startRunPolling(runId);
+    fetchRunHistory();
+  });
+
   fetchCaseList("api");
   fetchCaseList("web");
+  fetchRunHistory();
 }
 
 function init() {
   setupThemeToggle();
   updateReportMeta(undefined);
+  initManageTabs();
+  (window as any).focusCreateTabs = focusCreateTabs;
   loadPlans().catch((err) => console.error("loadPlans error", err));
   loadManagePlans().catch((err) => console.error("loadManagePlans error", err));
   initManagement();
@@ -1351,6 +1579,10 @@ function init() {
   document.getElementById("linkAutomation")?.addEventListener("click", (e) => {
     e.preventDefault();
     switchView("automation");
+  });
+  document.getElementById("linkDataset")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    switchView("dataset");
   });
   document.getElementById("linkHowTo")?.addEventListener("click", (e) => {
     e.preventDefault();

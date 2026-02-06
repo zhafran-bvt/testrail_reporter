@@ -24,8 +24,12 @@
       --border: #EAEAEA;                                /* Borders */
 
       --ring: rgba(26, 138, 133, 0.35);                 /* Focus ring from primary */
-      --shadow: 0 10px 25px rgba(0,0,0,.08);
-      --radius: 12px;
+      --shadow: 0 4px 14px rgba(0,0,0,.06);
+      --shadow-soft: 0 8px 22px rgba(8, 32, 54, 0.09);
+      --radius: 10px;
+      --surface: rgba(255,255,255,0.94);
+      --nav-surface: rgba(248, 251, 253, 0.95);
+      --hero-blur: blur(8px);
       --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='%23222222' d='M6.293 9.293a1 1 0 0 1 1.414 0L12 13.586l4.293-4.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 0 1 0-1.414Z'/%3E%3C/svg%3E");
     }
     [data-theme="dark"],
@@ -36,7 +40,10 @@
         --border: #333333;
         --bg: #1C1C1C;
         --bg2: rgba(44,159,211,0.06);
-        --shadow: 0 10px 25px rgba(0,0,0,.4);
+        --shadow: 0 4px 14px rgba(0,0,0,.32);
+        --shadow-soft: 0 8px 22px rgba(0,0,0,.4);
+        --surface: rgba(30,30,30,0.92);
+        --nav-surface: rgba(20,20,20,0.92);
         --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath fill='%23EAEAEA' d='M6.293 9.293a1 1 0 0 1 1.414 0L12 13.586l4.293-4.293a1 1 0 1 1 1.414 1.414l-5 5a1 1 0 0 1-1.414 0l-5-5a1 1 0 0 1 0-1.414Z'/%3E%3C/svg%3E");
     }
     html, body { height: 100%; }
@@ -45,54 +52,139 @@
       color: var(--text);
       min-height: 100vh;
       display: block;
-      padding: 0 0 32px;
-      background: var(--bg);
+      padding: 0 0 12px;
+      background: linear-gradient(180deg, var(--bg2), var(--bg));
       font-family: 'Source Sans 3', 'Helvetica Neue', Arial, sans-serif;
     }
-    .shell { width: 100%; max-width: none; background: #fff; box-shadow: none; border-radius: 0; overflow: hidden; }
+    .shell {
+      width: min(1720px, 99vw);
+      margin: 6px auto 0;
+      background: transparent;
+      box-shadow: none;
+      border-radius: 12px;
+      overflow: hidden;
+    }
     .masthead {
-      background: linear-gradient(90deg, #0f766e, #128f88);
+      background: linear-gradient(100deg, #0f766e 0%, #147b95 100%);
       color: #f8fafc;
-      padding: 16px 20px;
+      padding: 11px 16px;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
+      border-radius: 12px 12px 0 0;
+      overflow: hidden;
     }
-    .masthead .logo { height: 42px; border-radius: 8px; box-shadow: 0 6px 12px rgba(0,0,0,0.2); }
+    .masthead::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, rgba(255,255,255,0.16), rgba(255,255,255,0));
+      pointer-events: none;
+    }
+    .masthead .logo {
+      height: 34px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
     .masthead .titles { display: flex; flex-direction: column; }
-    .masthead h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
-    .masthead .subtitle { margin: 2px 0 0; color: rgba(255,255,255,0.85); }
+    .masthead h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: .2px;
+    }
+    .masthead .subtitle {
+      margin: 2px 0 0;
+      color: rgba(255,255,255,0.86);
+      font-size: 12px;
+    }
     .masthead-right { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
-    .nav-shell { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 70px); }
-    .side-nav { background: #f1f5f9; border-right: 1px solid #e2e8f0; padding: 16px 12px; }
-    .nav-item { display:flex; align-items:center; gap:10px; padding: 10px 12px; border-radius: 12px; color: #0f172a; text-decoration: none; font-weight: 600; margin-bottom: 8px; transition: background .12s ease, color .12s ease; }
-    .nav-item svg { width: 18px; height: 18px; }
-    .nav-item:hover { background: #e2f3f3; color: #0f766e; }
-    .nav-item.active { background: #0f766e; color: #fff; }
+    .nav-shell {
+      display: grid;
+      grid-template-columns: 204px 1fr;
+      min-height: calc(100vh - 56px);
+      border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: var(--hero-blur);
+    }
+    .side-nav {
+      background: var(--nav-surface);
+      border-right: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+      padding: 10px 8px;
+    }
+    .nav-item {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 9px;
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 6px;
+      border: 1px solid transparent;
+      transition: background .12s ease, color .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+    .nav-item svg { width: 16px; height: 16px; }
+    .nav-item:hover {
+      background: color-mix(in srgb, var(--primary) 11%, #fff);
+      color: var(--primary-600);
+      border-color: color-mix(in srgb, var(--primary) 28%, transparent);
+    }
+    [data-theme="dark"] .nav-item,
+    [data-bs-theme="dark"] .nav-item {
+      color: #e5e7eb;
+    }
+    [data-theme="dark"] .nav-item:hover,
+    [data-bs-theme="dark"] .nav-item:hover {
+      background: color-mix(in srgb, var(--primary) 24%, transparent);
+      color: #f8fafc;
+    }
+    .nav-item.active {
+      background: linear-gradient(118deg, var(--primary), var(--primary-600));
+      color: #fff;
+      box-shadow: 0 3px 10px rgba(17, 109, 118, 0.22);
+    }
     .content {
-      padding: 40px 24px;
-      background: linear-gradient(180deg, var(--bg2), transparent 35%), var(--bg);
+      padding: 18px 14px;
+      background: linear-gradient(180deg, var(--bg2), transparent 30%), var(--bg);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
     }
     .content h1 { text-align: center; }
-    .content .subtitle { text-align: center; margin-bottom: 24px; }
-    .grid-panels { display:grid; grid-template-columns: 2fr 1.25fr; gap:16px; align-items:start; }
-    .manage-stack { display:flex; flex-direction:column; gap:12px; }
+    .content .subtitle { text-align: center; margin-bottom: 12px; }
+    .grid-panels { display:grid; grid-template-columns: 2fr 1.25fr; gap:10px; align-items:start; }
+    .manage-stack { display:flex; flex-direction:column; gap:10px; }
     .manage-stack .card form { margin-top: 8px; }
     @media (max-width: 960px){
       .nav-shell { grid-template-columns: 1fr; }
-      .side-nav { display:flex; flex-direction:row; gap:8px; }
+      .side-nav {
+        display:flex;
+        flex-direction:row;
+        gap:6px;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      .side-nav .nav-item { margin-bottom: 0; flex: 0 0 auto; }
       .grid-panels { grid-template-columns: 1fr; }
     }
     .hidden { display: none !important; }
-    h2 { font-size:16px; font-weight:700; margin:0 0 8px; letter-spacing:.2px; color: var(--text); }
+    h2 {
+      font-size:15px;
+      font-weight:700;
+      margin:0 0 6px;
+      letter-spacing:.2px;
+      color: var(--text);
+    }
     .logo-wrap { position: relative; display:flex; align-items:center; gap:12px; }
     .logo { display:block; max-height: 56px; position: relative; z-index: 1; }
-    .subtitle { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+    .subtitle { color: var(--muted); margin: 0 0 8px; font-size: 13px; }
     .panel-toggle {
       display:flex;
       align-items:center;
@@ -114,36 +206,87 @@
       color: var(--muted);
     }
     .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 86%, var(--card-bg));
+      border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
       border-radius: var(--radius);
-      padding: 16px 16px 18px;
+      padding: 12px;
       box-shadow: var(--shadow);
-      backdrop-filter: saturate(120%) blur(4px);
+      backdrop-filter: saturate(118%) blur(4px);
+      transition: box-shadow .12s ease;
     }
+    .card:hover { box-shadow: var(--shadow); }
     .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 640px){ .grid { grid-template-columns: 1fr; } }
-    label { display:block; margin: 8px 0 6px; font-size: 13px; color: var(--muted); }
-    input, select { padding: 10px 12px; font-size: 14px; width: 100%; box-sizing: border-box; border:1px solid var(--border); border-radius: 10px; background: transparent; color: inherit; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+    label { display:block; margin: 6px 0 4px; font-size: 12px; color: var(--muted); }
+    input, select { padding: 8px 10px; font-size: 13px; width: 100%; box-sizing: border-box; border:1px solid var(--border); border-radius: 8px; background: transparent; color: inherit; transition: border-color .12s ease, box-shadow .12s ease, background .12s ease; }
     select {
       appearance: none;
       background-image: var(--select-arrow);
       background-repeat: no-repeat;
       background-position: right 12px center;
       background-size: 12px;
-      padding-right: 36px;
+      padding-right: 30px;
     }
-    input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--ring); }
-    .note { color: var(--muted); font-size: 13px; text-align: center; margin: 6px 0 0; }
-    .actions { display:flex; justify-content: center; margin-top: 16px; gap: 10px; }
+    input:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+    .note { color: var(--muted); font-size: 12px; text-align: center; margin: 4px 0 0; }
+    .actions { display:flex; justify-content: center; margin-top: 10px; gap: 8px; }
     button:not(.panel-toggle) {
-      padding: 10px 16px; font-size: 14px; cursor: pointer; border-radius: 10px;
-      border: 1px solid var(--primary); background: var(--primary); color: #fff;
-      transition: background .15s ease, transform .05s ease;
+      padding: 8px 12px; font-size: 13px; cursor: pointer; border-radius: 8px;
+      border: 1px solid var(--primary); background: linear-gradient(120deg, var(--primary), var(--accent)); color: #fff;
+      transition: filter .12s ease, box-shadow .12s ease;
     }
-    button:not(.panel-toggle):hover { background: var(--primary-600); }
-    button:not(.panel-toggle):active { transform: translateY(1px); }
+    button:not(.panel-toggle):hover { filter: brightness(1.02); box-shadow: 0 4px 12px rgba(16, 117, 132, 0.2); }
+    button:not(.panel-toggle):active { transform: none; }
     button:not(.panel-toggle):focus { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    #reporterView,
+    #dashboardView,
+    #manageView,
+    #automationView,
+    #datasetView,
+    #howToView { animation: viewIn .14s ease; }
+    @keyframes viewIn {
+      from { opacity: 0; transform: translateY(2px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Dataset view layout tuning */
+    #datasetView {
+      width: min(1540px, 98vw) !important;
+      max-width: none !important;
+      margin: 0 auto !important;
+      padding-top: 2px;
+      align-self: stretch;
+      order: -1;
+    }
+    #datasetView .dataset-hero {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin: 0 0 10px;
+    }
+    #datasetView .dataset-hero h1 {
+      margin: 0;
+      text-align: left;
+      font-size: 42px;
+      line-height: 1.05;
+      letter-spacing: -0.6px;
+      color: var(--text);
+    }
+    #datasetView .dataset-hero .subtitle {
+      margin: 0;
+      text-align: left;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    #datasetView .grid-panels {
+      gap: 10px;
+      align-items: flex-start;
+    }
+    @media (max-width: 960px) {
+      #datasetView .dataset-hero h1 { font-size: 30px; }
+      #datasetView .grid-panels { grid-template-columns: 1fr !important; }
+    }
 
     /* Toast styles handled by Bootstrap */
     .runs-section { margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(15,23,42,0.02); }
@@ -438,6 +581,13 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
 
+    /* Legacy compatibility selector used by responsive tests */
+    .create-forms-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
     [data-theme="dark"] .manage-create-tabs,
     [data-bs-theme="dark"] .manage-create-tabs {
       background: rgba(255, 255, 255, 0.03);
@@ -578,6 +728,21 @@
       flex-wrap: wrap;
     }
 
+    .automation-runner-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .automation-checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
     .automation-runner-status {
       font-size: 12px;
       color: var(--muted);
@@ -626,6 +791,49 @@
       max-height: 220px;
       overflow: auto;
       white-space: pre-wrap;
+    }
+
+    .automation-run-history {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(26, 138, 133, 0.05);
+      display: grid;
+      gap: 10px;
+    }
+
+    .automation-run-history-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .automation-run-history-head h4 {
+      margin: 0;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .automation-run-history-list {
+      display: grid;
+      gap: 8px;
+      max-height: 240px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .automation-run-card {
+      appearance: none;
+      text-align: left;
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
+
+    [data-theme="dark"] .automation-run-card,
+    [data-bs-theme="dark"] .automation-run-card {
+      background: rgba(255, 255, 255, 0.06);
     }
 
     [data-theme="dark"] .automation-run-log,
@@ -1740,6 +1948,10 @@
     
     /* Tablet (768px - 1024px) - Adjusted columns */
     @media (max-width: 1024px) and (min-width: 768px) {
+      .create-forms-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
       .dashboard-stats-grid {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -1764,6 +1976,10 @@
     
     /* Mobile (below 768px) - Single column layout */
     @media (max-width: 767px) {
+      .create-forms-grid {
+        grid-template-columns: 1fr;
+      }
+
       .dashboard-stats-grid {
         grid-template-columns: 1fr;
       }
@@ -3751,7 +3967,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 1 3 3v1.1l1.6.9a3 3 0 0 1 1.1 4.1l-.55.95.55.95a3 3 0 0 1-1.1 4.1l-1.6.9V19a3 3 0 0 1-6 0v-1.1l-1.6-.9a3 3 0 0 1-1.1-4.1l.55-.95-.55-.95a3 3 0 0 1 1.1-4.1l1.6-.9V5a3 3 0 0 1 3-3Z" fill="currentColor" fill-opacity=".15"/><path d="M12 8.5a3.5 3.5 0 1 1-3.5 3.5A3.5 3.5 0 0 1 12 8.5Zm0 2a1.5 1.5 0 1 0 1.5 1.5A1.5 1.5 0 0 0 12 10.5Z" fill="currentColor"/></svg>
           Automation Management
         </a>
-        <a href="#" id="linkDataset" class="nav-item" onclick="showDatasetView(); return false;">
+        <a href="#" id="linkDataset" class="nav-item">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor" fill-opacity=".15"/><path d="M3 3h18v2H3V3zm0 4h18v2H3V7zm0 4h18v2H3v-2zm0 4h18v2H3v-2zm0 4h18v2H3v-2z" fill="currentColor"/></svg>
           Dataset Generator
         </a>
@@ -4400,11 +4616,28 @@
                 <option value="true">true</option>
               </select>
             </div>
+            <div class="automation-field">
+              <label for="automationRunHeaded">Browser UI (E2E only)</label>
+              <select id="automationRunHeaded">
+                <option value="false">false</option>
+                <option value="true">true</option>
+              </select>
+            </div>
           </div>
           <div class="automation-runner-actions">
             <button type="button" class="refresh-btn" id="automationRunUseSelectedBtn">Use selected case</button>
             <button type="button" class="refresh-btn" id="automationRunBtn">Run Automation</button>
+            <button type="button" class="refresh-btn" id="automationRunStopBtn">Stop Run</button>
             <button type="button" class="refresh-btn" id="automationAllureBtn">Generate Allure Report</button>
+          </div>
+          <div class="automation-runner-tools">
+            <label class="automation-checkbox">
+              <input type="checkbox" id="automationRunErrorsOnly" />
+              Errors only
+            </label>
+            <button type="button" class="refresh-btn" id="automationRunCopyCmdBtn">Copy Command</button>
+            <button type="button" class="refresh-btn" id="automationRunCopyLogBtn">Copy Log</button>
+            <button type="button" class="refresh-btn" id="automationRunDownloadLogBtn">Download Log</button>
           </div>
           <div class="automation-runner-status" id="automationRunStatus">Ready to run.</div>
           <div class="automation-runner-status" id="automationAllureStatus">Allure report: not generated.</div>
@@ -4413,6 +4646,15 @@
             <div class="automation-progress-bar" id="automationRunProgressBar"></div>
           </div>
           <pre class="automation-run-log" id="automationRunLog">No logs yet.</pre>
+          <div class="automation-run-history">
+            <div class="automation-run-history-head">
+              <h4>Recent runs</h4>
+              <button type="button" class="refresh-btn" id="automationRunHistoryRefreshBtn">Refresh</button>
+            </div>
+            <div class="automation-run-history-list" id="automationRunHistory">
+              <div class="automation-case-card">No runs yet.</div>
+            </div>
+          </div>
         </div>
 
         <div class="automation-tabs" role="region" aria-labelledby="automationTabsTitle">
@@ -4554,63 +4796,85 @@
       <div id="howToView" class="hidden" style="max-width: 900px; margin: 0 auto; padding: 12px 0;">
         <div class="card" style="margin-bottom:12px;">
           <h2 style="margin:0 0 8px;">How to Use</h2>
-          <p class="subtitle" style="margin:0 0 12px;">Quick steps to generate reports and manage TestRail content.</p>
-          
+          <p class="subtitle" style="margin:0 0 12px;">Complete guide for all sidebar features: Reporter, Dashboard, Management, Automation, and Dataset Generator.</p>
+
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">🚀 Quick Start</h3>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
+            <li>Open <b>Reporter</b> to generate HTML reports from a plan or run.</li>
+            <li>Use <b>Dashboard</b> to monitor pass rate, completion, and issues across plans.</li>
+            <li>Use <b>Management</b> to create, update, and delete plans, runs, and cases.</li>
+            <li>Use <b>Automation Management</b> to manage payloads/test data and run automation from this UI.</li>
+            <li>Use <b>Dataset Generator</b> to generate synthetic geospatial files for testing.</li>
+          </ul>
+
           <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">📊 Reporter</h3>
           <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
-            <li>Pilih <b>Project</b> dan <b>Plan</b> dari dropdown (klik <b>Refresh</b> jika daftar kosong)</li>
-            <li>Gunakan kolom <b>search</b> untuk mencari run berdasarkan nama</li>
-            <li>Centang run yang ingin dilaporkan (bisa lebih dari satu)</li>
-            <li>Klik <b>Preview Report</b> - report HTML akan terbuka di tab baru dan bisa langsung diunduh</li>
-            <li><b>Tips</b>: Lampiran akan dikompresi dan di-inline di report; video bisa ditranscode bila fitur aktif</li>
+            <li>Select <b>Project</b> and <b>Plan</b>, then click <b>Refresh</b> if dropdown data is stale.</li>
+            <li>Filter runs with the search field and select one or multiple runs to include.</li>
+            <li>Click <b>Preview Report</b> to queue report generation and open the result in a new tab.</li>
+            <li>Use report metadata and toasts to track progress, queue state, and completion.</li>
+            <li>Generated reports are offline-friendly because attachments are embedded inline.</li>
           </ul>
 
-          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">⚙️ Management - Hierarchical Navigation</h3>
-          <p style="margin:0 0 8px; color: var(--muted); font-size:14px;">Management menggunakan navigasi hierarki: <b>Plans → Runs → Test Cases</b></p>
-          
-          <h4 style="margin:12px 0 6px; font-size:14px; font-weight:600;">📋 Plans</h4>
-          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
-            <li>Lihat daftar test plans (diurutkan berdasarkan <b>update terbaru</b>)</li>
-            <li>Setiap plan menampilkan: ID, status (Active/Completed), dan <b>waktu terakhir diupdate</b></li>
-            <li>Gunakan <b>search bar</b> untuk filter plans berdasarkan nama</li>
-            <li>Klik tombol <b>Refresh</b> untuk mendapatkan data terbaru</li>
-            <li>Klik tombol <b>Edit</b> pada plan untuk melihat runs di dalam plan tersebut</li>
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">📈 Dashboard</h3>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
+            <li>Browse plans with pagination, search, date filters, and completion filters.</li>
+            <li>Sort plans by name, date, pass rate, or test count.</li>
+            <li>Expand a plan to inspect run-level metrics and status distribution.</li>
+            <li>Use <b>Report</b> actions to trigger report generation directly from dashboard cards.</li>
+            <li>Use cache clear/refresh actions when you need newest TestRail data immediately.</li>
           </ul>
 
-          <h4 style="margin:12px 0 6px; font-size:14px; font-weight:600;">🏃 Runs (dalam Plan)</h4>
-          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
-            <li>Setelah klik <b>Edit</b> pada plan, modal akan muncul menampilkan daftar runs</li>
-            <li>Breadcrumb menunjukkan posisi: <b>Plans > [Nama Plan]</b></li>
-            <li>Klik tombol <b>Edit</b> pada run untuk melihat detail run dan test cases</li>
-            <li>Klik tombol <b>Delete</b> untuk menghapus run (dengan konfirmasi)</li>
-            <li>Klik <b>Back</b> atau breadcrumb <b>Plans</b> untuk kembali ke daftar plans</li>
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">⚙️ Management (Hierarchical)</h3>
+          <p style="margin:0 0 8px; color: var(--muted); font-size:14px;">Management flow uses hierarchy: <b>Plans → Runs → Test Cases</b>.</p>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
+            <li><b>Plans:</b> view, search, refresh, edit, and delete plans (with confirmation and cascade awareness).</li>
+            <li><b>Runs:</b> open plan details, view runs, edit run metadata, and delete runs safely.</li>
+            <li><b>Run Details:</b> update run information, add/remove cases, and run bulk actions.</li>
+            <li><b>Test Cases:</b> edit title/refs/BDD scenarios, add results, and review evidence/attachments.</li>
+            <li>Use breadcrumb and back controls to move up levels without losing context.</li>
           </ul>
 
-          <h4 style="margin:12px 0 6px; font-size:14px; font-weight:600;">✅ Test Cases (dalam Run)</h4>
-          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
-            <li>Setelah klik <b>Edit</b> pada run, modal akan muncul menampilkan detail run dan test cases</li>
-            <li>Breadcrumb menunjukkan posisi: <b>Plans > [Nama Plan] > [Nama Run]</b></li>
-            <li>Edit <b>Run Details</b>: nama, deskripsi, dan references</li>
-            <li>Klik <b>Save Changes</b> untuk menyimpan perubahan run</li>
-            <li>Klik tombol <b>Edit</b> pada test case untuk mengedit case (title, refs, BDD scenarios, attachments)</li>
-            <li>Klik tombol <b>Delete</b> pada test case untuk menghapus (dengan konfirmasi)</li>
-            <li>Klik <b>Back</b> atau breadcrumb untuk navigasi ke level sebelumnya</li>
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">🛠️ Create & Update Flows</h3>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
+            <li><b>Create Plan:</b> enter plan name, optional milestone/description, then submit.</li>
+            <li><b>Create Run:</b> choose plan, set scope (all cases or selected cases), and submit.</li>
+            <li><b>Create Case:</b> add title, optional refs, and optional BDD steps.</li>
+            <li>Use modal edit forms for fast updates, then verify success toast before continuing.</li>
           </ul>
 
-          <h4 style="margin:12px 0 6px; font-size:14px; font-weight:600;">📝 Edit Test Case</h4>
-          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 12px; font-size:14px;">
-            <li>Modal edit case akan muncul <b>di atas</b> modal run details</li>
-            <li>Edit <b>Title</b> (required), <b>References</b>, dan <b>BDD Scenarios</b></li>
-            <li>Upload <b>Attachments</b>: drag & drop atau klik untuk browse (PNG, JPG, GIF, MP4, MOV, WebM, PDF, max 25MB)</li>
-            <li>Klik <b>Save Changes</b> untuk menyimpan</li>
-            <li>Klik <b>Cancel</b> untuk kembali ke run details tanpa menyimpan</li>
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">🤖 Automation Management</h3>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
+            <li>Check <b>Automation Status</b> first to confirm repo/app path/runner availability.</li>
+            <li>Use <b>Run Automation</b> controls to set app/env/tag/parallel/headed options and start runs.</li>
+            <li>Use runner tools for stop, copy command, copy log, download log, and error-only filtering.</li>
+            <li>Switch between <b>API</b> and <b>Web</b> tabs to load cases and edit payload/test-data templates.</li>
+            <li>Use <b>Generate Allure Report</b> and open the generated link for execution insights.</li>
           </ul>
 
-          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">🎯 Create New Content</h3>
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">🗺️ Dataset Generator</h3>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
+            <li>Set rows, columns, area, geometry, and output format.</li>
+            <li>Optional realism controls: distributions, spatial weighting, noise, outliers, missing values, seasonality, and date range.</li>
+            <li>Optional boundary controls: GeoJSON area + strict land-only mode.</li>
+            <li>Submit generation, monitor job status, then download output file when complete.</li>
+          </ul>
+
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">🧭 Navigation & UX Tips</h3>
+          <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0 0 16px; font-size:14px;">
+            <li>Sidebar state is preserved visually with active highlighting per view.</li>
+            <li>Use refresh buttons when external TestRail changes are not yet visible.</li>
+            <li>Look for toast messages after create/update/delete/run actions to confirm outcome.</li>
+            <li>For long jobs, keep the tab open and monitor progress bars/log blocks.</li>
+          </ul>
+
+          <h3 style="margin:16px 0 8px; font-size:15px; color: var(--primary);">🩺 Troubleshooting</h3>
           <ul style="padding-left:18px; color: var(--muted); line-height:1.7; margin:0; font-size:14px;">
-            <li><b>Create Plan</b>: Isi nama plan dan (opsional) milestone, lalu submit. Form otomatis bersih setelah sukses</li>
-            <li><b>Create Run</b>: Pilih plan yang aktif, isi nama/desc/refs. Untuk scope: centang "Include all cases" atau klik <b>Select cases</b> untuk memilih case tertentu</li>
-            <li><b>Create Case</b>: Buat case baru dengan title + refs opsional. Jika ada BDD, tempelkan skenario di kolom BDD (satu baris per langkah)</li>
+            <li><b>Empty plan/run lists:</b> verify project ID and click <b>Refresh</b>.</li>
+            <li><b>Report not opening:</b> allow pop-ups for this host and retry preview.</li>
+            <li><b>Automation disabled:</b> verify automation repo mount and environment variables on host/container.</li>
+            <li><b>Dataset job fails:</b> validate required fields and ensure strict land mode has a GeoJSON boundary selected.</li>
+            <li><b>Connection issues:</b> confirm app is running and <code>/healthz</code> returns <code>ok: true</code>.</li>
           </ul>
         </div>
       </div>
@@ -4667,81 +4931,6 @@
       </div>
       <div class="modal-actions">
         <button type="button" class="refresh-btn" id="casePickerDone">Done</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Edit Plan Modal -->
-  <div id="editPlanModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editPlanTitle">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h3 id="editPlanTitle" style="margin:0; font-size:16px;">Edit Test Plan</h3>
-        <button type="button" id="editPlanClose" class="modal-close" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <form id="editPlanForm">
-          <input type="hidden" id="editPlanId" />
-          <label style="margin: 8px 0 6px;">Plan Name</label>
-          <input type="text" id="editPlanName" placeholder="Plan name" required style="width: 100%;" />
-          <label style="margin: 8px 0 6px;">Description (optional)</label>
-          <textarea id="editPlanDesc" placeholder="Description" style="width: 100%; min-height: 80px;"></textarea>
-          <label style="margin: 8px 0 6px;">Milestone ID (optional)</label>
-          <input type="number" id="editPlanMilestone" placeholder="Milestone ID" style="width: 100%;" />
-        </form>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="refresh-btn" id="editPlanCancel">Cancel</button>
-        <button type="button" id="editPlanSave">Save Changes</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Edit Run Modal -->
-  <div id="editRunModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editRunTitle">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h3 id="editRunTitle" style="margin:0; font-size:16px;">Edit Test Run</h3>
-        <button type="button" id="editRunClose" class="modal-close" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <form id="editRunForm">
-          <input type="hidden" id="editRunId" />
-          <label style="margin: 8px 0 6px;">Run Name</label>
-          <input type="text" id="editRunName" placeholder="Run name" required style="width: 100%;" />
-          <label style="margin: 8px 0 6px;">Description (optional)</label>
-          <textarea id="editRunDesc" placeholder="Description" style="width: 100%; min-height: 80px;"></textarea>
-          <label style="margin: 8px 0 6px;">Refs (optional)</label>
-          <input type="text" id="editRunRefs" placeholder="Comma separated refs" style="width: 100%;" />
-        </form>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="refresh-btn" id="editRunCancel">Cancel</button>
-        <button type="button" id="editRunSave">Save Changes</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Edit Case Modal -->
-  <div id="editCaseModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editCaseTitle">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h3 id="editCaseTitle" style="margin:0; font-size:16px;">Edit Test Case</h3>
-        <button type="button" id="editCaseClose" class="modal-close" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <form id="editCaseForm">
-          <input type="hidden" id="editCaseId" />
-          <label style="margin: 8px 0 6px;">Case Title</label>
-          <input type="text" id="editCaseTitle" placeholder="Case title" required style="width: 100%;" />
-          <label style="margin: 8px 0 6px;">BDD Scenarios (optional)</label>
-          <textarea id="editCaseBdd" placeholder="BDD scenarios" style="width: 100%; min-height: 100px;"></textarea>
-          <label style="margin: 8px 0 6px;">Refs (optional)</label>
-          <input type="text" id="editCaseRefs" placeholder="Comma separated refs" style="width: 100%;" />
-        </form>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="refresh-btn" id="editCaseCancel">Cancel</button>
-        <button type="button" id="editCaseSave">Save Changes</button>
       </div>
     </div>
   </div>
@@ -5130,7 +5319,7 @@
       </div>
       
       <div class="dashboard-runs-section" style="display: none;">
-        <button type="button" class="dashboard-runs-toggle">
+        <button type="button" class="dashboard-runs-toggle" aria-expanded="false">
           <svg class="dashboard-runs-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path fill="currentColor" d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/>
           </svg>
@@ -5718,587 +5907,6 @@
   </script>
   <script src="/assets/dashboard.js?v={{ cache_bust }}"></script>
   <script src="/assets/app.js?v={{ cache_bust }}"></script>
-  <script>
-    // Edit functionality for plans, runs, and cases
-    (function() {
-      // Helper function to show toast messages (reuse from app.js)
-      function showToast(message, type) {
-        const container = document.getElementById('toastContainer');
-        if (!container) return;
-        
-        const div = document.createElement('div');
-        const variant = type === 'error' ? 'bg-danger text-white' : 
-                       type === 'success' ? 'bg-success text-white' : 'bg-info text-white';
-        div.className = `toast align-items-center ${variant}`;
-        div.setAttribute('role', 'alert');
-        div.setAttribute('aria-live', 'assertive');
-        div.setAttribute('aria-atomic', 'true');
-        
-        const safeMessage = String(message || '').replace(/[&<>"]/g, (c) => 
-          ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
-        );
-        
-        div.innerHTML = `<div class="d-flex">
-          <div class="toast-body">${safeMessage}</div>
-        </div>`;
-        
-        container.appendChild(div);
-        const toastObj = new bootstrap.Toast(div, { delay: 4000 });
-        toastObj.show();
-        
-        div.addEventListener('hidden.bs.toast', () => {
-          if (div.parentNode === container) {
-            container.removeChild(div);
-          }
-        });
-      }
-
-      // Helper function for API requests
-      async function requestJson(url, options) {
-        const resp = await fetch(url, options);
-        const text = await resp.text();
-        let data = null;
-        if (text) {
-          try {
-            data = JSON.parse(text);
-          } catch (err) {
-            data = null;
-          }
-        }
-        if (!resp.ok) {
-          const detail = (data && typeof data === 'object') ? (data.detail || data.error) : '';
-          throw new Error(detail || text || `Request to ${url} failed (${resp.status})`);
-        }
-        return data || {};
-      }
-
-      // Modal management functions
-      function openModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-          modal.classList.remove('hidden');
-        }
-      }
-
-      function closeModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) {
-          modal.classList.add('hidden');
-        }
-      }
-
-      function initScopedTabs(container) {
-        if (!container) return;
-        const tabButtons = Array.from(container.querySelectorAll('.manage-tab'));
-        const panels = Array.from(container.querySelectorAll('.manage-tab-panel'));
-        if (!tabButtons.length || !panels.length) return;
-
-        function activateTab(button) {
-          const targetId = button.getAttribute('aria-controls');
-          tabButtons.forEach((btn) => {
-            const active = btn === button;
-            btn.classList.toggle('is-active', active);
-            btn.setAttribute('aria-selected', active ? 'true' : 'false');
-          });
-          panels.forEach((panel) => {
-            panel.classList.toggle('is-active', panel.id === targetId);
-          });
-        }
-
-        tabButtons.forEach((btn) => {
-          btn.addEventListener('click', () => activateTab(btn));
-        });
-      }
-
-      function initCreateTabs() {
-        initScopedTabs(document.querySelector('.manage-create-tabs'));
-      }
-
-      function initAutomationTabs() {
-        initScopedTabs(document.querySelector('.automation-tabs'));
-      }
-
-      function focusCreateTabs() {
-        const container = document.querySelector('.manage-create-tabs');
-        if (!container) return;
-        const planTab = container.querySelector('#tabCreatePlan');
-        if (planTab) {
-          planTab.click();
-          planTab.focus();
-        }
-        container.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-
-      window.focusCreateTabs = focusCreateTabs;
-
-      // Edit Plan functionality
-      window.openEditPlanModal = function(planId, planName, planDesc, planMilestone) {
-        document.getElementById('editPlanId').value = planId || '';
-        document.getElementById('editPlanName').value = planName || '';
-        document.getElementById('editPlanDesc').value = planDesc || '';
-        document.getElementById('editPlanMilestone').value = planMilestone || '';
-        openModal('editPlanModal');
-      };
-
-      async function saveEditPlan() {
-        const planId = document.getElementById('editPlanId').value;
-        const name = document.getElementById('editPlanName').value.trim();
-        const description = document.getElementById('editPlanDesc').value.trim() || null;
-        const milestoneId = document.getElementById('editPlanMilestone').value.trim();
-
-        if (!planId) {
-          showToast('Plan ID is missing', 'error');
-          return;
-        }
-
-        if (!name) {
-          showToast('Plan name is required', 'error');
-          return;
-        }
-
-        const payload = {
-          name: name,
-          description: description,
-          milestone_id: milestoneId ? parseInt(milestoneId, 10) : null
-        };
-
-        try {
-          const data = await requestJson(`/api/manage/plan/${planId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-
-          showToast(`Plan #${planId} updated successfully`, 'success');
-          closeModal('editPlanModal');
-          
-          // Refresh plans list if available
-          if (typeof window.loadPlans === 'function') {
-            window.loadPlans(true);
-          }
-          if (typeof window.loadManagePlans === 'function') {
-            window.loadManagePlans(true);
-          }
-        } catch (err) {
-          showToast(err.message || 'Failed to update plan', 'error');
-        }
-      }
-
-      // Edit Run functionality
-      window.openEditRunModal = function(runId, runName, runDesc, runRefs) {
-        document.getElementById('editRunId').value = runId || '';
-        document.getElementById('editRunName').value = runName || '';
-        document.getElementById('editRunDesc').value = runDesc || '';
-        document.getElementById('editRunRefs').value = runRefs || '';
-        openModal('editRunModal');
-      };
-
-      async function saveEditRun() {
-        const runId = document.getElementById('editRunId').value;
-        const name = document.getElementById('editRunName').value.trim();
-        const description = document.getElementById('editRunDesc').value.trim() || null;
-        const refs = document.getElementById('editRunRefs').value.trim() || null;
-
-        if (!runId) {
-          showToast('Run ID is missing', 'error');
-          return;
-        }
-
-        if (!name) {
-          showToast('Run name is required', 'error');
-          return;
-        }
-
-        const payload = {
-          name: name,
-          description: description,
-          refs: refs
-        };
-
-        try {
-          const data = await requestJson(`/api/manage/run/${runId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-
-          showToast(`Run #${runId} updated successfully`, 'success');
-          closeModal('editRunModal');
-          
-          // Refresh runs list if available
-          if (typeof window.loadRuns === 'function') {
-            window.loadRuns();
-          }
-        } catch (err) {
-          showToast(err.message || 'Failed to update run', 'error');
-        }
-      }
-
-      // Edit Case functionality
-      window.openEditCaseModal = function(caseId, caseTitle, caseBdd, caseRefs) {
-        document.getElementById('editCaseId').value = caseId || '';
-        document.getElementById('editCaseTitle').value = caseTitle || '';
-        document.getElementById('editCaseBdd').value = caseBdd || '';
-        document.getElementById('editCaseRefs').value = caseRefs || '';
-        openModal('editCaseModal');
-      };
-
-      async function saveEditCase() {
-        const caseId = document.getElementById('editCaseId').value;
-        const title = document.getElementById('editCaseTitle').value.trim();
-        const bddScenarios = document.getElementById('editCaseBdd').value.trim() || null;
-        const refs = document.getElementById('editCaseRefs').value.trim() || null;
-
-        if (!caseId) {
-          showToast('Case ID is missing', 'error');
-          return;
-        }
-
-        if (!title) {
-          showToast('Case title is required', 'error');
-          return;
-        }
-
-        const payload = {
-          title: title,
-          bdd_scenarios: bddScenarios,
-          refs: refs
-        };
-
-        try {
-          const data = await requestJson(`/api/manage/case/${caseId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-
-          showToast(`Case #${caseId} updated successfully`, 'success');
-          closeModal('editCaseModal');
-          
-          // Refresh cases list if available
-          if (typeof window.loadCases === 'function') {
-            window.loadCases(true);
-          }
-        } catch (err) {
-          showToast(err.message || 'Failed to update case', 'error');
-        }
-      }
-
-      // Event listeners for modal controls
-      document.addEventListener('DOMContentLoaded', function() {
-        initCreateTabs();
-        initAutomationTabs();
-        // Plan modal
-        const editPlanClose = document.getElementById('editPlanClose');
-        const editPlanCancel = document.getElementById('editPlanCancel');
-        const editPlanSave = document.getElementById('editPlanSave');
-        
-        if (editPlanClose) editPlanClose.addEventListener('click', () => closeModal('editPlanModal'));
-        if (editPlanCancel) editPlanCancel.addEventListener('click', () => closeModal('editPlanModal'));
-        if (editPlanSave) editPlanSave.addEventListener('click', saveEditPlan);
-
-        // Run modal
-        const editRunClose = document.getElementById('editRunClose');
-        const editRunCancel = document.getElementById('editRunCancel');
-        const editRunSave = document.getElementById('editRunSave');
-        
-        if (editRunClose) editRunClose.addEventListener('click', () => closeModal('editRunModal'));
-        if (editRunCancel) editRunCancel.addEventListener('click', () => closeModal('editRunModal'));
-        if (editRunSave) editRunSave.addEventListener('click', saveEditRun);
-
-        // Case modal
-        const editCaseClose = document.getElementById('editCaseClose');
-        const editCaseCancel = document.getElementById('editCaseCancel');
-        const editCaseSave = document.getElementById('editCaseSave');
-        
-        if (editCaseClose) editCaseClose.addEventListener('click', () => closeModal('editCaseModal'));
-        if (editCaseCancel) editCaseCancel.addEventListener('click', () => closeModal('editCaseModal'));
-        if (editCaseSave) editCaseSave.addEventListener('click', saveEditCase);
-
-        // Close modals when clicking outside
-        document.getElementById('editPlanModal')?.addEventListener('click', function(e) {
-          if (e.target.id === 'editPlanModal') closeModal('editPlanModal');
-        });
-        document.getElementById('editRunModal')?.addEventListener('click', function(e) {
-          if (e.target.id === 'editRunModal') closeModal('editRunModal');
-        });
-        document.getElementById('editCaseModal')?.addEventListener('click', function(e) {
-          if (e.target.id === 'editCaseModal') closeModal('editCaseModal');
-        });
-
-        // Load lists functionality
-        const refreshPlanListBtn = document.getElementById('refreshPlanListBtn');
-        const refreshRunListBtn = document.getElementById('refreshRunListBtn');
-        const refreshCaseListBtn = document.getElementById('refreshCaseListBtn');
-
-        if (refreshPlanListBtn) {
-          refreshPlanListBtn.addEventListener('click', loadPlanList);
-        }
-        if (refreshRunListBtn) {
-          refreshRunListBtn.addEventListener('click', loadRunList);
-        }
-        if (refreshCaseListBtn) {
-          refreshCaseListBtn.addEventListener('click', loadCaseList);
-        }
-      });
-
-      // Load plan list with edit buttons
-      async function loadPlanList() {
-        const container = document.getElementById('planListContainer');
-        const projectInput = document.getElementById('planProject');
-        const project = projectInput ? projectInput.value || '1' : '1';
-
-        if (!container) return;
-
-        container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Loading plans...</p>';
-
-        try {
-          const data = await requestJson(`/api/plans?project=${encodeURIComponent(project)}&is_completed=0`);
-          const plans = Array.isArray(data.plans) ? data.plans : [];
-
-          if (plans.length === 0) {
-            container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">No plans found</p>';
-            return;
-          }
-
-          // Sort by creation date (newest first)
-          plans.sort((a, b) => (b.created_on || 0) - (a.created_on || 0));
-
-          // Take only first 10 plans
-          const displayPlans = plans.slice(0, 10);
-
-          container.innerHTML = displayPlans.map(plan => {
-            const name = String(plan.name || `Plan ${plan.id}`).replace(/[&<>"]/g, (c) => 
-              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
-            );
-            const status = plan.is_completed ? 'Completed' : 'Active';
-            const statusColor = plan.is_completed ? 'var(--muted)' : 'var(--primary)';
-            
-            return `
-              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);">
-                <div style="flex: 1; min-width: 0;">
-                  <div style="font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${name}</div>
-                  <div style="font-size: 12px; color: var(--muted);">
-                    ID: ${plan.id} • <span style="color: ${statusColor};">${status}</span>
-                  </div>
-                </div>
-                <button type="button" class="refresh-btn" onclick="openEditPlanModal(${plan.id}, '${name.replace(/'/g, "\\'")}', '', null)" style="font-size: 12px; padding: 4px 10px; flex-shrink: 0; margin-left: 8px;">
-                  Edit
-                </button>
-              </div>
-            `;
-          }).join('');
-        } catch (err) {
-          container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Failed to load plans</p>';
-          showToast(err.message || 'Failed to load plans', 'error');
-        }
-      }
-
-      // Load run list with edit buttons
-      async function loadRunList() {
-        const container = document.getElementById('runListContainer');
-        const planSelect = document.getElementById('runPlanSelect');
-        const projectInput = document.getElementById('runProject');
-        
-        if (!container || !planSelect) return;
-
-        const planId = planSelect.value;
-        const project = projectInput ? projectInput.value || '1' : '1';
-
-        if (!planId) {
-          container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Please select a plan first</p>';
-          return;
-        }
-
-        container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Loading runs...</p>';
-
-        try {
-          const data = await requestJson(`/api/runs?project=${encodeURIComponent(project)}&plan=${encodeURIComponent(planId)}`);
-          const runs = Array.isArray(data.runs) ? data.runs : [];
-
-          if (runs.length === 0) {
-            container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">No runs found in this plan</p>';
-            return;
-          }
-
-          container.innerHTML = runs.map(run => {
-            const name = String(run.name || `Run ${run.id}`).replace(/[&<>"]/g, (c) => 
-              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
-            );
-            const suite = run.suite_name ? String(run.suite_name).replace(/[&<>"]/g, (c) => 
-              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
-            ) : '';
-            const status = run.is_completed ? 'Completed' : 'Active';
-            const statusColor = run.is_completed ? 'var(--muted)' : 'var(--primary)';
-            
-            return `
-              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);">
-                <div style="flex: 1; min-width: 0;">
-                  <div style="font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${name}</div>
-                  <div style="font-size: 12px; color: var(--muted);">
-                    ID: ${run.id}${suite ? ` • ${suite}` : ''} • <span style="color: ${statusColor};">${status}</span>
-                  </div>
-                </div>
-                <button type="button" class="refresh-btn" onclick="openEditRunModal(${run.id}, '${name.replace(/'/g, "\\'")}', '', '')" style="font-size: 12px; padding: 4px 10px; flex-shrink: 0; margin-left: 8px;">
-                  Edit
-                </button>
-              </div>
-            `;
-          }).join('');
-        } catch (err) {
-          container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Failed to load runs</p>';
-          showToast(err.message || 'Failed to load runs', 'error');
-        }
-      }
-
-      // Load case list with edit buttons
-      async function loadCaseList() {
-        const container = document.getElementById('caseListManageContainer');
-        const projectInput = document.getElementById('caseProject');
-        const project = projectInput ? projectInput.value || '1' : '1';
-
-        if (!container) return;
-
-        container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Loading cases...</p>';
-
-        try {
-          // Use the same parameters as the case picker
-          const config = window.__APP_CONFIG__ || {};
-          const params = new URLSearchParams({ project: project });
-          
-          if (config.defaultSuiteId !== null && config.defaultSuiteId !== undefined) {
-            params.append('suite_id', String(config.defaultSuiteId));
-          }
-          if (config.defaultSectionId !== null && config.defaultSectionId !== undefined) {
-            params.append('section_id', String(config.defaultSectionId));
-          }
-
-          const data = await requestJson(`/api/cases?${params.toString()}`);
-          const cases = Array.isArray(data.cases) ? data.cases : [];
-
-          if (cases.length === 0) {
-            container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">No cases found</p>';
-            return;
-          }
-
-          // Sort by updated date (newest first) and take first 10
-          cases.sort((a, b) => (b.updated_on || 0) - (a.updated_on || 0));
-          const displayCases = cases.slice(0, 10);
-
-          container.innerHTML = displayCases.map(testCase => {
-            const title = String(testCase.title || `Case ${testCase.id}`).replace(/[&<>"]/g, (c) => 
-              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
-            );
-            const refs = testCase.refs ? String(testCase.refs).replace(/[&<>"]/g, (c) => 
-              ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c] || c
-            ) : '';
-            
-            return `
-              <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);">
-                <div style="flex: 1; min-width: 0;">
-                  <div style="font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
-                  <div style="font-size: 12px; color: var(--muted);">
-                    ID: ${testCase.id}${refs ? ` • Refs: ${refs}` : ''}
-                  </div>
-                </div>
-                <button type="button" class="refresh-btn" onclick="openEditCaseModal(${testCase.id}, '${title.replace(/'/g, "\\'")}', '', '${refs.replace(/'/g, "\\'")}' )" style="font-size: 12px; padding: 4px 10px; flex-shrink: 0; margin-left: 8px;">
-                  Edit
-                </button>
-              </div>
-            `;
-          }).join('');
-        } catch (err) {
-          container.innerHTML = '<p style="color: var(--muted); font-size: 13px; text-align: center; padding: 20px;">Failed to load cases</p>';
-          showToast(err.message || 'Failed to load cases', 'error');
-        }
-      }
-
-      // Make load functions globally available
-      window.loadPlanList = loadPlanList;
-      window.loadRunList = loadRunList;
-      window.loadCaseList = loadCaseList;
-    })();
-
-    // Simple navigation functionality for Dataset Generator
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('Navigation JavaScript loaded');
-      const views = {
-        'linkReporter': 'reporterView',
-        'linkDashboard': 'dashboardView', 
-        'linkManage': 'manageView',
-        'linkAutomation': 'automationView',
-        'linkDataset': 'datasetView',
-        'linkHowTo': 'howToView'
-      };
-      
-      function showView(viewId) {
-        // Hide all views
-        Object.values(views).forEach(id => {
-          const view = document.getElementById(id);
-          if (view) view.classList.add('hidden');
-        });
-        
-        // Show selected view
-        const targetView = document.getElementById(viewId);
-        if (targetView) targetView.classList.remove('hidden');
-        
-        // Update navigation active state
-        document.querySelectorAll('.nav-item').forEach(item => {
-          item.classList.remove('active');
-        });
-      }
-      
-      // Add click handlers to navigation items
-      Object.entries(views).forEach(([linkId, viewId]) => {
-        const link = document.getElementById(linkId);
-        console.log('Setting up navigation for:', linkId, '-> element found:', !!link);
-        if (link) {
-          link.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Navigation clicked:', linkId, '->', viewId);
-            showView(viewId);
-            this.classList.add('active');
-          });
-        }
-      });
-      
-      // Show reporter view by default
-      showView('reporterView');
-      const reporterLink = document.getElementById('linkReporter');
-      if (reporterLink) reporterLink.classList.add('active');
-      
-      // Define showView function
-      function showView(viewId) {
-        console.log('Switching to view:', viewId);
-        // Hide all views
-        const allViews = ['reporterView', 'dashboardView', 'manageView', 'automationView', 'datasetView', 'howToView'];
-        allViews.forEach(id => {
-          const view = document.getElementById(id);
-          if (view) view.classList.add('hidden');
-        });
-        
-        // Show selected view
-        const targetView = document.getElementById(viewId);
-        if (targetView) {
-          targetView.classList.remove('hidden');
-          console.log('Showing view:', viewId);
-        } else {
-          console.error('View not found:', viewId);
-        }
-      }
-      
-      // Make showView function globally available for inline onclick handlers
-      window.showDatasetView = function() {
-        console.log('Dataset Generator clicked!');
-        showView('datasetView');
-        // Update active state
-        document.querySelectorAll('.nav-item').forEach(item => {
-          item.classList.remove('active');
-        });
-        document.getElementById('linkDataset').classList.add('active');
-      };
-    });
-  </script>
   <script src="/assets/dataset-nav.js?v={{ cache_bust }}"></script>
 </body>
 </html>

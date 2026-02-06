@@ -206,14 +206,6 @@ job_manager = ReportJobManager(max_workers=report_worker_count, max_history=conf
 
 
 @router.get("/report")
-def report_alias(
-    project: int = 1, plan: int | None = None, run: int | None = None, client=Depends(get_testrail_client)
-):
-    """Alias for /api/report (synchronous legacy endpoint)."""
-    return report_sync(project=project, plan=plan, run=run, client=client)
-
-
-@router.get("/report")
 def report_sync(
     project: int = 1,
     plan: int | None = None,

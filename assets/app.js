@@ -73,21 +73,25 @@
     const reporter = document.getElementById("reporterView");
     const manage = document.getElementById("manageView");
     const automation = document.getElementById("automationView");
+    const dataset = document.getElementById("datasetView");
     const howto = document.getElementById("howToView");
     const dashboard = document.getElementById("dashboardView");
     const linkReporter = document.getElementById("linkReporter");
     const linkManage = document.getElementById("linkManage");
     const linkAutomation = document.getElementById("linkAutomation");
+    const linkDataset = document.getElementById("linkDataset");
     const linkHowto = document.getElementById("linkHowTo");
     const linkDashboard = document.getElementById("linkDashboard");
     reporter == null ? void 0 : reporter.classList.add("hidden");
     manage == null ? void 0 : manage.classList.add("hidden");
     automation == null ? void 0 : automation.classList.add("hidden");
+    dataset == null ? void 0 : dataset.classList.add("hidden");
     howto == null ? void 0 : howto.classList.add("hidden");
     dashboard == null ? void 0 : dashboard.classList.add("hidden");
     linkReporter == null ? void 0 : linkReporter.classList.remove("active");
     linkManage == null ? void 0 : linkManage.classList.remove("active");
     linkAutomation == null ? void 0 : linkAutomation.classList.remove("active");
+    linkDataset == null ? void 0 : linkDataset.classList.remove("active");
     linkHowto == null ? void 0 : linkHowto.classList.remove("active");
     linkDashboard == null ? void 0 : linkDashboard.classList.remove("active");
     if (target === "manage") {
@@ -99,6 +103,12 @@
     } else if (target === "automation") {
       automation == null ? void 0 : automation.classList.remove("hidden");
       linkAutomation == null ? void 0 : linkAutomation.classList.add("active");
+    } else if (target === "dataset") {
+      dataset == null ? void 0 : dataset.classList.remove("hidden");
+      linkDataset == null ? void 0 : linkDataset.classList.add("active");
+      if (typeof window.showDatasetView === "function") {
+        window.showDatasetView();
+      }
     } else if (target === "howto") {
       howto == null ? void 0 : howto.classList.remove("hidden");
       linkHowto == null ? void 0 : linkHowto.classList.add("active");
@@ -4475,6 +4485,40 @@ Note: This will only remove them from the run, not delete them from the project.
     form.querySelectorAll(".input-invalid").forEach((el) => el.classList.remove("input-invalid"));
     applyWizardStep(form, 1);
   }
+  function initScopedTabs(container) {
+    if (!container) return;
+    const tabButtons = Array.from(container.querySelectorAll(".manage-tab"));
+    const panels = Array.from(container.querySelectorAll(".manage-tab-panel"));
+    if (!tabButtons.length || !panels.length) return;
+    const activateTab = (button) => {
+      const targetId = button.getAttribute("aria-controls");
+      tabButtons.forEach((btn) => {
+        const active = btn === button;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      panels.forEach((panel) => {
+        panel.classList.toggle("is-active", panel.id === targetId);
+      });
+    };
+    tabButtons.forEach((btn) => {
+      btn.addEventListener("click", () => activateTab(btn));
+    });
+  }
+  function focusCreateTabs() {
+    const container = document.querySelector(".manage-create-tabs");
+    if (!container) return;
+    const planTab = container.querySelector("#tabCreatePlan");
+    if (planTab) {
+      planTab.click();
+      planTab.focus();
+    }
+    container.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function initManageTabs() {
+    initScopedTabs(document.querySelector(".manage-create-tabs"));
+    initScopedTabs(document.querySelector(".automation-tabs"));
+  }
   function stripAutomationHtml(value) {
     const lowered = value.toLowerCase();
     if (!lowered.includes("<p") && !lowered.includes("<br") && !lowered.includes("</")) {
@@ -4546,13 +4590,24 @@ Note: This will only remove them from the run, not delete them from the project.
     const runTag = document.getElementById("automationRunTag");
     const allureLabel = document.getElementById("automationAllureLabel");
     const runParallel = document.getElementById("automationRunParallel");
+    const runHeaded = document.getElementById("automationRunHeaded");
     const runUseSelected = document.getElementById("automationRunUseSelectedBtn");
     const runBtn = document.getElementById("automationRunBtn");
+    const runStopBtn = document.getElementById("automationRunStopBtn");
+    const runCopyCmdBtn = document.getElementById("automationRunCopyCmdBtn");
+    const runDownloadLogBtn = document.getElementById("automationRunDownloadLogBtn");
+    const runCopyLogBtn = document.getElementById("automationRunCopyLogBtn");
+    const runErrorsOnlyToggle = document.getElementById("automationRunErrorsOnly");
     const runStatus = document.getElementById("automationRunStatus");
     const runProgressBar = document.getElementById("automationRunProgressBar");
     const runLog = document.getElementById("automationRunLog");
+    const runHistoryList = document.getElementById("automationRunHistory");
+    const runHistoryRefreshBtn = document.getElementById("automationRunHistoryRefreshBtn");
     const runStorageKey = "automationRunId";
     let runPoller = null;
+    let lastRunId = null;
+    let lastRunCommand = null;
+    let lastRunLogLines = [];
     const allureBtn = document.getElementById("automationAllureBtn");
     const allureStatus = document.getElementById("automationAllureStatus");
     const allureLink = document.getElementById("automationAllureLink");
@@ -4574,6 +4629,7 @@ Note: This will only remove them from the run, not delete them from the project.
     const webFeaturePath = document.getElementById("automationWebFeaturePath");
     const webPreview = document.getElementById("automationWebPreview");
     let selectedCase = null;
+    const logErrorRegex = /(error|failed|exception|traceback|cypresserror)/i;
     const renderTags = (container, kind, item) => {
       if (!container) return;
       const tags = /* @__PURE__ */ new Set();
@@ -4868,6 +4924,69 @@ Note: This will only remove them from the run, not delete them from the project.
       }
     };
     loadAutomationStatus();
+    const filterLogLines = (lines, errorsOnly) => {
+      if (!errorsOnly) return lines;
+      return lines.filter((line) => logErrorRegex.test(line));
+    };
+    const updateLogView = () => {
+      var _a;
+      if (!runLog) return;
+      const errorsOnly = (_a = runErrorsOnlyToggle == null ? void 0 : runErrorsOnlyToggle.checked) != null ? _a : false;
+      const lines = filterLogLines(lastRunLogLines, errorsOnly);
+      runLog.textContent = lines.join("\n") || "No logs yet.";
+    };
+    const updateRunActions = (status, runId) => {
+      const active = status === "running" || status === "stopping";
+      if (runStopBtn) runStopBtn.disabled = !active || !runId;
+      if (runCopyCmdBtn) runCopyCmdBtn.disabled = !lastRunCommand;
+      if (runDownloadLogBtn) runDownloadLogBtn.disabled = !runId;
+      if (runCopyLogBtn) runCopyLogBtn.disabled = !lastRunLogLines.length;
+    };
+    const renderRunHistory = (runs) => {
+      if (!runHistoryList) return;
+      runHistoryList.innerHTML = "";
+      if (!runs.length) {
+        const empty = document.createElement("div");
+        empty.className = "automation-case-card";
+        empty.textContent = "No runs yet.";
+        runHistoryList.appendChild(empty);
+        return;
+      }
+      runs.forEach((run) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "automation-case-card automation-run-card";
+        card.dataset.runId = run.run_id;
+        if (run.run_id === lastRunId) {
+          card.classList.add("is-active");
+        }
+        const title = document.createElement("div");
+        title.className = "automation-case-title";
+        title.textContent = `${(run.test_type || "run").toUpperCase()} \xB7 ${run.environment || "env"} \xB7 ${run.app || "app"}`;
+        const meta = document.createElement("div");
+        meta.className = "automation-case-meta-line";
+        const tagLabel = run.test_tag ? `Tag: ${run.test_tag}` : "Tag: all";
+        const startedAt = run.started_at ? formatRelativeTime(new Date(run.started_at)) : "unknown";
+        meta.textContent = `${tagLabel} \xB7 ${startedAt}`;
+        const detail = document.createElement("div");
+        detail.className = "automation-case-meta-line";
+        const progress = run.progress_percent != null ? `${run.progress_percent}%` : "n/a";
+        detail.textContent = `Status: ${run.status || "unknown"} \xB7 Progress: ${progress}`;
+        card.appendChild(title);
+        card.appendChild(meta);
+        card.appendChild(detail);
+        runHistoryList.appendChild(card);
+      });
+    };
+    const fetchRunHistory = async () => {
+      try {
+        const data = await requestJson("/api/automation/runs");
+        renderRunHistory((data == null ? void 0 : data.runs) || []);
+      } catch (e) {
+        renderRunHistory([]);
+      }
+    };
+    updateRunActions("idle", null);
     runUseSelected == null ? void 0 : runUseSelected.addEventListener("click", () => {
       if (!selectedCase) {
         showToast("Select a case first.", "error");
@@ -4883,18 +5002,38 @@ Note: This will only remove them from the run, not delete them from the project.
         runStatus.textContent = `Ready to run C${selectedCase.id}.`;
       }
     });
+    const syncHeadedToggle = () => {
+      if (!runHeaded) return;
+      const typeValue = ((runType == null ? void 0 : runType.value) || "api").toLowerCase();
+      const enableHeaded = typeValue === "e2e" || typeValue === "all";
+      runHeaded.disabled = !enableHeaded;
+      if (!enableHeaded) {
+        runHeaded.value = "false";
+      }
+    };
+    runType == null ? void 0 : runType.addEventListener("change", syncHeadedToggle);
+    runType == null ? void 0 : runType.addEventListener("input", syncHeadedToggle);
+    document.addEventListener("change", (event) => {
+      const target = event.target;
+      if ((target == null ? void 0 : target.id) === "automationRunType") {
+        syncHeadedToggle();
+      }
+    });
+    syncHeadedToggle();
     runBtn == null ? void 0 : runBtn.addEventListener("click", async () => {
       const wantsParallel = ((runParallel == null ? void 0 : runParallel.value) || "false") === "true";
       if (wantsParallel) {
         showToast("Parallel runs are not supported locally yet.", "error");
         return;
       }
+      const wantsHeaded = ((runHeaded == null ? void 0 : runHeaded.value) || "false") === "true";
       const payload = {
         app_name: (runApp == null ? void 0 : runApp.value) || "lokasi_intelligence",
         test_type: (runType == null ? void 0 : runType.value) || "api",
         test_tag: (runTag == null ? void 0 : runTag.value.trim()) || "",
         environment: (runEnv == null ? void 0 : runEnv.value) || "staging",
-        parallel: wantsParallel
+        parallel: wantsParallel,
+        headed: wantsHeaded
       };
       if (runStatus) {
         runStatus.textContent = "Dispatching workflow...";
@@ -4906,6 +5045,7 @@ Note: This will only remove them from the run, not delete them from the project.
           body: JSON.stringify(payload)
         });
         const runId = (response == null ? void 0 : response.run_id) || "";
+        lastRunCommand = (response == null ? void 0 : response.command) || null;
         if (runId) {
           localStorage.setItem(runStorageKey, runId);
         }
@@ -4923,12 +5063,61 @@ Note: This will only remove them from the run, not delete them from the project.
         if (runId) {
           startRunPolling(runId);
         }
+        fetchRunHistory();
         showToast("Automation run started.", "success");
       } catch (err) {
         if (runStatus) {
           runStatus.textContent = (err == null ? void 0 : err.message) || "Dispatch failed.";
         }
         showToast((err == null ? void 0 : err.message) || "Failed to dispatch workflow.", "error");
+      }
+    });
+    runStopBtn == null ? void 0 : runStopBtn.addEventListener("click", async () => {
+      if (!lastRunId) {
+        showToast("No active run selected.", "error");
+        return;
+      }
+      try {
+        await requestJson(`/api/automation/run/${encodeURIComponent(lastRunId)}/stop`, {
+          method: "POST"
+        });
+        showToast("Stop requested.", "info");
+        pollRunStatus(lastRunId);
+        fetchRunHistory();
+      } catch (err) {
+        showToast((err == null ? void 0 : err.message) || "Failed to stop run.", "error");
+      }
+    });
+    runCopyCmdBtn == null ? void 0 : runCopyCmdBtn.addEventListener("click", async () => {
+      if (!lastRunCommand) {
+        showToast("No command available.", "error");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(lastRunCommand);
+        showToast("Command copied.", "success");
+      } catch (e) {
+        showToast("Failed to copy command.", "error");
+      }
+    });
+    runDownloadLogBtn == null ? void 0 : runDownloadLogBtn.addEventListener("click", () => {
+      if (!lastRunId) {
+        showToast("No run selected.", "error");
+        return;
+      }
+      const url = `/api/automation/run/${encodeURIComponent(lastRunId)}/log?download=1`;
+      window.open(url, "_blank", "noopener");
+    });
+    runCopyLogBtn == null ? void 0 : runCopyLogBtn.addEventListener("click", async () => {
+      if (!(runLog == null ? void 0 : runLog.textContent)) {
+        showToast("No log output available.", "error");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(runLog.textContent);
+        showToast("Log copied.", "success");
+      } catch (e) {
+        showToast("Failed to copy log.", "error");
       }
     });
     allureBtn == null ? void 0 : allureBtn.addEventListener("click", async () => {
@@ -4975,10 +5164,11 @@ Note: This will only remove them from the run, not delete them from the project.
     const updateRunUI = (data) => {
       var _a;
       const status = (data == null ? void 0 : data.status) || "unknown";
+      const statusLabel = status.replace(/_/g, " ");
       const completed = (_a = data == null ? void 0 : data.completed_cases) != null ? _a : 0;
       const total = data == null ? void 0 : data.total_cases;
       const progress = data == null ? void 0 : data.progress_percent;
-      const summaryParts = [`Status: ${status}`];
+      const summaryParts = [`Status: ${statusLabel}`];
       if (typeof total === "number") {
         summaryParts.push(`Progress: ${completed}/${total}`);
       } else {
@@ -4996,15 +5186,20 @@ Note: This will only remove them from the run, not delete them from the project.
       if (runProgressBar) {
         runProgressBar.style.width = typeof progress === "number" ? `${progress}%` : "0%";
       }
-      if (runLog && Array.isArray(data == null ? void 0 : data.log_tail)) {
-        runLog.textContent = data.log_tail.join("\n") || "No logs yet.";
-      }
+      lastRunCommand = (data == null ? void 0 : data.command) || lastRunCommand;
+      lastRunLogLines = Array.isArray(data == null ? void 0 : data.log_tail) ? data.log_tail : [];
+      updateLogView();
+      updateRunActions(status, lastRunId);
     };
     const pollRunStatus = async (runId) => {
       try {
-        const data = await requestJson(`/api/automation/run/${encodeURIComponent(runId)}`);
+        const errorsOnly = (runErrorsOnlyToggle == null ? void 0 : runErrorsOnlyToggle.checked) ? "true" : "false";
+        const data = await requestJson(
+          `/api/automation/run/${encodeURIComponent(runId)}?errors_only=${errorsOnly}`
+        );
         updateRunUI(data);
-        if ((data == null ? void 0 : data.status) === "success" || (data == null ? void 0 : data.status) === "failed") {
+        fetchRunHistory();
+        if ((data == null ? void 0 : data.status) === "success" || (data == null ? void 0 : data.status) === "failed" || (data == null ? void 0 : data.status) === "completed_with_failures" || (data == null ? void 0 : data.status) === "stopped") {
           stopRunPolling();
         }
       } catch (err) {
@@ -5017,6 +5212,7 @@ Note: This will only remove them from the run, not delete them from the project.
     };
     const startRunPolling = (runId) => {
       stopRunPolling();
+      lastRunId = runId;
       pollRunStatus(runId);
       runPoller = window.setInterval(() => pollRunStatus(runId), 5e3);
     };
@@ -5024,13 +5220,33 @@ Note: This will only remove them from the run, not delete them from the project.
     if (existingRunId) {
       startRunPolling(existingRunId);
     }
+    runErrorsOnlyToggle == null ? void 0 : runErrorsOnlyToggle.addEventListener("change", () => {
+      if (lastRunId) {
+        pollRunStatus(lastRunId);
+      } else {
+        updateLogView();
+      }
+    });
+    runHistoryRefreshBtn == null ? void 0 : runHistoryRefreshBtn.addEventListener("click", fetchRunHistory);
+    runHistoryList == null ? void 0 : runHistoryList.addEventListener("click", (event) => {
+      const target = event.target;
+      const card = target == null ? void 0 : target.closest(".automation-run-card");
+      const runId = card == null ? void 0 : card.dataset.runId;
+      if (!runId) return;
+      localStorage.setItem(runStorageKey, runId);
+      startRunPolling(runId);
+      fetchRunHistory();
+    });
     fetchCaseList("api");
     fetchCaseList("web");
+    fetchRunHistory();
   }
   function init() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
     setupThemeToggle();
     updateReportMeta(void 0);
+    initManageTabs();
+    window.focusCreateTabs = focusCreateTabs;
     loadPlans().catch((err) => console.error("loadPlans error", err));
     loadManagePlans().catch((err) => console.error("loadManagePlans error", err));
     initManagement();
@@ -5100,14 +5316,18 @@ Note: This will only remove them from the run, not delete them from the project.
       e.preventDefault();
       switchView("automation");
     });
-    (_r = document.getElementById("linkHowTo")) == null ? void 0 : _r.addEventListener("click", (e) => {
+    (_r = document.getElementById("linkDataset")) == null ? void 0 : _r.addEventListener("click", (e) => {
+      e.preventDefault();
+      switchView("dataset");
+    });
+    (_s = document.getElementById("linkHowTo")) == null ? void 0 : _s.addEventListener("click", (e) => {
       e.preventDefault();
       switchView("howto");
     });
-    (_s = document.getElementById("runProject")) == null ? void 0 : _s.addEventListener("change", () => {
+    (_t = document.getElementById("runProject")) == null ? void 0 : _t.addEventListener("change", () => {
       loadManagePlans();
     });
-    (_t = document.getElementById("caseProject")) == null ? void 0 : _t.addEventListener("change", () => {
+    (_u = document.getElementById("caseProject")) == null ? void 0 : _u.addEventListener("change", () => {
       loadManagePlans();
     });
     document.querySelectorAll(".panel-toggle").forEach((btn) => {

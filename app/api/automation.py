@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import threading
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from typing import Any, Dict
 from uuid import uuid4
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
+from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel
 
 import app.core.dependencies as dependencies
@@ -30,6 +32,9 @@ _REQUEST_RE = re.compile(
 )
 _ENV_LINE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 _LOG_SCENARIO_RE = re.compile(r"^\s*Scenario(?: Outline)?:", re.IGNORECASE | re.MULTILINE)
+_LOG_ERROR_RE = re.compile(r"(error|failed|exception|traceback|cypresserror)", re.IGNORECASE)
+_CYPRESS_SPEC_LINE_RE = re.compile(r"^\s*[│|]\s*[✔✖]\s+.+$", re.MULTILINE)
+_CYPRESS_SUMMARY_RE = re.compile(r"[✔✖]\s*(\d+)\s+of\s+(\d+)\s+(?:failed|passed)", re.IGNORECASE)
 _RUNS: dict[str, dict[str, Any]] = {}
 _RUN_LOCK = threading.Lock()
 
@@ -262,13 +267,25 @@ def _normalize_payload(value: Any) -> str:
 
 def _build_run_commands(payload: AutomationRunRequest) -> list[tuple[str, str]]:
     tag = (payload.test_tag or "").strip()
+    headed_args = " -- --headed" if payload.headed else ""
     if payload.test_type == "all":
         if tag:
-            return [("api", "npm run test:tag"), ("e2e", "npm run test:tag")]
-        return [("api", "npm run test:api"), ("e2e", "npm run test:e2e")]
+            return [
+                ("api", "npm run test:tag"),
+                ("e2e", f"npm run test:tag{headed_args}"),
+            ]
+        return [
+            ("api", "npm run test:api"),
+            ("e2e", f"npm run test:e2e{headed_args}"),
+        ]
     if payload.test_type == "api":
         return [("api", "npm run test:tag" if tag else "npm run test:api")]
-    return [("e2e", "npm run test:tag" if tag else "npm run test:e2e")]
+    return [
+        (
+            "e2e",
+            f"npm run test:tag{headed_args}" if tag else f"npm run test:e2e{headed_args}",
+        )
+    ]
 
 
 def _load_env_file(path: Path) -> dict[str, str]:
@@ -312,6 +329,31 @@ def _resolve_app_root(repo_root: Path, app_name: str) -> Path:
     return app_root
 
 
+def _ensure_node_modules(repo_root: Path, env: dict[str, str]) -> None:
+    node_modules = repo_root / "node_modules"
+    if node_modules.exists():
+        return
+    auto_install = os.getenv("AUTOMATION_NPM_INSTALL", "0").strip().lower()
+    if auto_install in {"1", "true", "yes", "on"}:
+        subprocess.run(["/bin/bash", "-lc", "npm ci"], cwd=repo_root, env=env, check=True)
+        return
+    raise HTTPException(status_code=400, detail="Automation dependencies not installed. Run npm ci.")
+
+
+def _ensure_cypress_binary(repo_root: Path, env: dict[str, str]) -> None:
+    verify = subprocess.run(
+        ["/bin/bash", "-lc", "npx cypress verify"],
+        cwd=repo_root,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    if verify.returncode == 0:
+        return
+    subprocess.run(["/bin/bash", "-lc", "npx cypress install"], cwd=repo_root, env=env, check=True)
+
+
 def _sanitize_label(value: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9_-]+", "-", value.strip())
     cleaned = re.sub(r"-{2,}", "-", cleaned).strip("-")
@@ -351,6 +393,42 @@ def _read_log_tail(path: Path, max_bytes: int = 20000, max_lines: int = 200) -> 
     if max_lines and len(lines) > max_lines:
         lines = lines[-max_lines:]
     return lines
+
+
+def _filter_log_lines(lines: list[str], errors_only: bool) -> list[str]:
+    if not errors_only:
+        return lines
+    return [line for line in lines if _LOG_ERROR_RE.search(line)]
+
+
+def _log_has_run_finished(path: Path) -> bool:
+    for line in _read_log_tail(path):
+        if "Run Finished" in line or "Tests completed successfully" in line:
+            return True
+    return False
+
+
+def _serialize_run(run_id: str, run: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "status": run.get("status"),
+        "exit_code": run.get("exit_code"),
+        "started_at": run.get("started_at"),
+        "updated_at": run.get("updated_at"),
+        "finished_at": run.get("finished_at"),
+        "pid": run.get("pid"),
+        "command": run.get("command"),
+        "log_path": run.get("log_path"),
+        "last_log_line": run.get("last_log_line"),
+        "completed_cases": run.get("completed_cases"),
+        "total_cases": run.get("total_cases"),
+        "progress_percent": run.get("progress_percent"),
+        "app": run.get("app"),
+        "test_type": run.get("test_type"),
+        "test_tag": run.get("test_tag"),
+        "environment": run.get("environment"),
+        "headed": run.get("headed"),
+    }
 
 
 def _estimate_total_cases(payload: AutomationRunRequest, repo_root: Path) -> tuple[int | None, str | None]:
@@ -406,21 +484,46 @@ def _update_run_progress(run: dict[str, Any]) -> None:
         return
     text = chunk.decode("utf-8", errors="ignore")
     new_count = len(_LOG_SCENARIO_RE.findall(text))
+    new_count += len(_CYPRESS_SPEC_LINE_RE.findall(text))
     run["completed_cases"] = int(run.get("completed_cases", 0)) + new_count
     run["log_offset"] = new_offset
+    summary_match = _CYPRESS_SUMMARY_RE.search(text)
+    if summary_match:
+        total_specs = int(summary_match.group(2))
+        run["total_cases"] = total_specs
+        run["completed_cases"] = max(int(run.get("completed_cases", 0)), total_specs)
     lines = text.splitlines()
     if lines:
         run["last_log_line"] = lines[-1]
     run["updated_at"] = datetime.now(timezone.utc).isoformat()
 
 
+def _update_run_progress_percent(run: dict[str, Any]) -> None:
+    total_cases = run.get("total_cases")
+    completed_cases = run.get("completed_cases", 0)
+    if isinstance(total_cases, int) and total_cases > 0:
+        run["progress_percent"] = min(100, int((completed_cases / total_cases) * 100))
+    else:
+        run["progress_percent"] = None
+
+
 def _watch_run(run_id: str, process: subprocess.Popen) -> None:
     exit_code = process.wait()
-    status = "success" if exit_code == 0 else "failed"
     with _RUN_LOCK:
         run = _RUNS.get(run_id)
         if run is None:
             return
+        _update_run_progress(run)
+        _update_run_progress_percent(run)
+        log_finished = _log_has_run_finished(Path(run.get("log_path", "")))
+        stop_requested = bool(run.get("stop_requested"))
+        if stop_requested and exit_code != 0:
+            status = "stopped"
+        elif exit_code == 0:
+            status = "success"
+        else:
+            has_activity = bool(run.get("completed_cases")) or bool(run.get("total_cases")) or log_finished
+            status = "completed_with_failures" if has_activity else "failed"
         run["status"] = status
         run["exit_code"] = exit_code
         run["finished_at"] = datetime.now(timezone.utc).isoformat()
@@ -438,6 +541,7 @@ class AutomationRunRequest(BaseModel):
     test_tag: str | None = None
     environment: str = "staging"
     parallel: bool = False
+    headed: bool = False
 
 
 class AllureReportRequest(BaseModel):
@@ -567,6 +671,8 @@ def run_automation(
         raise HTTPException(status_code=400, detail="Invalid test_type.")
     if payload.environment not in {"staging", "preproduction", "production"}:
         raise HTTPException(status_code=400, detail="Invalid environment.")
+    if payload.headed and payload.test_type == "api":
+        raise HTTPException(status_code=400, detail="Headed mode is only supported for E2E runs.")
     if payload.parallel:
         raise HTTPException(status_code=400, detail="Parallel runs are not supported locally yet.")
     if not shutil.which("npm"):
@@ -586,6 +692,9 @@ def run_automation(
     env["NODE_ENV"] = payload.environment
     if tag:
         env["TAGS"] = tag
+
+    _ensure_node_modules(repo_root, env)
+    _ensure_cypress_binary(repo_root, env)
 
     command_parts = [f"NODE_ENV_TEST_TYPE={test_type} {cmd}" for test_type, cmd in commands]
     command = " && ".join(command_parts)
@@ -616,6 +725,7 @@ def run_automation(
             "test_type": payload.test_type,
             "test_tag": tag,
             "environment": payload.environment,
+            "headed": payload.headed,
             "env_path": str(env_path) if env_path else None,
             "status": "running",
             "exit_code": None,
@@ -624,6 +734,8 @@ def run_automation(
             "normalized_tag": normalized_tag,
             "log_offset": 0,
             "last_log_line": "",
+            "stop_requested": False,
+            "stop_requested_at": None,
         }
 
     thread = threading.Thread(target=_watch_run, args=(run_id, process), daemon=True)
@@ -693,22 +805,105 @@ def generate_allure_report(
     }
 
 
+@router.get("/runs")
+def list_automation_runs():
+    """List recent automation runs."""
+    with _RUN_LOCK:
+        runs = []
+        for run_id, run in _RUNS.items():
+            _update_run_progress(run)
+            _update_run_progress_percent(run)
+            runs.append(_serialize_run(run_id, run))
+
+    runs.sort(key=lambda item: item.get("started_at") or "", reverse=True)
+    return {"runs": runs}
+
+
+@router.post("/run/{run_id}/stop")
+def stop_automation_run(run_id: str, _write_enabled=Depends(require_write_enabled)):
+    """Stop a running automation process."""
+    with _RUN_LOCK:
+        run = _RUNS.get(run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found.")
+        status = run.get("status")
+        if status not in {"running", "stopping"}:
+            raise HTTPException(status_code=400, detail="Run is not active.")
+        run["status"] = "stopping"
+        run["stop_requested"] = True
+        run["stop_requested_at"] = datetime.now(timezone.utc).isoformat()
+        run["updated_at"] = run["stop_requested_at"]
+        pid = run.get("pid")
+
+    if pid:
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to stop run: {exc}")
+
+    return {"success": True, "message": "Stop requested.", "run_id": run_id}
+
+
+@router.get("/run/{run_id}/log")
+def get_automation_run_log(
+    run_id: str,
+    scope: str = "tail",
+    errors_only: bool = False,
+    download: bool = False,
+    max_lines: int = 400,
+):
+    """Fetch log output for a run."""
+    with _RUN_LOCK:
+        run = _RUNS.get(run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found.")
+        log_path = Path(run.get("log_path", ""))
+
+    if not log_path.exists():
+        raise HTTPException(status_code=404, detail="Log file not found.")
+
+    if download:
+        return FileResponse(
+            path=log_path,
+            media_type="text/plain",
+            filename=log_path.name,
+        )
+
+    if scope not in {"tail", "full"}:
+        raise HTTPException(status_code=400, detail="Invalid scope.")
+
+    if scope == "tail":
+        lines = _read_log_tail(log_path, max_lines=max_lines)
+    else:
+        try:
+            text = log_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to read log: {exc}")
+        lines = text.splitlines()
+        if max_lines and len(lines) > max_lines:
+            lines = lines[-max_lines:]
+
+    lines = _filter_log_lines(lines, errors_only)
+    return PlainTextResponse("\n".join(lines))
+
+
 @router.get("/run/{run_id}")
-def get_automation_run(run_id: str):
+def get_automation_run(run_id: str, errors_only: bool = False):
     """Get status and recent logs for a run."""
     with _RUN_LOCK:
         run = _RUNS.get(run_id)
         if not run:
             raise HTTPException(status_code=404, detail="Run not found.")
         _update_run_progress(run)
+        _update_run_progress_percent(run)
         status = run.get("status", "running")
         total_cases = run.get("total_cases")
         completed_cases = run.get("completed_cases", 0)
-        progress_percent = None
-        if isinstance(total_cases, int) and total_cases > 0:
-            progress_percent = min(100, int((completed_cases / total_cases) * 100))
+        progress_percent = run.get("progress_percent")
         log_path = Path(run.get("log_path", ""))
-        log_tail = _read_log_tail(log_path)
+        log_tail = _filter_log_lines(_read_log_tail(log_path), errors_only)
 
     return {
         "run_id": run_id,

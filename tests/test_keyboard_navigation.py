@@ -215,13 +215,13 @@ class TestKeyboardNavigationFocusManagement(BaseAPITestCase):
 
     def test_expand_create_section_focuses_toggle(self):
         """Test that focusCreateTabs focuses the Plan tab"""
-        response = self.client.get("/")
+        response = self.client.get("/assets/app.js")
         self.assertEqual(response.status_code, 200)
-        html = response.text
+        js = response.text
 
         # Verify focus management in focusCreateTabs
-        self.assertIn("focusCreateTabs", html)
-        self.assertIn("planTab.focus()", html)
+        self.assertIn("focusCreateTabs", js)
+        self.assertIn("planTab.focus()", js)
 
 
 if __name__ == "__main__":

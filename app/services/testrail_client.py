@@ -54,8 +54,15 @@ class TestRailClientService:
             session.mount("http://", adapter)
             session.mount("https://", adapter)
 
-            # Set reasonable timeouts
-            session.timeout = (10, 30)  # (connect, read) timeout
+            # Set reasonable default timeout for all session requests.
+            default_timeout = (10, 30)  # (connect, read) timeout
+            original_request = session.request
+
+            def _request_with_timeout(method, url, **kwargs):
+                kwargs.setdefault("timeout", default_timeout)
+                return original_request(method, url, **kwargs)
+
+            session.request = _request_with_timeout  # type: ignore[method-assign]
 
             # Store session reference
             if self._session is None:

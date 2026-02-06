@@ -2,7 +2,7 @@
 
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -42,7 +42,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
                 content={
                     "detail": "An unexpected error occurred",
                     "error_code": "INTERNAL_SERVER_ERROR",
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     "correlation_id": correlation_id,
                 },
                 headers={"X-Correlation-ID": correlation_id},

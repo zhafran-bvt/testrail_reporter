@@ -2,7 +2,6 @@
 
 import os
 import threading
-import time
 from pathlib import Path
 
 import requests
@@ -68,6 +67,28 @@ _keepalive_thread: threading.Thread | None = None
 _keepalive_stop = threading.Event()
 _memlog_thread: threading.Thread | None = None
 _memlog_stop = threading.Event()
+
+
+def _asset_cache_token() -> str:
+    """Use latest static/template mtime as a stable cache token."""
+    candidates = [
+        Path("templates/index.html"),
+        Path("assets/app.js"),
+        Path("assets/dashboard.js"),
+        Path("assets/dataset-nav.js"),
+        Path("assets/dataset-nav.css"),
+    ]
+    latest_mtime = 0
+    for path in candidates:
+        try:
+            if path.exists():
+                latest_mtime = max(latest_mtime, int(path.stat().st_mtime))
+        except OSError:
+            continue
+    return str(latest_mtime or 1)
+
+
+ASSET_CACHE_TOKEN = _asset_cache_token()
 
 
 def _start_keepalive():
@@ -198,7 +219,7 @@ def index(request: Request):
             "default_section_id": config.DEFAULT_SECTION_ID,
             "brand": brand,
             "logo_url": logo_url,
-            "cache_bust": int(time.time()),  # Cache-busting for JS/CSS files
+            "cache_bust": ASSET_CACHE_TOKEN,
         },
     )
 
